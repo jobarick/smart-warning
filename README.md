@@ -5,16 +5,28 @@ A web app (PWA) for instant emergency alerts across all connected devices — de
 ## Structure
 
 - `server/` — Node.js WebSocket relay (port **3001**). Broadcasts every alert / all-clear to all connected clients and tracks how many devices are online.
-- `client/` — React + TypeScript + Vite PWA (dev port **5175**). Trigger panel, warning settings, alert overlay, and history log.
+- `server-python/` — **Python (FastAPI + uvicorn) relay** — a drop-in equivalent of the Node relay: same WebSocket protocol, same JSON messages, same port 3001. Use *either* server, not both (they both bind 3001).
+- `client/` — React + TypeScript + Vite PWA (dev port **5300**). Trigger panel, warning settings, alert overlay, and history log.
 
 ## Run
 
+Pick one relay server:
+
 ```
+# Option A — Node relay
 cd server && npm install && npm start
+
+# Option B — Python relay (FastAPI + uvicorn)
+cd server-python && pip install -r requirements.txt && uvicorn relay:app --host 0.0.0.0 --port 3001
+```
+
+Then start the client:
+
+```
 cd client && npm install && npm run dev
 ```
 
-Open `http://localhost:5175`. Other devices on the same Wi-Fi can open `http://<your-PC-LAN-IP>:5175` — the client automatically connects its WebSocket to the same host on port 3001.
+Open `http://localhost:5300`. Other devices on the same Wi-Fi can open `http://<your-PC-LAN-IP>:5300` — the client automatically connects its WebSocket to the same host on port 3001.
 
 ## Features
 
