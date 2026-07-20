@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { AlertType, Severity } from '../types';
 import { ALERT_META, SEVERITY_META } from '../types';
+import { Icon } from './Icon';
 
 interface Props {
   onTrigger: (type: AlertType, severity: Severity, message: string) => void;
@@ -16,7 +17,7 @@ export function TriggerPanel({ onTrigger, disabled }: Props) {
 
   return (
     <section className="panel">
-      <h2>Trigger alert</h2>
+      <h2>Trigger emergency warning</h2>
       <div className="sev-row" role="radiogroup" aria-label="Severity">
         {SEVERITIES.map((s) => (
           <button
@@ -49,12 +50,13 @@ export function TriggerPanel({ onTrigger, disabled }: Props) {
               disabled={disabled}
               onClick={() => onTrigger(t, severity, message.trim())}
             >
-              <span className="trigger-icon">{meta.icon}</span>
+              <Icon name={meta.icon} className="trigger-icon" style={{ color: meta.color }} />
               <span>{meta.label}</span>
             </button>
           );
         })}
       </div>
+      <p className="hint">Choose the threat type and severity to flash red screen edges, trigger sirens, and warn workers or security crews.</p>
       {disabled && <p className="hint">An alert is already active — send all clear before triggering a new one.</p>}
     </section>
   );

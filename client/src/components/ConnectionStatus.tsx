@@ -1,4 +1,5 @@
 import type { SocketStatus } from '../hooks/useAlertSocket';
+import { Icon } from './Icon';
 
 interface Props {
   status: SocketStatus;
@@ -17,7 +18,7 @@ export function ConnectionStatus({ status, deviceCount, audioArmed, onArmAudio }
   return (
     <div className="status-bar">
       <div className="brand">
-        <span className="brand-icon">🚨</span>
+        <Icon name="siren" className="brand-icon" />
         <span className="brand-name">Smart Emergency Warning</span>
       </div>
       <div className="status-items">
@@ -31,10 +32,12 @@ export function ConnectionStatus({ status, deviceCount, audioArmed, onArmAudio }
           </span>
         )}
         {audioArmed ? (
-          <span className="audio-ok" title="Sirens can play on this device">🔊 Sound ready</span>
+          <span className="audio-ok" title="Sirens can play on this device">
+            <Icon name="volume" /> Sound ready
+          </span>
         ) : (
           <button className="btn btn-arm" onClick={onArmAudio}>
-            🔇 Tap to enable sound
+            <Icon name="volume-off" /> Tap to enable sound
           </button>
         )}
       </div>

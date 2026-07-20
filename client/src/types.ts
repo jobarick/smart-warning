@@ -40,20 +40,22 @@ export interface Settings {
   autoFullscreen: boolean;
 }
 
+import type { IconName } from './components/Icon';
+
 export interface AlertTypeMeta {
   label: string;
-  icon: string;
+  icon: IconName;
   color: string;
   tone: SirenTone;
 }
 
 export const ALERT_META: Record<AlertType, AlertTypeMeta> = {
-  fire: { label: 'Fire', icon: '🔥', color: '#ff3b30', tone: 'wail' },
-  medical: { label: 'Medical', icon: '🚑', color: '#ff375f', tone: 'hilo' },
-  security: { label: 'Security', icon: '🚨', color: '#d70015', tone: 'yelp' },
-  hazard: { label: 'Hazard', icon: '⚠️', color: '#ff9500', tone: 'pulse' },
-  cyber: { label: 'Cyber Threat', icon: '🛡️', color: '#bf5af2', tone: 'pulse' },
-  evacuation: { label: 'Evacuation', icon: '🏃', color: '#ff453a', tone: 'hilo' },
+  fire: { label: 'Fire', icon: 'flame', color: '#ff3b30', tone: 'wail' },
+  medical: { label: 'Medical', icon: 'medical', color: '#ff375f', tone: 'hilo' },
+  security: { label: 'Security', icon: 'lock', color: '#d70015', tone: 'yelp' },
+  hazard: { label: 'Hazard', icon: 'hazard', color: '#ff9500', tone: 'pulse' },
+  cyber: { label: 'Cyber Threat', icon: 'shield-alert', color: '#bf5af2', tone: 'pulse' },
+  evacuation: { label: 'Evacuation', icon: 'exit', color: '#ff453a', tone: 'hilo' },
 };
 
 export const SEVERITY_META: Record<Severity, { label: string; rank: number }> = {

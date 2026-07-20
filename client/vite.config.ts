@@ -14,12 +14,12 @@ export default defineConfig({
         short_name: 'Alert System',
         description:
           'Instant emergency alerts with red warning border, flashing lights, and customizable sirens across all connected devices.',
-        theme_color: '#ffffff',
-        background_color: '#ffffff',
+        theme_color: '#060608',
+        background_color: '#060608',
         display: 'standalone',
         icons: [{ src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
       },
     }),
   ],
-  server: { host: true, port: 5175, strictPort: true },
+  server: { host: true, port: 5300, strictPort: true },
 });

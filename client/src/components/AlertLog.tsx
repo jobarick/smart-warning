@@ -1,5 +1,6 @@
 import type { LogEntry } from '../types';
 import { ALERT_META, SEVERITY_META } from '../types';
+import { Icon } from './Icon';
 
 export function AlertLog({ entries }: { entries: LogEntry[] }) {
   return (
@@ -14,7 +15,7 @@ export function AlertLog({ entries }: { entries: LogEntry[] }) {
               <span className="log-time">{new Date(e.timestamp).toLocaleTimeString()}</span>
               {e.kind === 'alert' && e.type && e.severity ? (
                 <>
-                  <span className="log-icon">{ALERT_META[e.type].icon}</span>
+                  <Icon name={ALERT_META[e.type].icon} className="log-icon" style={{ color: ALERT_META[e.type].color }} />
                   <span className="log-text">
                     <strong style={{ color: ALERT_META[e.type].color }}>{ALERT_META[e.type].label}</strong>{' '}
                     ({SEVERITY_META[e.severity].label}){e.message ? ` — ${e.message}` : ''}
@@ -22,7 +23,7 @@ export function AlertLog({ entries }: { entries: LogEntry[] }) {
                 </>
               ) : (
                 <>
-                  <span className="log-icon">✅</span>
+                  <Icon name="check-circle" className="log-icon" style={{ color: '#30d158' }} />
                   <span className="log-text">All clear</span>
                 </>
               )}

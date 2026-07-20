@@ -1,5 +1,6 @@
 import type { Settings, SirenTone } from '../types';
 import { SAFE_FLASH_RATE } from '../lib/settings';
+import { Icon } from './Icon';
 
 interface Props {
   settings: Settings;
@@ -22,9 +23,10 @@ export function SettingsPanel({ settings, onChange, onTestSiren, onTestAlarm, si
 
   return (
     <section className="panel">
-      <h2>Warning settings</h2>
+      <h2>Emergency controls</h2>
 
-      <label className="field">
+      <div className="fields-grid">
+      <label className="field field-wide">
         <span>Device name</span>
         <input
           type="text"
@@ -80,7 +82,7 @@ export function SettingsPanel({ settings, onChange, onTestSiren, onTestAlarm, si
         />
       </label>
 
-      <label className="field field-check">
+      <label className="field field-check field-wide">
         <input
           type="checkbox"
           checked={settings.allowFastStrobe}
@@ -134,13 +136,22 @@ export function SettingsPanel({ settings, onChange, onTestSiren, onTestAlarm, si
         />
         <span>Go fullscreen when an alert fires</span>
       </label>
+      </div>
 
       <div className="settings-actions">
         <button className="btn" onClick={onTestSiren}>
-          {sirenTesting ? '⏹ Stop siren test' : '🔊 Test siren'}
+          {sirenTesting ? (
+            <>
+              <Icon name="stop" /> Stop siren test
+            </>
+          ) : (
+            <>
+              <Icon name="volume" /> Test siren
+            </>
+          )}
         </button>
         <button className="btn" onClick={onTestAlarm}>
-          🧪 Test alarm (this device only)
+          <Icon name="flask" /> Test alarm (this device only)
         </button>
       </div>
     </section>
