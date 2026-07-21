@@ -593,6 +593,41 @@ body {
   }
 }
 
+/* Silent mode: no siren, so the flash has to carry the alert on its own —
+   a fast alternating red/white beacon, distinct from the pulse/strobe used
+   when sound is also playing, and readable from across a room. */
+.overlay-beacon {
+  position: absolute;
+  inset: 0;
+}
+
+.overlay-beacon-a {
+  background: var(--alert-color);
+  animation: beaconFlash var(--flash-dur) steps(1) infinite;
+}
+
+.overlay-beacon-b {
+  background: #ffffff;
+  animation: beaconFlash var(--flash-dur) steps(1) infinite reverse;
+}
+
+@keyframes beaconFlash {
+  0%,
+  49% {
+    opacity: max(var(--alpha), 0.75);
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.overlay-silent .overlay-border {
+  box-shadow:
+    inset 0 0 0 var(--border-w) var(--alert-color),
+    inset 0 0 calc(var(--border-w) * 3.5) calc(var(--border-w) * 0.9) #ffffff;
+}
+
 .overlay-card {
   position: relative;
   z-index: 1;

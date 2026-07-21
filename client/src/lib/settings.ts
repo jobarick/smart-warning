@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS: Settings = {
   volume: 0.7,
   vibration: true,
   autoFullscreen: false,
+  silentMode: false,
 };
 
 export function loadSettings(): Settings {

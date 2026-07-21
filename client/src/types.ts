@@ -1,6 +1,6 @@
 export type AlertType = 'fire' | 'medical' | 'security' | 'hazard' | 'cyber' | 'evacuation';
 export type Severity = 'low' | 'medium' | 'high' | 'critical';
-export type SirenTone = 'wail' | 'yelp' | 'hilo' | 'pulse';
+export type SirenTone = 'wail' | 'yelp' | 'hilo' | 'pulse' | 'phaser';
 export type FlashMode = 'none' | 'pulse' | 'strobe';
 
 export interface AlertMessage {
@@ -38,6 +38,7 @@ export interface Settings {
   volume: number; // 0–1
   vibration: boolean;
   autoFullscreen: boolean;
+  silentMode: boolean; // flash/border/vibration only — no siren, regardless of severity
 }
 
 import type { IconName } from './components/Icon';
@@ -55,7 +56,7 @@ export const ALERT_META: Record<AlertType, AlertTypeMeta> = {
   security: { label: 'Security', icon: 'lock', color: '#d70015', tone: 'yelp' },
   hazard: { label: 'Hazard', icon: 'hazard', color: '#ff9500', tone: 'pulse' },
   cyber: { label: 'Cyber Threat', icon: 'shield-alert', color: '#bf5af2', tone: 'pulse' },
-  evacuation: { label: 'Evacuation', icon: 'exit', color: '#ff453a', tone: 'hilo' },
+  evacuation: { label: 'Evacuation', icon: 'exit', color: '#ff453a', tone: 'phaser' },
 };
 
 export const SEVERITY_META: Record<Severity, { label: string; rank: number }> = {

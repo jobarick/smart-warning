@@ -101,12 +101,13 @@ export default function App() {
 
   // Which tone should be sounding right now (alarm takes priority over testing).
   const activeTone: SirenTone | null = useMemo(() => {
+    if (settings.silentMode) return null;
     if (alarm.alert && !alarm.acknowledged && severityWants(alarm.alert.severity).siren) {
       return settings.sirenTone === 'auto' ? ALERT_META[alarm.alert.type].tone : settings.sirenTone;
     }
     if (sirenTesting) return settings.sirenTone === 'auto' ? 'wail' : settings.sirenTone;
     return null;
-  }, [alarm, sirenTesting, settings.sirenTone]);
+  }, [alarm, sirenTesting, settings.sirenTone, settings.silentMode]);
 
   useEffect(() => {
     if (activeTone && armed) {

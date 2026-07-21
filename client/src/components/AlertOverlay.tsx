@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { AlertMessage, Settings } from '../types';
 import { ALERT_META, SEVERITY_META, severityWants } from '../types';
-import { effectiveFlashRate } from '../lib/settings';
+import { effectiveFlashRate, SAFE_FLASH_RATE } from '../lib/settings';
 import { Icon } from './Icon';
 
 interface Props {
@@ -40,8 +40,11 @@ export function AlertOverlay({ alert, acknowledged, settings, onAcknowledge, onA
 
   const meta = ALERT_META[alert.type];
   const wants = severityWants(alert.severity);
-  const flashMode = acknowledged || !wants.flash ? 'none' : settings.flashMode;
-  const rate = effectiveFlashRate(settings);
+  // Silent mode has no siren, so the flash IS the alert — always beacon, regardless of
+  // severity/flash-pattern settings, and as fast/bright as the seizure-safety cap allows.
+  const silentBeacon = settings.silentMode && !acknowledged;
+  const flashMode = acknowledged || (!silentBeacon && !wants.flash) ? 'none' : settings.flashMode;
+  const rate = silentBeacon ? (settings.allowFastStrobe ? 10 : SAFE_FLASH_RATE) : effectiveFlashRate(settings);
 
   const style = {
     '--border-w': `${settings.borderThickness}px`,
@@ -52,9 +55,18 @@ export function AlertOverlay({ alert, acknowledged, settings, onAcknowledge, onA
   } as React.CSSProperties;
 
   return (
-    <div className="overlay" style={style}>
-      {flashMode === 'strobe' && <div className="overlay-strobe" />}
-      {flashMode === 'pulse' && <div className="overlay-flash-bg" />}
+    <div className={`overlay ${silentBeacon ? 'overlay-silent' : ''}`} style={style}>
+      {silentBeacon ? (
+        <>
+          <div className="overlay-beacon overlay-beacon-a" />
+          <div className="overlay-beacon overlay-beacon-b" />
+        </>
+      ) : (
+        <>
+          {flashMode === 'strobe' && <div className="overlay-strobe" />}
+          {flashMode === 'pulse' && <div className="overlay-flash-bg" />}
+        </>
+      )}
       <div className="overlay-edge-bars" aria-hidden="true">
         <span className="edge-strip edge-top" />
         <span className="edge-strip edge-right" />

@@ -16,6 +16,7 @@ const TONES: { value: Settings['sirenTone']; label: string }[] = [
   { value: 'yelp', label: 'Yelp (fast sweep)' },
   { value: 'hilo', label: 'Hi-lo two-tone' },
   { value: 'pulse', label: 'Pulse beep' },
+  { value: 'phaser', label: 'Phaser sweep' },
 ];
 
 export function SettingsPanel({ settings, onChange, onTestSiren, onTestAlarm, sirenTesting }: Props) {
@@ -94,10 +95,22 @@ export function SettingsPanel({ settings, onChange, onTestSiren, onTestAlarm, si
         </span>
       </label>
 
+      <label className="field field-check field-wide">
+        <input
+          type="checkbox"
+          checked={settings.silentMode}
+          onChange={(e) => onChange({ silentMode: e.target.checked })}
+        />
+        <span>
+          Silent mode — <em>flash and border only, no siren on this device</em>
+        </span>
+      </label>
+
       <label className="field">
         <span>Siren tone</span>
         <select
           value={settings.sirenTone}
+          disabled={settings.silentMode}
           onChange={(e) => onChange({ sirenTone: e.target.value as 'auto' | SirenTone })}
         >
           {TONES.map((t) => (
@@ -114,6 +127,7 @@ export function SettingsPanel({ settings, onChange, onTestSiren, onTestAlarm, si
           type="range"
           min={0}
           max={100}
+          disabled={settings.silentMode}
           value={Math.round(settings.volume * 100)}
           onChange={(e) => onChange({ volume: Number(e.target.value) / 100 })}
         />
@@ -139,7 +153,7 @@ export function SettingsPanel({ settings, onChange, onTestSiren, onTestAlarm, si
       </div>
 
       <div className="settings-actions">
-        <button className="btn" onClick={onTestSiren}>
+        <button className="btn" onClick={onTestSiren} disabled={settings.silentMode}>
           {sirenTesting ? (
             <>
               <Icon name="stop" /> Stop siren test

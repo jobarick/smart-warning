@@ -15,6 +15,7 @@ const TONES: Record<SirenTone, ToneSpec> = {
   yelp: { wave: 'sawtooth', baseFreq: 700, lfoWave: 'sine', lfoFreq: 4, lfoDepth: 250, mode: 'fm' },
   hilo: { wave: 'square', baseFreq: 540, lfoWave: 'square', lfoFreq: 1, lfoDepth: 120, mode: 'fm' },
   pulse: { wave: 'square', baseFreq: 880, lfoWave: 'square', lfoFreq: 3, lfoDepth: 0.5, mode: 'am' },
+  phaser: { wave: 'triangle', baseFreq: 460, lfoWave: 'sawtooth', lfoFreq: 0.6, lfoDepth: 260, mode: 'fm' },
 };
 
 class SirenEngine {
