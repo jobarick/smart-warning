@@ -4,6 +4,9 @@ const http = require('http');
 const { WebSocketServer } = require('ws');
 
 const PORT = process.env.PORT || 3001;
+// If set, clients must present this shared token before the relay accepts or
+// delivers any message to them. Unset = open (only safe on a trusted LAN).
+const TOKEN = process.env.RELAY_TOKEN || '';
 
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
@@ -15,8 +18,14 @@ const wss = new WebSocketServer({ server });
 function broadcast(obj) {
   const data = JSON.stringify(obj);
   for (const client of wss.clients) {
-    if (client.readyState === 1) client.send(data);
+    if (client.readyState === 1 && client.authed) client.send(data);
   }
+}
+
+function authedCount() {
+  let n = 0;
+  for (const ws of wss.clients) if (ws.readyState === 1 && ws.authed) n++;
+  return n;
 }
 
 const STATUSES = new Set(['safe', 'sos', 'idle']);
@@ -45,7 +54,7 @@ function sanitizeWorker(msg, connId) {
 function rosterList() {
   const workers = [];
   for (const ws of wss.clients) {
-    if (ws.readyState === 1 && ws.worker) workers.push(ws.worker);
+    if (ws.readyState === 1 && ws.authed && ws.worker) workers.push(ws.worker);
   }
   return workers;
 }
@@ -60,15 +69,36 @@ wss.on('connection', (ws, req) => {
   ws.isAlive = true;
   ws.connId = nextId++;
   ws.worker = null;
+  ws.authed = !TOKEN; // open when no token is configured
   ws.on('pong', () => { ws.isAlive = true; });
 
+  // When a token is required, drop the connection unless it authenticates promptly.
+  const authTimer = TOKEN
+    ? setTimeout(() => { if (!ws.authed) ws.close(4001, 'authentication required'); }, 5000)
+    : null;
+
   console.log(`[+] client #${ws.connId} connected from ${req.socket.remoteAddress} (${wss.clients.size} online)`);
-  broadcast({ kind: 'presence', count: wss.clients.size });
+  if (ws.authed) broadcast({ kind: 'presence', count: authedCount() });
 
   ws.on('message', (raw) => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
     if (!msg || typeof msg.kind !== 'string') return;
+
+    if (msg.kind === 'auth') {
+      if (TOKEN && msg.token === TOKEN) {
+        ws.authed = true;
+        clearTimeout(authTimer);
+        console.log(`[+] client #${ws.connId} authenticated`);
+        broadcast({ kind: 'presence', count: authedCount() });
+        broadcastRoster();
+      } else {
+        ws.close(4001, 'invalid token');
+      }
+      return;
+    }
+
+    if (!ws.authed) return; // ignore all traffic until authenticated
 
     if (msg.kind === 'alert' || msg.kind === 'all-clear') {
       if (msg.kind === 'alert') {
@@ -88,8 +118,9 @@ wss.on('connection', (ws, req) => {
   });
 
   ws.on('close', () => {
+    clearTimeout(authTimer);
     console.log(`[-] client #${ws.connId} disconnected (${wss.clients.size} online)`);
-    broadcast({ kind: 'presence', count: wss.clients.size });
+    broadcast({ kind: 'presence', count: authedCount() });
     broadcastRoster();
   });
 });

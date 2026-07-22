@@ -53,6 +53,9 @@ export function useAlertSocket(onMessage: (m: WireMessage) => void, getSelfInfo?
       ws.onopen = () => {
         retries = 0;
         setStatus('open');
+        // Authenticate first if a shared token is configured for this build.
+        const token = import.meta.env.VITE_RELAY_TOKEN as string | undefined;
+        if (token) ws.send(JSON.stringify({ kind: 'auth', token }));
         const info = getSelfInfoRef.current?.();
         if (info) ws.send(JSON.stringify({ kind: 'hello', ...info }));
         beat = window.setInterval(() => {

@@ -47,8 +47,15 @@ a `/` health check, so it runs as-is on Render, Railway, Fly.io, etc.
 **3. Point the client at the relay.** On the Vercel project, set an environment
 variable `VITE_WS_URL` to the relay's public URL, e.g.
 `wss://smart-warning-relay.onrender.com`, and redeploy. Without it the client
-falls back to `ws(s)://<same-host>:3001` (the LAN behaviour). Note: the relay
-still has no auth — add a shared token before any real-world use.
+falls back to `ws(s)://<same-host>:3001` (the LAN behaviour).
+
+**4. Secure it with a shared token.** Pick a long random string. Set it as
+`RELAY_TOKEN` on the relay host **and** as `VITE_RELAY_TOKEN` on Vercel (same
+value), then redeploy both. The relay then rejects any client that doesn't
+present the token, so a stranger who finds the URL can't trigger alerts. Leave
+both unset only for a trusted LAN. See `client/.env.example` and
+`server/.env.example`. (This is a shared secret, not per-user accounts — full
+auth comes with the backend phase.)
 
 ## Features
 
