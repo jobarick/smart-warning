@@ -14,13 +14,14 @@ export const DEFAULT_SETTINGS: Settings = {
   vibration: true,
   autoFullscreen: false,
   silentMode: false,
-  shareLocation: false,
+  shareLocation: true,
   zone: '',
   profileId: 'generic',
   operatorId: '',
   assemblyLat: null,
   assemblyLng: null,
   assemblyLabel: 'Assembly point',
+  theme: 'dark',
 };
 
 /** Build a stable operator ID from a name, e.g. "Samirah A." → "SA-2026-0017". */

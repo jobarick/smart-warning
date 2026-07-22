@@ -46,6 +46,11 @@ export default function App() {
   useEffect(() => saveSettings(settings), [settings]);
   useEffect(() => localStorage.setItem(VIEW_KEY, view), [view]);
 
+  // Black or white background — applied to the document root so tokens flip.
+  useEffect(() => {
+    document.documentElement.dataset.theme = settings.theme;
+  }, [settings.theme]);
+
   // Assign a stable operator ID the first time (or if the name is set and none exists).
   useEffect(() => {
     if (!settings.operatorId) setSettings((s) => ({ ...s, operatorId: makeOperatorId(s.deviceName) }));
@@ -250,6 +255,9 @@ export default function App() {
         onArmAudio={() => void arm()}
         view={view}
         onViewChange={setView}
+        userName={settings.deviceName}
+        theme={settings.theme}
+        onToggleTheme={() => patchSettings({ theme: settings.theme === 'dark' ? 'light' : 'dark' })}
       />
 
       {view === 'command' ? (

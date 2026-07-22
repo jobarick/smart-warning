@@ -10,6 +10,9 @@ interface Props {
   onArmAudio: () => void;
   view: AppView;
   onViewChange: (v: AppView) => void;
+  userName: string;
+  theme: 'dark' | 'light';
+  onToggleTheme: () => void;
 }
 
 const STATUS_LABEL: Record<SocketStatus, string> = {
@@ -18,7 +21,7 @@ const STATUS_LABEL: Record<SocketStatus, string> = {
   closed: 'Offline — retrying',
 };
 
-export function ConnectionStatus({ status, deviceCount, audioArmed, onArmAudio, view, onViewChange }: Props) {
+export function ConnectionStatus({ status, deviceCount, audioArmed, onArmAudio, view, onViewChange, userName, theme, onToggleTheme }: Props) {
   return (
     <div className="status-bar">
       <div className="brand">
@@ -27,13 +30,21 @@ export function ConnectionStatus({ status, deviceCount, audioArmed, onArmAudio, 
       </div>
       <div className="view-toggle" role="tablist" aria-label="View">
         <button role="tab" aria-selected={view === 'worker'} className={view === 'worker' ? 'active' : ''} onClick={() => onViewChange('worker')}>
-          Worker
+          {userName.trim() || 'Me'}
         </button>
         <button role="tab" aria-selected={view === 'command'} className={view === 'command' ? 'active' : ''} onClick={() => onViewChange('command')}>
-          Command
+          Supervisor
         </button>
       </div>
       <div className="status-items">
+        <button
+          className="theme-toggle"
+          onClick={onToggleTheme}
+          aria-label={theme === 'dark' ? 'Switch to light background' : 'Switch to dark background'}
+          title={theme === 'dark' ? 'Light background' : 'Dark background'}
+        >
+          <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
+        </button>
         <span className={`conn conn-${status}`}>
           <span className="conn-dot" />
           {STATUS_LABEL[status]}
