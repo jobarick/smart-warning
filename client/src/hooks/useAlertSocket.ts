@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { WireMessage } from '../types';
+import { parseWireMessage } from '../lib/validate';
 
 export type SocketStatus = 'connecting' | 'open' | 'closed';
 
@@ -28,12 +29,16 @@ export function useAlertSocket(onMessage: (m: WireMessage) => void) {
         setStatus('open');
       };
       ws.onmessage = (e) => {
-        let msg: WireMessage;
+        let raw: unknown;
         try {
-          msg = JSON.parse(e.data);
+          raw = JSON.parse(e.data);
         } catch {
           return;
         }
+        // Never trust the relay: a malformed type/severity used to crash every
+        // connected client. Drop anything that doesn't match the schema.
+        const msg = parseWireMessage(raw);
+        if (!msg) return;
         if (msg.kind === 'presence') setDeviceCount(msg.count);
         onMessageRef.current(msg);
       };
