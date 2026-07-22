@@ -60,6 +60,17 @@ export function SettingsPanel({ settings, onChange, onTestSiren, onTestAlarm, si
         />
       </label>
 
+      <label className="field">
+        <span>Operator ID</span>
+        <input
+          type="text"
+          value={settings.operatorId}
+          maxLength={24}
+          placeholder="e.g. SA-2026-0017"
+          onChange={(e) => onChange({ operatorId: e.target.value })}
+        />
+      </label>
+
       <label className="field field-check field-wide">
         <input
           type="checkbox"
@@ -69,6 +80,39 @@ export function SettingsPanel({ settings, onChange, onTestSiren, onTestAlarm, si
         <span>
           Share my location — <em>sends GPS coordinates to the command view so a supervisor can find you</em>
         </span>
+      </label>
+
+      <label className="field field-wide">
+        <span>Assembly / safe zone name</span>
+        <input
+          type="text"
+          value={settings.assemblyLabel}
+          maxLength={40}
+          placeholder="e.g. Main Gate, Assembly Point B"
+          onChange={(e) => onChange({ assemblyLabel: e.target.value })}
+        />
+      </label>
+
+      <label className="field">
+        <span>Assembly latitude</span>
+        <input
+          type="number"
+          step="0.000001"
+          value={settings.assemblyLat ?? ''}
+          placeholder="-6.792354"
+          onChange={(e) => onChange({ assemblyLat: e.target.value === '' ? null : Number(e.target.value) })}
+        />
+      </label>
+
+      <label className="field">
+        <span>Assembly longitude</span>
+        <input
+          type="number"
+          step="0.000001"
+          value={settings.assemblyLng ?? ''}
+          placeholder="39.208328"
+          onChange={(e) => onChange({ assemblyLng: e.target.value === '' ? null : Number(e.target.value) })}
+        />
       </label>
 
       <label className="field">

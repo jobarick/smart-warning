@@ -79,6 +79,10 @@ export interface Settings {
   shareLocation: boolean; // opt-in GPS — sends lat/long to the command roster
   zone: string; // area/zone this device is working in (shown to the supervisor)
   profileId: string; // active industry profile — relabels alert types + protocols
+  operatorId: string; // stable per-operator identifier, e.g. "SA-2026-0017"
+  assemblyLat: number | null; // assembly / safe-zone coordinates
+  assemblyLng: number | null;
+  assemblyLabel: string; // name of the assembly point
 }
 
 import type { IconName } from './components/Icon';
@@ -133,4 +137,7 @@ export interface LogEntry {
   sender: string;
   timestamp: number;
   mine: boolean;
+  durationMs?: number; // how long the alarm stayed active (set on all-clear)
+  lat?: number | null; // where the alert was raised (if location was shared)
+  lng?: number | null;
 }

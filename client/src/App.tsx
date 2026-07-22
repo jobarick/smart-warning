@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AlertMessage, AlertType, AllClearMessage, LogEntry, Severity, SirenTone, WireMessage, WorkerInfo } from './types';
 import { ALERT_META, severityWants } from './types';
-import { loadSettings, saveSettings } from './lib/settings';
+import { loadSettings, saveSettings, makeOperatorId } from './lib/settings';
 import { startVibration, stopVibration } from './lib/haptics';
 import { useAlertSocket } from './hooks/useAlertSocket';
 import { useAlarmState } from './hooks/useAlarmState';
 import { useSiren } from './hooks/useSiren';
 import { useSelfTelemetry } from './hooks/useSelfTelemetry';
+import { useNetworkStatus } from './hooks/useNetworkStatus';
 import { AlertOverlay } from './components/AlertOverlay';
+import { OperatorStatus } from './components/OperatorStatus';
 import { SosPanel } from './components/SosPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 import { ConnectionStatus, type AppView } from './components/ConnectionStatus';
@@ -29,16 +31,28 @@ export default function App() {
   const profile = useMemo(() => getProfile(settings.profileId), [settings.profileId]);
   const sessionId = useRef<string>(crypto.randomUUID());
   const telemetry = useSelfTelemetry(settings.shareLocation);
+  const network = useNetworkStatus();
+  const telemetryRef = useRef(telemetry);
+  telemetryRef.current = telemetry;
+  const activeAlertLogRef = useRef<{ id: string; startedAt: number } | null>(null);
+
+  // One-second tick that drives the response-time lap timer.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => saveSettings(settings), [settings]);
   useEffect(() => localStorage.setItem(VIEW_KEY, view), [view]);
 
+  // Assign a stable operator ID the first time (or if the name is set and none exists).
+  useEffect(() => {
+    if (!settings.operatorId) setSettings((s) => ({ ...s, operatorId: makeOperatorId(s.deviceName) }));
+  }, [settings.operatorId]);
+
   const patchSettings = useCallback((patch: Partial<typeof settings>) => {
     setSettings((s) => ({ ...s, ...patch }));
-  }, []);
-
-  const addLog = useCallback((entry: Omit<LogEntry, 'id'>) => {
-    setLog((l) => [{ ...entry, id: crypto.randomUUID() }, ...l].slice(0, 50));
   }, []);
 
   const handleWire = useCallback(
@@ -46,21 +60,48 @@ export default function App() {
       if (m.kind === 'alert') {
         setSirenTesting(false);
         dispatch({ type: 'RAISE', alert: m });
-        addLog({
-          kind: 'alert',
-          type: m.type,
-          severity: m.severity,
-          message: m.message,
-          sender: m.sender,
-          timestamp: m.timestamp,
-          mine: m.sender === settings.deviceName,
-        });
+        const id = crypto.randomUUID();
+        activeAlertLogRef.current = { id, startedAt: m.timestamp };
+        const tel = telemetryRef.current;
+        setLog((l) =>
+          [
+            {
+              id,
+              kind: 'alert' as const,
+              type: m.type,
+              severity: m.severity,
+              message: m.message,
+              sender: m.sender,
+              timestamp: m.timestamp,
+              mine: m.sender === settings.deviceName,
+              lat: tel.lat,
+              lng: tel.lng,
+            },
+            ...l,
+          ].slice(0, 50),
+        );
       } else if (m.kind === 'all-clear') {
         dispatch({ type: 'CLEAR' });
-        addLog({ kind: 'all-clear', sender: m.sender, timestamp: m.timestamp, mine: m.sender === settings.deviceName });
+        const active = activeAlertLogRef.current;
+        activeAlertLogRef.current = null;
+        setLog((l) => {
+          const patched = active
+            ? l.map((e) => (e.id === active.id ? { ...e, durationMs: m.timestamp - active.startedAt } : e))
+            : l;
+          return [
+            {
+              id: crypto.randomUUID(),
+              kind: 'all-clear' as const,
+              sender: m.sender,
+              timestamp: m.timestamp,
+              mine: m.sender === settings.deviceName,
+            },
+            ...patched,
+          ].slice(0, 50);
+        });
       }
     },
-    [dispatch, addLog, settings.deviceName],
+    [dispatch, settings.deviceName],
   );
 
   // This device's own status for the shared roster: 'sos' while an alert it
@@ -237,6 +278,16 @@ export default function App() {
         </main>
       ) : (
         <main className="worker">
+          <OperatorStatus
+            name={settings.deviceName}
+            operatorId={settings.operatorId}
+            telemetry={telemetry}
+            network={network}
+            shareLocation={settings.shareLocation}
+            assembly={{ lat: settings.assemblyLat, lng: settings.assemblyLng, label: settings.assemblyLabel }}
+            alarm={alarm}
+            now={now}
+          />
           <SosPanel profile={profile} disabled={alarmActive} onTrigger={trigger} />
           <div className="worker-tools">
             <button className="btn settings-link" onClick={() => setShowSettings(true)}>

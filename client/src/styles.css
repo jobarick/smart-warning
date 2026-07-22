@@ -426,8 +426,8 @@ body {
 
 .log-item {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  flex-direction: column;
+  gap: 4px;
   font-size: 0.84rem;
   padding: 8px 11px;
   background: var(--bg-2);
@@ -1182,3 +1182,69 @@ body {
 @media (prefers-reduced-motion: no-preference) {
   .sos-btn:not(:disabled) .sos-btn-sos { animation: cmd-beat 1.6s ease-in-out infinite; }
 }
+
+/* log entry: main row + optional meta row */
+.log-main { display: flex; align-items: baseline; gap: 10px; }
+.log-meta {
+  display: flex;
+  gap: 14px;
+  padding-left: 2px;
+  font-size: 0.74rem;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Operator status card ─────────────────────────────── */
+.op {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 18px 20px;
+}
+.op-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.op-hello { font-size: 0.86rem; color: var(--muted); }
+.op-name { font-size: 1.5rem; font-weight: 700; line-height: 1.1; letter-spacing: -0.01em; }
+.op-id { font-size: 0.78rem; color: var(--faint); font-family: var(--mono); }
+.op-badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 0.78rem; font-weight: 600; padding: 6px 12px; border-radius: 999px; flex: none;
+}
+.op-badge-dot { width: 8px; height: 8px; border-radius: 50%; }
+.op-badge.safe { background: var(--safe-bg, rgba(48,209,88,0.13)); color: var(--cmd-safe); }
+.op-badge.safe .op-badge-dot { background: var(--cmd-safe); }
+.op-badge.danger { background: var(--crit-bg, rgba(255,69,58,0.13)); color: var(--cmd-crit); }
+.op-badge.danger .op-badge-dot { background: var(--cmd-crit); }
+
+.op-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  margin-top: 16px;
+}
+.op-tile {
+  background: var(--panel-2);
+  border: 1px solid var(--panel-border);
+  border-radius: 11px;
+  padding: 11px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.op-tile-wide { grid-column: 1 / -1; }
+.op-tile-active { border-color: rgba(255, 69, 58, 0.5); }
+.op-t-lbl {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--faint); font-weight: 600;
+}
+.op-t-lbl svg { font-size: 0.9rem; }
+.op-tile b { font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.op-mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.op-muted { color: var(--muted); font-weight: 500; font-size: 0.9rem; }
+.op-dir { font-size: 0.8rem; font-weight: 500; color: var(--muted); }
+.op-safe { margin-left: auto; font-size: 0.78rem; font-weight: 600; }
+.op-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; }
+.op-bars i { width: 3px; background: var(--panel-border); border-radius: 1px; }
+.op-bars i.on { background: var(--cmd-safe); }

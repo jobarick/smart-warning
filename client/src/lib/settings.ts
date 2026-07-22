@@ -17,7 +17,24 @@ export const DEFAULT_SETTINGS: Settings = {
   shareLocation: false,
   zone: '',
   profileId: 'generic',
+  operatorId: '',
+  assemblyLat: null,
+  assemblyLng: null,
+  assemblyLabel: 'Assembly point',
 };
+
+/** Build a stable operator ID from a name, e.g. "Samirah A." → "SA-2026-0017". */
+export function makeOperatorId(name: string): string {
+  const initials =
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((w) => w[0]!.toUpperCase())
+      .join('')
+      .slice(0, 3) || 'OP';
+  const serial = String(Math.floor(1 + Math.random() * 9999)).padStart(4, '0');
+  return `${initials}-${new Date().getFullYear()}-${serial}`;
+}
 
 export function loadSettings(): Settings {
   try {
