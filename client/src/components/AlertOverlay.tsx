@@ -8,11 +8,12 @@ interface Props {
   alert: AlertMessage;
   acknowledged: boolean;
   settings: Settings;
+  label?: string; // sector wording for the alert type (from the active profile)
   onAcknowledge: () => void;
   onAllClear: () => void;
 }
 
-export function AlertOverlay({ alert, acknowledged, settings, onAcknowledge, onAllClear }: Props) {
+export function AlertOverlay({ alert, acknowledged, settings, label, onAcknowledge, onAllClear }: Props) {
   // Ignore clicks for a moment after the overlay appears so a double-tap on a
   // trigger button can't accidentally acknowledge or all-clear the alert.
   const [armed, setArmed] = useState(false);
@@ -77,7 +78,7 @@ export function AlertOverlay({ alert, acknowledged, settings, onAcknowledge, onA
       <div className="overlay-card" role="alert" style={{ borderColor: meta.color }}>
         <Icon name={meta.icon} className="overlay-icon" style={{ color: meta.color }} />
         <div className="overlay-title" style={{ color: meta.color }}>
-          {meta.label.toUpperCase()} ALERT
+          {(label ?? meta.label).toUpperCase()} ALERT
         </div>
         <div className={`sev-badge sev-${alert.severity}`}>{SEVERITY_META[alert.severity].label} severity</div>
         {alert.message && <p className="overlay-message">{alert.message}</p>}

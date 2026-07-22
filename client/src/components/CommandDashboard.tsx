@@ -2,13 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 import type { AlarmState } from '../hooks/useAlarmState';
 import type { SocketStatus } from '../hooks/useAlertSocket';
 import type { LogEntry, WorkerInfo } from '../types';
-import { ALERT_META, SAFETY_PROTOCOL, SEVERITY_META } from '../types';
+import { ALERT_META, SEVERITY_META } from '../types';
+import { alertLabel, alertProtocol, type IndustryProfile } from '../lib/profiles';
 import { Icon } from './Icon';
 
 interface Props {
   roster: WorkerInfo[];
   alarm: AlarmState;
   log: LogEntry[];
+  profile: IndustryProfile;
   selfName: string;
   status: SocketStatus;
   onAcknowledge: () => void;
@@ -66,7 +68,7 @@ function useMapPoints(roster: WorkerInfo[]) {
   }, [roster]);
 }
 
-export function CommandDashboard({ roster, alarm, log, selfName, status, onAcknowledge, onAllClear }: Props) {
+export function CommandDashboard({ roster, alarm, log, profile, selfName, status, onAcknowledge, onAllClear }: Props) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -81,7 +83,7 @@ export function CommandDashboard({ roster, alarm, log, selfName, status, onAckno
 
   const sender = alert ? roster.find((w) => w.name === alert.sender) : undefined;
   const meta = alert ? ALERT_META[alert.type] : null;
-  const protocol = alert ? SAFETY_PROTOCOL[alert.type] : [];
+  const protocol = alert ? alertProtocol(profile, alert.type) : [];
 
   return (
     <div className="cmd">
@@ -135,7 +137,7 @@ export function CommandDashboard({ roster, alarm, log, selfName, status, onAckno
                   <span className="cmd-feed-msg">
                     {e.kind === 'alert' ? (
                       <>
-                        <b>{e.type ? ALERT_META[e.type].label : 'Alert'}</b> · {e.severity} — {e.sender}
+                        <b>{e.type ? alertLabel(profile, e.type) : 'Alert'}</b> · {e.severity} — {e.sender}
                       </>
                     ) : (
                       <>All clear — {e.sender}</>
@@ -166,7 +168,7 @@ export function CommandDashboard({ roster, alarm, log, selfName, status, onAckno
                     <Icon name={meta!.icon} />
                   </div>
                   <div>
-                    <div className="cmd-ae-type">{meta!.label}</div>
+                    <div className="cmd-ae-type">{alertLabel(profile, alert.type)}</div>
                     <span className="cmd-ae-sev" style={{ color: meta!.color }}>{SEVERITY_META[alert.severity].label} severity</span>
                   </div>
                   <div className="cmd-ae-timer">

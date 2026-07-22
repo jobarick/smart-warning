@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS: Settings = {
   silentMode: false,
   shareLocation: false,
   zone: '',
+  profileId: 'generic',
 };
 
 export function loadSettings(): Settings {

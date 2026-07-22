@@ -1,5 +1,6 @@
 import type { Settings, SirenTone } from '../types';
 import { SAFE_FLASH_RATE } from '../lib/settings';
+import { INDUSTRY_PROFILES } from '../lib/profiles';
 import { Icon } from './Icon';
 
 interface Props {
@@ -27,6 +28,17 @@ export function SettingsPanel({ settings, onChange, onTestSiren, onTestAlarm, si
       <h2>Emergency controls</h2>
 
       <div className="fields-grid">
+      <label className="field field-wide">
+        <span>Industry profile</span>
+        <select value={settings.profileId} onChange={(e) => onChange({ profileId: e.target.value })}>
+          {INDUSTRY_PROFILES.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.label} — {p.tagline}
+            </option>
+          ))}
+        </select>
+      </label>
+
       <label className="field">
         <span>Device name</span>
         <input

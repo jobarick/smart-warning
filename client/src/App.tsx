@@ -8,11 +8,13 @@ import { useAlarmState } from './hooks/useAlarmState';
 import { useSiren } from './hooks/useSiren';
 import { useSelfTelemetry } from './hooks/useSelfTelemetry';
 import { AlertOverlay } from './components/AlertOverlay';
-import { TriggerPanel } from './components/TriggerPanel';
+import { SosPanel } from './components/SosPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 import { ConnectionStatus, type AppView } from './components/ConnectionStatus';
 import { AlertLog } from './components/AlertLog';
 import { CommandDashboard } from './components/CommandDashboard';
+import { Icon } from './components/Icon';
+import { getProfile, alertLabel } from './lib/profiles';
 
 const VIEW_KEY = 'alert-system-view';
 
@@ -22,7 +24,9 @@ export default function App() {
   const [log, setLog] = useState<LogEntry[]>([]);
   const [sirenTesting, setSirenTesting] = useState(false);
   const [view, setView] = useState<AppView>(() => (localStorage.getItem(VIEW_KEY) === 'command' ? 'command' : 'worker'));
+  const [showSettings, setShowSettings] = useState(false);
   const { armed, arm, siren } = useSiren();
+  const profile = useMemo(() => getProfile(settings.profileId), [settings.profileId]);
   const sessionId = useRef<string>(crypto.randomUUID());
   const telemetry = useSelfTelemetry(settings.shareLocation);
 
@@ -212,26 +216,34 @@ export default function App() {
           roster={roster}
           alarm={alarm}
           log={log}
+          profile={profile}
           selfName={settings.deviceName}
           status={status}
           onAcknowledge={() => dispatch({ type: 'ACKNOWLEDGE' })}
           onAllClear={allClear}
         />
+      ) : showSettings ? (
+        <main className="worker">
+          <button className="btn back-btn" onClick={() => setShowSettings(false)}>
+            <Icon name="arrow-left" /> Back to SOS
+          </button>
+          <SettingsPanel
+            settings={settings}
+            onChange={patchSettings}
+            onTestSiren={() => void toggleSirenTest()}
+            onTestAlarm={testAlarm}
+            sirenTesting={sirenTesting}
+          />
+        </main>
       ) : (
-        <main className="layout">
-          <div className="col">
-            <TriggerPanel onTrigger={trigger} disabled={alarmActive} />
-            <AlertLog entries={log} />
+        <main className="worker">
+          <SosPanel profile={profile} disabled={alarmActive} onTrigger={trigger} />
+          <div className="worker-tools">
+            <button className="btn settings-link" onClick={() => setShowSettings(true)}>
+              <Icon name="settings" /> Settings &amp; alarm options
+            </button>
           </div>
-          <div className="col">
-            <SettingsPanel
-              settings={settings}
-              onChange={patchSettings}
-              onTestSiren={() => void toggleSirenTest()}
-              onTestAlarm={testAlarm}
-              sirenTesting={sirenTesting}
-            />
-          </div>
+          <AlertLog entries={log} />
         </main>
       )}
 
@@ -240,6 +252,7 @@ export default function App() {
           alert={alarm.alert}
           acknowledged={alarm.acknowledged}
           settings={settings}
+          label={alertLabel(profile, alarm.alert.type)}
           onAcknowledge={() => dispatch({ type: 'ACKNOWLEDGE' })}
           onAllClear={allClear}
         />

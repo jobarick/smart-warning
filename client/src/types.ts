@@ -78,6 +78,7 @@ export interface Settings {
   silentMode: boolean; // flash/border/vibration only — no siren, regardless of severity
   shareLocation: boolean; // opt-in GPS — sends lat/long to the command roster
   zone: string; // area/zone this device is working in (shown to the supervisor)
+  profileId: string; // active industry profile — relabels alert types + protocols
 }
 
 import type { IconName } from './components/Icon';
