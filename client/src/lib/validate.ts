@@ -1,4 +1,4 @@
-import type { AlertType, Severity, WireMessage } from '../types';
+import type { AlertType, Severity, WireMessage, WorkerInfo, WorkerRole, WorkerStatus } from '../types';
 import { ALERT_META, SEVERITY_META } from '../types';
 
 // Allowlists derived from the metadata tables so they can never drift out of
@@ -11,6 +11,34 @@ export const isSeverity = (v: unknown): v is Severity => typeof v === 'string' &
 
 const str = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : fallback);
 const num = (v: unknown, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
+const numOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+const STATUSES = new Set<string>(['safe', 'sos', 'idle']);
+const ROLES = new Set<string>(['worker', 'supervisor']);
+
+/** Coerce one untrusted roster entry into a well-formed WorkerInfo. */
+function parseWorker(raw: unknown): WorkerInfo | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const w = raw as Record<string, unknown>;
+  const id = str(w.id);
+  if (!id) return null;
+  const status: WorkerStatus = STATUSES.has(w.status as string) ? (w.status as WorkerStatus) : 'safe';
+  const role: WorkerRole = ROLES.has(w.role as string) ? (w.role as WorkerRole) : 'worker';
+  const battery = numOrNull(w.battery);
+  return {
+    id,
+    name: str(w.name, 'Unknown'),
+    role,
+    status,
+    zone: str(w.zone),
+    battery: battery === null ? null : Math.max(0, Math.min(1, battery)),
+    charging: w.charging === true,
+    lat: numOrNull(w.lat),
+    lng: numOrNull(w.lng),
+    accuracy: numOrNull(w.accuracy),
+    updatedAt: num(w.updatedAt, Date.now()),
+  };
+}
 
 /**
  * Parse an untrusted, already-JSON-decoded value from the relay into a
@@ -49,6 +77,11 @@ export function parseWireMessage(raw: unknown): WireMessage | null {
       };
     case 'presence':
       return { kind: 'presence', count: Math.max(0, Math.trunc(num(m.count, 0))) };
+    case 'roster': {
+      if (!Array.isArray(m.workers)) return null;
+      const workers = m.workers.map(parseWorker).filter((w): w is WorkerInfo => w !== null);
+      return { kind: 'roster', workers };
+    }
     default:
       return null;
   }

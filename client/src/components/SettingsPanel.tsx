@@ -27,7 +27,7 @@ export function SettingsPanel({ settings, onChange, onTestSiren, onTestAlarm, si
       <h2>Emergency controls</h2>
 
       <div className="fields-grid">
-      <label className="field field-wide">
+      <label className="field">
         <span>Device name</span>
         <input
           type="text"
@@ -35,6 +35,28 @@ export function SettingsPanel({ settings, onChange, onTestSiren, onTestAlarm, si
           maxLength={40}
           onChange={(e) => onChange({ deviceName: e.target.value })}
         />
+      </label>
+
+      <label className="field">
+        <span>Zone / area</span>
+        <input
+          type="text"
+          value={settings.zone}
+          maxLength={40}
+          placeholder="e.g. Sublevel 2, Line B"
+          onChange={(e) => onChange({ zone: e.target.value })}
+        />
+      </label>
+
+      <label className="field field-check field-wide">
+        <input
+          type="checkbox"
+          checked={settings.shareLocation}
+          onChange={(e) => onChange({ shareLocation: e.target.checked })}
+        />
+        <span>
+          Share my location — <em>sends GPS coordinates to the command view so a supervisor can find you</em>
+        </span>
       </label>
 
       <label className="field">

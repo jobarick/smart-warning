@@ -1,22 +1,39 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { WireMessage } from '../types';
+import type { WireMessage, WorkerInfo } from '../types';
 import { parseWireMessage } from '../lib/validate';
 
 export type SocketStatus = 'connecting' | 'open' | 'closed';
 
 const WS_PORT = 3001;
+const HEARTBEAT_MS = 5000;
 
-export function useAlertSocket(onMessage: (m: WireMessage) => void) {
+/**
+ * @param onMessage    handler for validated inbound messages
+ * @param getSelfInfo  returns this device's current telemetry, or null to stay
+ *                     anonymous (no roster entry). Read fresh on every heartbeat.
+ */
+export function useAlertSocket(onMessage: (m: WireMessage) => void, getSelfInfo?: () => WorkerInfo | null) {
   const [status, setStatus] = useState<SocketStatus>('connecting');
   const [deviceCount, setDeviceCount] = useState(0);
+  const [roster, setRoster] = useState<WorkerInfo[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const onMessageRef = useRef(onMessage);
   onMessageRef.current = onMessage;
+  const getSelfInfoRef = useRef(getSelfInfo);
+  getSelfInfoRef.current = getSelfInfo;
+
+  const sendHeartbeat = useCallback(() => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    const info = getSelfInfoRef.current?.();
+    if (info) ws.send(JSON.stringify({ kind: 'heartbeat', ...info }));
+  }, []);
 
   useEffect(() => {
     let disposed = false;
     let retries = 0;
     let timer = 0;
+    let beat = 0;
 
     const connect = () => {
       setStatus('connecting');
@@ -27,6 +44,12 @@ export function useAlertSocket(onMessage: (m: WireMessage) => void) {
       ws.onopen = () => {
         retries = 0;
         setStatus('open');
+        const info = getSelfInfoRef.current?.();
+        if (info) ws.send(JSON.stringify({ kind: 'hello', ...info }));
+        beat = window.setInterval(() => {
+          const i = getSelfInfoRef.current?.();
+          if (i && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ kind: 'heartbeat', ...i }));
+        }, HEARTBEAT_MS);
       };
       ws.onmessage = (e) => {
         let raw: unknown;
@@ -40,12 +63,15 @@ export function useAlertSocket(onMessage: (m: WireMessage) => void) {
         const msg = parseWireMessage(raw);
         if (!msg) return;
         if (msg.kind === 'presence') setDeviceCount(msg.count);
+        else if (msg.kind === 'roster') setRoster(msg.workers);
         onMessageRef.current(msg);
       };
       ws.onclose = () => {
+        clearInterval(beat);
         if (disposed) return;
         setStatus('closed');
         setDeviceCount(0);
+        setRoster([]);
         timer = window.setTimeout(connect, Math.min(1000 * 2 ** retries++, 10000));
       };
       ws.onerror = () => ws.close();
@@ -55,6 +81,7 @@ export function useAlertSocket(onMessage: (m: WireMessage) => void) {
     return () => {
       disposed = true;
       clearTimeout(timer);
+      clearInterval(beat);
       wsRef.current?.close();
     };
   }, []);
@@ -69,5 +96,5 @@ export function useAlertSocket(onMessage: (m: WireMessage) => void) {
     return false;
   }, []);
 
-  return { status, deviceCount, send };
+  return { status, deviceCount, roster, send, sendHeartbeat };
 }

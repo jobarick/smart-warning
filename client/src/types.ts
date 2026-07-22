@@ -25,7 +25,44 @@ export interface PresenceMessage {
   count: number;
 }
 
-export type WireMessage = AlertMessage | AllClearMessage | PresenceMessage;
+export type WorkerStatus = 'safe' | 'sos' | 'idle';
+export type WorkerRole = 'worker' | 'supervisor';
+
+/** Per-device telemetry the relay tracks and rebroadcasts as a roster. */
+export interface WorkerInfo {
+  id: string;
+  name: string;
+  role: WorkerRole;
+  status: WorkerStatus;
+  zone: string;
+  battery: number | null; // 0–1, null if the Battery API is unavailable
+  charging: boolean;
+  lat: number | null;
+  lng: number | null;
+  accuracy: number | null; // metres
+  updatedAt: number;
+}
+
+/** Sent client → server on connect and on every heartbeat. Never rebroadcast. */
+export interface HelloMessage extends WorkerInfo {
+  kind: 'hello';
+}
+export interface HeartbeatMessage extends WorkerInfo {
+  kind: 'heartbeat';
+}
+/** Sent server → clients whenever the set of connected devices changes. */
+export interface RosterMessage {
+  kind: 'roster';
+  workers: WorkerInfo[];
+}
+
+export type WireMessage =
+  | AlertMessage
+  | AllClearMessage
+  | PresenceMessage
+  | HelloMessage
+  | HeartbeatMessage
+  | RosterMessage;
 
 export interface Settings {
   deviceName: string;
@@ -39,6 +76,8 @@ export interface Settings {
   vibration: boolean;
   autoFullscreen: boolean;
   silentMode: boolean; // flash/border/vibration only — no siren, regardless of severity
+  shareLocation: boolean; // opt-in GPS — sends lat/long to the command roster
+  zone: string; // area/zone this device is working in (shown to the supervisor)
 }
 
 import type { IconName } from './components/Icon';
@@ -73,6 +112,16 @@ export const severityWants = (s: Severity) => ({
   siren: SEVERITY_META[s].rank >= 2,
   vibration: SEVERITY_META[s].rank >= 2,
 });
+
+/** What to do when each alert type fires — shown to workers and on the command panel. */
+export const SAFETY_PROTOCOL: Record<AlertType, string[]> = {
+  fire: ['Leave the building now', 'Do not use the elevator', 'Follow the lit route to assembly', 'Do not re-enter'],
+  medical: ['Keep the casualty still', 'Clear the area around them', 'Send someone to guide first aid in', 'Report injuries and hazards'],
+  security: ['Move to a secure room', 'Lock or barricade the door', 'Stay quiet and out of sight', 'Wait for the all-clear'],
+  hazard: ['Stop work immediately', 'Move upwind of the hazard', 'Wear the required PPE', 'Report the spill or release'],
+  cyber: ['Disconnect affected systems', 'Do not power devices off', 'Stop using shared drives', 'Await IT security instructions'],
+  evacuation: ['Evacuate immediately', 'Do not use the elevator', 'Proceed to the assembly point', 'Check in when you arrive'],
+};
 
 export interface LogEntry {
   id: string;

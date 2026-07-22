@@ -1,11 +1,15 @@
 import type { SocketStatus } from '../hooks/useAlertSocket';
 import { Icon } from './Icon';
 
+export type AppView = 'worker' | 'command';
+
 interface Props {
   status: SocketStatus;
   deviceCount: number;
   audioArmed: boolean;
   onArmAudio: () => void;
+  view: AppView;
+  onViewChange: (v: AppView) => void;
 }
 
 const STATUS_LABEL: Record<SocketStatus, string> = {
@@ -14,12 +18,20 @@ const STATUS_LABEL: Record<SocketStatus, string> = {
   closed: 'Offline — retrying',
 };
 
-export function ConnectionStatus({ status, deviceCount, audioArmed, onArmAudio }: Props) {
+export function ConnectionStatus({ status, deviceCount, audioArmed, onArmAudio, view, onViewChange }: Props) {
   return (
     <div className="status-bar">
       <div className="brand">
         <Icon name="siren" className="brand-icon" />
         <span className="brand-name">Smart Emergency Warning</span>
+      </div>
+      <div className="view-toggle" role="tablist" aria-label="View">
+        <button role="tab" aria-selected={view === 'worker'} className={view === 'worker' ? 'active' : ''} onClick={() => onViewChange('worker')}>
+          Worker
+        </button>
+        <button role="tab" aria-selected={view === 'command'} className={view === 'command' ? 'active' : ''} onClick={() => onViewChange('command')}>
+          Command
+        </button>
       </div>
       <div className="status-items">
         <span className={`conn conn-${status}`}>

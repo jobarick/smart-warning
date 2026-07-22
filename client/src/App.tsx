@@ -1,25 +1,33 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { AlertMessage, AlertType, AllClearMessage, LogEntry, Severity, SirenTone, WireMessage } from './types';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { AlertMessage, AlertType, AllClearMessage, LogEntry, Severity, SirenTone, WireMessage, WorkerInfo } from './types';
 import { ALERT_META, severityWants } from './types';
 import { loadSettings, saveSettings } from './lib/settings';
 import { startVibration, stopVibration } from './lib/haptics';
 import { useAlertSocket } from './hooks/useAlertSocket';
 import { useAlarmState } from './hooks/useAlarmState';
 import { useSiren } from './hooks/useSiren';
+import { useSelfTelemetry } from './hooks/useSelfTelemetry';
 import { AlertOverlay } from './components/AlertOverlay';
 import { TriggerPanel } from './components/TriggerPanel';
 import { SettingsPanel } from './components/SettingsPanel';
-import { ConnectionStatus } from './components/ConnectionStatus';
+import { ConnectionStatus, type AppView } from './components/ConnectionStatus';
 import { AlertLog } from './components/AlertLog';
+import { CommandDashboard } from './components/CommandDashboard';
+
+const VIEW_KEY = 'alert-system-view';
 
 export default function App() {
   const [settings, setSettings] = useState(loadSettings);
   const [alarm, dispatch] = useAlarmState();
   const [log, setLog] = useState<LogEntry[]>([]);
   const [sirenTesting, setSirenTesting] = useState(false);
+  const [view, setView] = useState<AppView>(() => (localStorage.getItem(VIEW_KEY) === 'command' ? 'command' : 'worker'));
   const { armed, arm, siren } = useSiren();
+  const sessionId = useRef<string>(crypto.randomUUID());
+  const telemetry = useSelfTelemetry(settings.shareLocation);
 
   useEffect(() => saveSettings(settings), [settings]);
+  useEffect(() => localStorage.setItem(VIEW_KEY, view), [view]);
 
   const patchSettings = useCallback((patch: Partial<typeof settings>) => {
     setSettings((s) => ({ ...s, ...patch }));
@@ -51,7 +59,34 @@ export default function App() {
     [dispatch, addLog, settings.deviceName],
   );
 
-  const { status, deviceCount, send } = useAlertSocket(handleWire);
+  // This device's own status for the shared roster: 'sos' while an alert it
+  // raised is still active, otherwise 'safe'.
+  const selfStatus = alarm.alert && alarm.alert.sender === settings.deviceName ? 'sos' : 'safe';
+
+  const getSelfInfo = useCallback(
+    (): WorkerInfo => ({
+      id: sessionId.current,
+      name: settings.deviceName,
+      role: view === 'command' ? 'supervisor' : 'worker',
+      status: selfStatus,
+      zone: settings.zone,
+      battery: telemetry.battery,
+      charging: telemetry.charging,
+      lat: settings.shareLocation ? telemetry.lat : null,
+      lng: settings.shareLocation ? telemetry.lng : null,
+      accuracy: settings.shareLocation ? telemetry.accuracy : null,
+      updatedAt: Date.now(),
+    }),
+    [settings.deviceName, settings.zone, settings.shareLocation, view, selfStatus, telemetry],
+  );
+
+  const { status, deviceCount, roster, send, sendHeartbeat } = useAlertSocket(handleWire, getSelfInfo);
+
+  // Push a heartbeat immediately when meaningful telemetry changes, so the
+  // command roster reflects SOS / location / battery without waiting for the tick.
+  useEffect(() => {
+    sendHeartbeat();
+  }, [selfStatus, telemetry.lat, telemetry.lng, telemetry.battery, settings.zone, settings.deviceName, view, sendHeartbeat]);
 
   const trigger = useCallback(
     (type: AlertType, severity: Severity, message: string) => {
@@ -149,8 +184,9 @@ export default function App() {
     };
   }, [alarmActive]);
 
-  // Optional fullscreen on alert.
+  // Optional fullscreen on alert (worker view only — the command view shouldn't take over).
   useEffect(() => {
+    if (view !== 'worker') return;
     if (alarmActive && settings.autoFullscreen && !document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(() => {});
     }
@@ -158,27 +194,48 @@ export default function App() {
       document.exitFullscreen().catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [alarmActive]);
+  }, [alarmActive, view]);
 
   return (
     <div className="app">
-      <ConnectionStatus status={status} deviceCount={deviceCount} audioArmed={armed} onArmAudio={() => void arm()} />
-      <main className="layout">
-        <div className="col">
-          <TriggerPanel onTrigger={trigger} disabled={alarmActive} />
-          <AlertLog entries={log} />
-        </div>
-        <div className="col">
-          <SettingsPanel
-            settings={settings}
-            onChange={patchSettings}
-            onTestSiren={() => void toggleSirenTest()}
-            onTestAlarm={testAlarm}
-            sirenTesting={sirenTesting}
-          />
-        </div>
-      </main>
-      {alarm.alert && (
+      <ConnectionStatus
+        status={status}
+        deviceCount={deviceCount}
+        audioArmed={armed}
+        onArmAudio={() => void arm()}
+        view={view}
+        onViewChange={setView}
+      />
+
+      {view === 'command' ? (
+        <CommandDashboard
+          roster={roster}
+          alarm={alarm}
+          log={log}
+          selfName={settings.deviceName}
+          status={status}
+          onAcknowledge={() => dispatch({ type: 'ACKNOWLEDGE' })}
+          onAllClear={allClear}
+        />
+      ) : (
+        <main className="layout">
+          <div className="col">
+            <TriggerPanel onTrigger={trigger} disabled={alarmActive} />
+            <AlertLog entries={log} />
+          </div>
+          <div className="col">
+            <SettingsPanel
+              settings={settings}
+              onChange={patchSettings}
+              onTestSiren={() => void toggleSirenTest()}
+              onTestAlarm={testAlarm}
+              sirenTesting={sirenTesting}
+            />
+          </div>
+        </main>
+      )}
+
+      {view === 'worker' && alarm.alert && (
         <AlertOverlay
           alert={alarm.alert}
           acknowledged={alarm.acknowledged}

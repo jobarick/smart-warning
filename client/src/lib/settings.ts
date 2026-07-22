@@ -14,6 +14,8 @@ export const DEFAULT_SETTINGS: Settings = {
   vibration: true,
   autoFullscreen: false,
   silentMode: false,
+  shareLocation: false,
+  zone: '',
 };
 
 export function loadSettings(): Settings {
