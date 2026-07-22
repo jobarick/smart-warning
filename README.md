@@ -28,6 +28,28 @@ cd client && npm install && npm run dev
 
 Open `http://localhost:5300`. Other devices on the same Wi-Fi can open `http://<your-PC-LAN-IP>:5300` — the client automatically connects its WebSocket to the same host on port 3001.
 
+## Deploy (Vercel + hosted relay)
+
+The repo is set up to deploy the client to **Vercel** and the relay to any
+always-on host. Two parts, because Vercel is static/serverless and can't run a
+persistent WebSocket server.
+
+**1. Client → Vercel.** `vercel.json` (repo root) builds the app in `client/`.
+Import the repo on Vercel and keep the Root Directory as the repo root — the
+config runs `cd client && npm run build` and serves `client/dist`. No settings
+to fiddle with.
+
+**2. Relay → an always-on host.** The relay reads `process.env.PORT` and exposes
+a `/` health check, so it runs as-is on Render, Railway, Fly.io, etc.
+- **Render:** New → Blueprint on this repo (`render.yaml` deploys `server/`).
+- **Railway / Fly / Cloud Run:** use `server/Dockerfile`.
+
+**3. Point the client at the relay.** On the Vercel project, set an environment
+variable `VITE_WS_URL` to the relay's public URL, e.g.
+`wss://smart-warning-relay.onrender.com`, and redeploy. Without it the client
+falls back to `ws(s)://<same-host>:3001` (the LAN behaviour). Note: the relay
+still has no auth — add a shared token before any real-world use.
+
 ## Features
 
 - **Six alert types** — Fire, Medical, Security, Hazard, Cyber Threat, Evacuation — each with its own color and siren tone.

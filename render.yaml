@@ -1,0 +1,13 @@
+# Render Blueprint for the WebSocket relay.
+# Deploy: on render.com, New → Blueprint → point at this repo. Render injects
+# PORT (the relay already reads process.env.PORT) and gives a public https/wss URL.
+# Then set VITE_WS_URL on the Vercel project to wss://<this-service>.onrender.com
+services:
+  - type: web
+    name: smart-warning-relay
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm install
+    startCommand: node index.js
+    healthCheckPath: /

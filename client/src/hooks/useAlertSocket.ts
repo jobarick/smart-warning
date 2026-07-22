@@ -5,6 +5,16 @@ import { parseWireMessage } from '../lib/validate';
 export type SocketStatus = 'connecting' | 'open' | 'closed';
 
 const WS_PORT = 3001;
+
+// Where to reach the relay. In LAN/dev we derive it from the current host so
+// phones connect with no config. For a hosted deployment (e.g. Vercel), set
+// VITE_WS_URL at build time to the public relay URL, e.g. wss://relay.example.com.
+function relayUrl(): string {
+  const configured = import.meta.env.VITE_WS_URL as string | undefined;
+  if (configured) return configured;
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${proto}://${location.hostname}:${WS_PORT}`;
+}
 const HEARTBEAT_MS = 5000;
 
 /**
@@ -37,8 +47,7 @@ export function useAlertSocket(onMessage: (m: WireMessage) => void, getSelfInfo?
 
     const connect = () => {
       setStatus('connecting');
-      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-      const ws = new WebSocket(`${proto}://${location.hostname}:${WS_PORT}`);
+      const ws = new WebSocket(relayUrl());
       wsRef.current = ws;
 
       ws.onopen = () => {
