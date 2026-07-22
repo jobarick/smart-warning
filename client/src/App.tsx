@@ -10,6 +10,7 @@ import { useSelfTelemetry } from './hooks/useSelfTelemetry';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
 import { AlertOverlay } from './components/AlertOverlay';
 import { OperatorStatus } from './components/OperatorStatus';
+import { MapPanel } from './components/MapPanel';
 import { SosPanel } from './components/SosPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 import { ConnectionStatus, type AppView } from './components/ConnectionStatus';
@@ -296,6 +297,11 @@ export default function App() {
             assembly={{ lat: settings.assemblyLat, lng: settings.assemblyLng, label: settings.assemblyLabel }}
             alarm={alarm}
             now={now}
+          />
+          <MapPanel
+            userLat={telemetry.lat}
+            userLng={telemetry.lng}
+            assembly={{ lat: settings.assemblyLat, lng: settings.assemblyLng, label: settings.assemblyLabel }}
           />
           <div className="worker-tools">
             <button className="btn settings-link" onClick={() => setShowSettings(true)}>

@@ -1203,6 +1203,34 @@ body {
 .theme-toggle:hover { color: var(--text); border-color: var(--faint); }
 .theme-toggle svg { width: 17px; height: 17px; }
 
+/* Location map */
+.mapcard {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.mapcard-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.mapcard-h svg { width: 16px; height: 16px; color: var(--cmd-safe); }
+.map-el {
+  height: 260px;
+  width: 100%;
+  background: var(--panel-2);
+}
+.map-el .leaflet-control-attribution {
+  font-size: 9px;
+  background: rgba(255, 255, 255, 0.75);
+}
+.map-empty { padding: 0 16px 16px; color: var(--muted); font-size: 0.88rem; }
+
 /* SOS hero — the always-visible primary action */
 .sos-title { font-size: 1.05rem; font-weight: 700; text-align: center; letter-spacing: 0.01em; }
 .sos-hero {
