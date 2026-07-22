@@ -1164,6 +1164,42 @@ body {
 
 .sos-hint { text-align: center; color: var(--faint); font-size: 0.8rem; }
 
+/* SOS hero — the always-visible primary action */
+.sos-title { font-size: 1.05rem; font-weight: 700; text-align: center; letter-spacing: 0.01em; }
+.sos-hero {
+  position: relative;
+  width: 190px;
+  height: 190px;
+  margin: 2px auto 0;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 10px 34px rgba(255, 59, 48, 0.4);
+  transition: transform 0.06s, filter 0.12s;
+}
+.sos-hero:not(:disabled):hover { filter: brightness(1.06); }
+.sos-hero:not(:disabled):active { transform: scale(0.97); }
+.sos-hero:disabled { background: var(--panel-2); color: var(--faint); box-shadow: none; cursor: default; }
+.sos-hero-word { font-family: var(--mono); font-size: 2.7rem; font-weight: 800; letter-spacing: 0.08em; line-height: 1; }
+.sos-hero-sub { font-size: 0.78rem; font-weight: 600; margin-top: 5px; opacity: 0.92; text-transform: uppercase; letter-spacing: 0.06em; }
+.sos-hero-ring { position: absolute; inset: -5px; border-radius: 50%; border: 2px solid var(--accent); opacity: 0; }
+.sos-pick { text-align: center; color: var(--muted); font-size: 0.85rem; margin-top: -6px; }
+.sos-types.flash { box-shadow: 0 0 0 2px var(--accent); border-radius: 14px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .sos-hero:not(:disabled) .sos-hero-ring { animation: sos-ring 1.9s ease-out infinite; }
+}
+@keyframes sos-ring {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.16); opacity: 0; }
+}
+
 .worker-tools { display: flex; justify-content: center; }
 .settings-link {
   background: transparent;

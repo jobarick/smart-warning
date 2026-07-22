@@ -16,6 +16,7 @@ export function SosPanel({ profile, disabled, onTrigger }: Props) {
   const [selected, setSelected] = useState<AlertType | null>(null);
   const [severity, setSeverity] = useState<Severity>('high');
   const [message, setMessage] = useState('');
+  const [flash, setFlash] = useState(false);
 
   // Reset the selection when the profile changes so stale labels never show.
   useEffect(() => setSelected(null), [profile.id]);
@@ -24,19 +25,38 @@ export function SosPanel({ profile, disabled, onTrigger }: Props) {
   const chosenMeta = selected ? ALERT_META[selected] : null;
 
   const fire = () => {
-    if (!selected || disabled) return;
+    if (disabled) return;
+    if (!selected) {
+      // Nudge the user to pick a type first instead of doing nothing silently.
+      setFlash(true);
+      setTimeout(() => setFlash(false), 1200);
+      return;
+    }
     onTrigger(selected, severity, message.trim());
     setMessage('');
   };
 
   return (
     <section className="sos" aria-labelledby="sos-heading">
-      <div className="sos-head">
-        <h2 id="sos-heading">Report an emergency</h2>
-        <p>Tap what's happening, then press <strong>SOS</strong>. Everyone connected is alerted instantly.</p>
-      </div>
+      <h2 id="sos-heading" className="sos-title">Emergency SOS</h2>
 
-      <div className="sos-types" role="group" aria-label="Emergency type">
+      <button
+        type="button"
+        className="sos-hero"
+        style={chosenMeta ? { background: chosenMeta.color, borderColor: chosenMeta.color } : undefined}
+        disabled={disabled}
+        onClick={fire}
+      >
+        <span className="sos-hero-ring" aria-hidden="true" />
+        <span className="sos-hero-word">SOS</span>
+        <span className="sos-hero-sub">
+          {disabled ? 'Alert active' : chosen ? `Tap to send ${chosen.label}` : 'Tap to alert'}
+        </span>
+      </button>
+
+      <p className="sos-pick">{disabled ? 'An alert is active' : chosen ? `${SEVERITY_META[severity].label} severity` : 'Choose the emergency, then press SOS'}</p>
+
+      <div className={`sos-types ${flash ? 'flash' : ''}`} role="group" aria-label="Emergency type">
         {profile.alerts.map((a) => {
           const meta = ALERT_META[a.type];
           const active = selected === a.type;
@@ -82,20 +102,6 @@ export function SosPanel({ profile, disabled, onTrigger }: Props) {
         disabled={disabled}
         onChange={(e) => setMessage(e.target.value)}
       />
-
-      <button
-        type="button"
-        className="sos-btn"
-        style={chosenMeta ? { background: chosenMeta.color, borderColor: chosenMeta.color } : undefined}
-        disabled={disabled || !selected}
-        onClick={fire}
-      >
-        <Icon name="siren" className="sos-btn-ic" />
-        <span className="sos-btn-lbl">
-          {disabled ? 'Alert active' : chosen ? `Send ${chosen.label} · ${SEVERITY_META[severity].label}` : 'Select an emergency'}
-        </span>
-        <span className="sos-btn-sos">SOS</span>
-      </button>
 
       <p className="sos-hint">{profile.label} · alerts reach every connected device on your network</p>
     </section>

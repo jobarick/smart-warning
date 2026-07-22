@@ -278,6 +278,7 @@ export default function App() {
         </main>
       ) : (
         <main className="worker">
+          <SosPanel profile={profile} disabled={alarmActive} onTrigger={trigger} />
           <OperatorStatus
             name={settings.deviceName}
             operatorId={settings.operatorId}
@@ -288,7 +289,6 @@ export default function App() {
             alarm={alarm}
             now={now}
           />
-          <SosPanel profile={profile} disabled={alarmActive} onTrigger={trigger} />
           <div className="worker-tools">
             <button className="btn settings-link" onClick={() => setShowSettings(true)}>
               <Icon name="settings" /> Settings &amp; alarm options
