@@ -1,18 +1,93 @@
-// Alert relay: broadcasts alerts / all-clears to every client, and tracks a live
-// roster of connected devices (name, status, battery, location) for the command view.
+// Alert backend: a real-time WebSocket relay + a REST API over persisted history.
+//
+//  • WS  — broadcasts alerts / all-clears to every client and tracks a live roster
+//          of connected devices (name, status, battery, location). Wire protocol
+//          unchanged, so existing clients keep working with no changes.
+//  • REST — read-only history/stats served from Postgres (see db.js). When no
+//          DATABASE_URL is configured the relay still runs; the API just reports
+//          that persistence is off and returns empty history.
 const http = require('http');
 const { WebSocketServer } = require('ws');
+const db = require('./db');
 
 const PORT = process.env.PORT || 3001;
 // If set, clients must present this shared token before the relay accepts or
 // delivers any message to them. Unset = open (only safe on a trusted LAN).
 const TOKEN = process.env.RELAY_TOKEN || '';
 
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-  res.end(JSON.stringify({ service: 'alert-relay', clients: wss.clients.size, uptime: process.uptime() }));
+// ---------------------------------------------------------------------------
+// HTTP + REST API
+// ---------------------------------------------------------------------------
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+function sendJson(res, status, body) {
+  res.writeHead(status, { 'Content-Type': 'application/json', ...CORS });
+  res.end(JSON.stringify(body));
+}
+
+const server = http.createServer(async (req, res) => {
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, CORS);
+    return res.end();
+  }
+
+  let url;
+  try {
+    url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  } catch {
+    return sendJson(res, 400, { error: 'bad request' });
+  }
+  const path = url.pathname.replace(/\/+$/, '') || '/';
+
+  try {
+    // Health check (also Render's healthCheckPath).
+    if (path === '/' && req.method === 'GET') {
+      return sendJson(res, 200, {
+        service: 'alert-backend',
+        clients: authedCount(),
+        persistence: db.enabled(),
+        uptime: process.uptime(),
+      });
+    }
+
+    if (path === '/api/incidents' && req.method === 'GET') {
+      const limit = Number(url.searchParams.get('limit')) || 50;
+      const status = url.searchParams.get('status') || undefined;
+      const incidents = await db.listIncidents({ limit, status });
+      return sendJson(res, 200, { persistence: db.enabled(), incidents });
+    }
+
+    const incMatch = path.match(/^\/api\/incidents\/([^/]+)$/);
+    if (incMatch && req.method === 'GET') {
+      const incident = await db.getIncident(decodeURIComponent(incMatch[1]));
+      if (!incident) return sendJson(res, 404, { error: 'not found' });
+      return sendJson(res, 200, { incident });
+    }
+
+    if (path === '/api/stats' && req.method === 'GET') {
+      const s = await db.stats();
+      return sendJson(res, 200, { persistence: db.enabled(), stats: s });
+    }
+
+    // Live roster straight from memory (not persisted).
+    if (path === '/api/roster' && req.method === 'GET') {
+      return sendJson(res, 200, { workers: rosterList(), count: authedCount() });
+    }
+
+    return sendJson(res, 404, { error: 'not found' });
+  } catch (err) {
+    console.error('[api] error:', err.message);
+    return sendJson(res, 500, { error: 'internal error' });
+  }
 });
 
+// ---------------------------------------------------------------------------
+// WebSocket relay
+// ---------------------------------------------------------------------------
 const wss = new WebSocketServer({ server });
 
 function broadcast(obj) {
@@ -103,8 +178,11 @@ wss.on('connection', (ws, req) => {
     if (msg.kind === 'alert' || msg.kind === 'all-clear') {
       if (msg.kind === 'alert') {
         console.log(`[!] ALERT ${msg.type}/${msg.severity} from #${ws.connId} "${msg.sender}": ${msg.message || '(no message)'}`);
+        // Persist the raised alert, enriched with the sender's last known location.
+        db.recordAlert(msg, ws.worker).catch((e) => console.error('[db] recordAlert:', e.message));
       } else {
         console.log(`[.] all-clear from #${ws.connId} "${msg.sender}"`);
+        db.resolveActive(msg).catch((e) => console.error('[db] resolveActive:', e.message));
       }
       broadcast(msg);
       return;
@@ -138,6 +216,20 @@ setInterval(() => {
   }
 }, 30000);
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Alert relay listening on ws://0.0.0.0:${PORT}`);
-});
+// ---------------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------------
+async function start() {
+  try {
+    const ready = await db.init();
+    console.log(ready ? '[db] connected — persistence ON' : '[db] no DATABASE_URL — persistence OFF (in-memory relay only)');
+  } catch (err) {
+    // A DB hiccup must never keep the life-safety relay from starting.
+    console.error('[db] init failed, continuing without persistence:', err.message);
+  }
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Alert backend listening on http://0.0.0.0:${PORT} (ws + REST)`);
+  });
+}
+
+start();

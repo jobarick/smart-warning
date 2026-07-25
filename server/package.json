@@ -1,14 +1,15 @@
 {
   "name": "alert-relay-server",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
-  "description": "WebSocket broadcast relay for the Smart Emergency Warning & Threat Alert System",
+  "description": "WebSocket broadcast relay + REST history API for the Smart Emergency Warning & Threat Alert System",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "dev": "node index.js"
   },
   "dependencies": {
+    "pg": "^8.13.1",
     "ws": "^8.18.0"
   }
 }

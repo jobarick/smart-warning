@@ -1,7 +1,15 @@
-# Render Blueprint for the WebSocket relay.
-# Deploy: on render.com, New → Blueprint → point at this repo. Render injects
-# PORT (the relay already reads process.env.PORT) and gives a public https/wss URL.
-# Then set VITE_WS_URL on the Vercel project to wss://<this-service>.onrender.com
+# Render Blueprint for the alert backend (WebSocket relay + REST history API).
+#
+# Deploy: on render.com, New → Blueprint → point at this repo. Render provisions
+# the Postgres database, injects DATABASE_URL and PORT into the web service, and
+# gives it a public https/wss URL. Then set VITE_WS_URL on the Vercel project to
+# wss://<this-service>.onrender.com and redeploy the client.
+databases:
+  - name: smart-warning-db
+    plan: free
+    databaseName: smartwarning
+    user: smartwarning
+
 services:
   - type: web
     name: smart-warning-relay
@@ -11,3 +19,13 @@ services:
     buildCommand: npm install
     startCommand: node index.js
     healthCheckPath: /
+    envVars:
+      # Durable incident history. Wired automatically from the database above.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: smart-warning-db
+          property: connectionString
+      # Optional shared token. Set a value in the dashboard to lock the relay down;
+      # it must match VITE_RELAY_TOKEN in the client build. Left blank = open relay.
+      - key: RELAY_TOKEN
+        sync: false
