@@ -275,6 +275,7 @@ export default function App() {
           alarm={alarm}
           log={log}
           history={history.incidents}
+          stats={history.stats}
           persistence={history.persistence}
           historyError={history.error}
           profile={profile}

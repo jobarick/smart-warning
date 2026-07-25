@@ -985,6 +985,17 @@ body {
 }
 .cmd-inc-badge.active { color: var(--cmd-crit); background: color-mix(in srgb, var(--cmd-crit) 16%, transparent); }
 .cmd-inc-badge.resolved { color: var(--cmd-safe); background: color-mix(in srgb, var(--cmd-safe) 16%, transparent); }
+.cmd-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--panel-border);
+  border-radius: 0 0 var(--radius, 12px) var(--radius, 12px);
+  overflow: hidden;
+}
+.cmd-stat { display: flex; flex-direction: column; gap: 4px; padding: 13px 15px; background: var(--panel); }
+.cmd-stat b { font-size: 1.5rem; font-weight: 700; color: var(--text); line-height: 1; font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) { .cmd-stats { grid-template-columns: repeat(2, 1fr); } }
 
 /* active emergency */
 .cmd-clear {

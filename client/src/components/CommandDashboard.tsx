@@ -4,7 +4,7 @@ import type { SocketStatus } from '../hooks/useAlertSocket';
 import type { AlertType, LogEntry, WorkerInfo } from '../types';
 import { ALERT_META, SEVERITY_META } from '../types';
 import { alertLabel, alertProtocol, type IndustryProfile } from '../lib/profiles';
-import type { Incident } from '../lib/api';
+import type { Incident, Stats } from '../lib/api';
 import { Icon } from './Icon';
 
 interface Props {
@@ -13,6 +13,8 @@ interface Props {
   log: LogEntry[];
   /** Persisted incidents from the backend. Empty until loaded / if no DB. */
   history: Incident[];
+  /** Aggregate stats from the backend, or null when persistence is off. */
+  stats: Stats | null;
   /** null = not yet known, true = DB-backed, false = backend is relay-only. */
   persistence: boolean | null;
   historyError: string | null;
@@ -26,6 +28,14 @@ interface Props {
 /** Human duration between two ISO timestamps, e.g. "2m 5s". */
 function durationBetween(fromIso: string, toIso: string): string {
   const s = Math.max(0, Math.round((new Date(toIso).getTime() - new Date(fromIso).getTime()) / 1000));
+  const m = Math.floor(s / 60);
+  return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
+}
+
+/** Format a seconds count as "2m 5s" / "8s" / "—" (null). */
+function formatSeconds(sec: number | null): string {
+  if (sec === null) return '—';
+  const s = Math.max(0, Math.round(sec));
   const m = Math.floor(s / 60);
   return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
 }
@@ -81,7 +91,7 @@ function useMapPoints(roster: WorkerInfo[]) {
   }, [roster]);
 }
 
-export function CommandDashboard({ roster, alarm, log, history, persistence, historyError, profile, selfName, status, onAcknowledge, onAllClear }: Props) {
+export function CommandDashboard({ roster, alarm, log, history, stats, persistence, historyError, profile, selfName, status, onAcknowledge, onAllClear }: Props) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -110,6 +120,21 @@ export function CommandDashboard({ roster, alarm, log, history, persistence, his
 
       <div className="cmd-main">
         <div className="cmd-col">
+          {persistence && stats && (
+            <section className="cmd-card">
+              <header className="cmd-h">
+                <Icon name="check-circle" /> <h3>Response overview</h3>
+                <span className="cmd-h-note">stored · all devices</span>
+              </header>
+              <div className="cmd-stats">
+                <div className="cmd-stat"><span className="cmd-lbl">Total incidents</span><b>{stats.total}</b></div>
+                <div className="cmd-stat"><span className="cmd-lbl">Last 24h</span><b>{stats.last24h}</b></div>
+                <div className="cmd-stat"><span className="cmd-lbl">Avg response</span><b>{formatSeconds(stats.avgResolveSeconds)}</b></div>
+                <div className="cmd-stat"><span className="cmd-lbl">Resolved</span><b>{Math.max(0, stats.total - stats.active)}</b></div>
+              </div>
+            </section>
+          )}
+
           <section className="cmd-card">
             <header className="cmd-h">
               <Icon name="hazard" /> <h3>Live location map</h3>

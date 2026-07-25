@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { fetchIncidents, type Incident } from '../lib/api';
+import { fetchIncidents, fetchStats, type Incident, type Stats } from '../lib/api';
 
 /**
  * Loads persisted incident history from the backend for the supervisor view.
@@ -14,6 +14,7 @@ import { fetchIncidents, type Incident } from '../lib/api';
  */
 export function useIncidentHistory(enabled: boolean, refreshKey: unknown) {
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [persistence, setPersistence] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -21,9 +22,10 @@ export function useIncidentHistory(enabled: boolean, refreshKey: unknown) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetchIncidents({ limit: 100 });
-      setPersistence(res.persistence);
-      setIncidents(res.incidents);
+      const [inc, st] = await Promise.all([fetchIncidents({ limit: 100 }), fetchStats()]);
+      setPersistence(inc.persistence);
+      setIncidents(inc.incidents);
+      setStats(st.stats);
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -48,5 +50,5 @@ export function useIncidentHistory(enabled: boolean, refreshKey: unknown) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
 
-  return { incidents, persistence, error, loading, refresh: load };
+  return { incidents, stats, persistence, error, loading, refresh: load };
 }
