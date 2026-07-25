@@ -973,6 +973,18 @@ body {
 .cmd-feed-msg { font-size: 0.82rem; color: var(--muted); }
 .cmd-feed-msg b { color: var(--text); font-weight: 600; }
 .cmd-empty { padding: 16px; color: var(--faint); font-size: 0.82rem; }
+.cmd-inc-badge {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  vertical-align: middle;
+}
+.cmd-inc-badge.active { color: var(--cmd-crit); background: color-mix(in srgb, var(--cmd-crit) 16%, transparent); }
+.cmd-inc-badge.resolved { color: var(--cmd-safe); background: color-mix(in srgb, var(--cmd-safe) 16%, transparent); }
 
 /* active emergency */
 .cmd-clear {

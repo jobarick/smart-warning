@@ -18,6 +18,7 @@ import { AlertLog } from './components/AlertLog';
 import { CommandDashboard } from './components/CommandDashboard';
 import { Icon } from './components/Icon';
 import { getProfile, alertLabel } from './lib/profiles';
+import { useIncidentHistory } from './hooks/useIncidentHistory';
 
 const VIEW_KEY = 'alert-system-view';
 
@@ -25,6 +26,8 @@ export default function App() {
   const [settings, setSettings] = useState(loadSettings);
   const [alarm, dispatch] = useAlarmState();
   const [log, setLog] = useState<LogEntry[]>([]);
+  // Bumped on every local alert/all-clear so the supervisor history refetches.
+  const [incidentTick, setIncidentTick] = useState(0);
   const [sirenTesting, setSirenTesting] = useState(false);
   const [view, setView] = useState<AppView>(() => (localStorage.getItem(VIEW_KEY) === 'command' ? 'command' : 'worker'));
   const [showSettings, setShowSettings] = useState(false);
@@ -65,6 +68,7 @@ export default function App() {
     (m: WireMessage) => {
       if (m.kind === 'alert') {
         setSirenTesting(false);
+        setIncidentTick((t) => t + 1);
         dispatch({ type: 'RAISE', alert: m });
         const id = crypto.randomUUID();
         activeAlertLogRef.current = { id, startedAt: m.timestamp };
@@ -87,6 +91,7 @@ export default function App() {
           ].slice(0, 50),
         );
       } else if (m.kind === 'all-clear') {
+        setIncidentTick((t) => t + 1);
         dispatch({ type: 'CLEAR' });
         const active = activeAlertLogRef.current;
         activeAlertLogRef.current = null;
@@ -132,6 +137,9 @@ export default function App() {
   );
 
   const { status, deviceCount, roster, send, sendHeartbeat } = useAlertSocket(handleWire, getSelfInfo);
+
+  // Persisted incident history for the supervisor view (only polled while it's open).
+  const history = useIncidentHistory(view === 'command', incidentTick);
 
   // Push a heartbeat immediately when meaningful telemetry changes, so the
   // command roster reflects SOS / location / battery without waiting for the tick.
@@ -266,6 +274,9 @@ export default function App() {
           roster={roster}
           alarm={alarm}
           log={log}
+          history={history.incidents}
+          persistence={history.persistence}
+          historyError={history.error}
           profile={profile}
           selfName={settings.deviceName}
           status={status}

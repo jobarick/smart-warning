@@ -1,20 +1,33 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { AlarmState } from '../hooks/useAlarmState';
 import type { SocketStatus } from '../hooks/useAlertSocket';
-import type { LogEntry, WorkerInfo } from '../types';
+import type { AlertType, LogEntry, WorkerInfo } from '../types';
 import { ALERT_META, SEVERITY_META } from '../types';
 import { alertLabel, alertProtocol, type IndustryProfile } from '../lib/profiles';
+import type { Incident } from '../lib/api';
 import { Icon } from './Icon';
 
 interface Props {
   roster: WorkerInfo[];
   alarm: AlarmState;
   log: LogEntry[];
+  /** Persisted incidents from the backend. Empty until loaded / if no DB. */
+  history: Incident[];
+  /** null = not yet known, true = DB-backed, false = backend is relay-only. */
+  persistence: boolean | null;
+  historyError: string | null;
   profile: IndustryProfile;
   selfName: string;
   status: SocketStatus;
   onAcknowledge: () => void;
   onAllClear: () => void;
+}
+
+/** Human duration between two ISO timestamps, e.g. "2m 5s". */
+function durationBetween(fromIso: string, toIso: string): string {
+  const s = Math.max(0, Math.round((new Date(toIso).getTime() - new Date(fromIso).getTime()) / 1000));
+  const m = Math.floor(s / 60);
+  return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -68,7 +81,7 @@ function useMapPoints(roster: WorkerInfo[]) {
   }, [roster]);
 }
 
-export function CommandDashboard({ roster, alarm, log, profile, selfName, status, onAcknowledge, onAllClear }: Props) {
+export function CommandDashboard({ roster, alarm, log, history, persistence, historyError, profile, selfName, status, onAcknowledge, onAllClear }: Props) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -128,23 +141,58 @@ export function CommandDashboard({ roster, alarm, log, profile, selfName, status
           </section>
 
           <section className="cmd-card">
-            <header className="cmd-h"><Icon name="siren" /> <h3>Incident timeline</h3></header>
+            <header className="cmd-h">
+              <Icon name="siren" /> <h3>Incident history</h3>
+              <span className="cmd-h-note">
+                {persistence ? `${history.length} stored` : persistence === false ? 'this session only' : '…'}
+              </span>
+            </header>
             <div className="cmd-feed">
-              {log.length === 0 && <p className="cmd-empty">No incidents recorded this session.</p>}
-              {log.slice(0, 8).map((e) => (
-                <div className="cmd-feed-it" key={e.id}>
-                  <span className="cmd-tm">{new Date(e.timestamp).toLocaleTimeString()}</span>
-                  <span className="cmd-feed-msg">
-                    {e.kind === 'alert' ? (
-                      <>
-                        <b>{e.type ? alertLabel(profile, e.type) : 'Alert'}</b> · {e.severity} — {e.sender}
-                      </>
-                    ) : (
-                      <>All clear — {e.sender}</>
-                    )}
-                  </span>
-                </div>
-              ))}
+              {persistence && historyError && (
+                <p className="cmd-empty">Couldn’t reach history service — retrying.</p>
+              )}
+              {/* DB-backed: durable incidents that survive refreshes and span devices. */}
+              {persistence ? (
+                history.length === 0 ? (
+                  <p className="cmd-empty">No incidents recorded yet.</p>
+                ) : (
+                  history.slice(0, 12).map((inc) => (
+                    <div className="cmd-feed-it" key={inc.id}>
+                      <span className="cmd-tm">{new Date(inc.raised_at).toLocaleTimeString()}</span>
+                      <span className="cmd-feed-msg">
+                        <b>{alertLabel(profile, inc.type as AlertType)}</b> · {inc.severity} — {inc.sender || 'unknown'}
+                        {inc.zone ? ` · ${inc.zone}` : ''}
+                        {inc.status === 'active' ? (
+                          <span className="cmd-inc-badge active">active</span>
+                        ) : (
+                          <span className="cmd-inc-badge resolved">
+                            resolved{inc.resolved_at ? ` · ${durationBetween(inc.raised_at, inc.resolved_at)}` : ''}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  ))
+                )
+              ) : (
+                // Relay-only backend (or history not yet loaded): fall back to the session log.
+                <>
+                  {log.length === 0 && <p className="cmd-empty">No incidents recorded this session.</p>}
+                  {log.slice(0, 8).map((e) => (
+                    <div className="cmd-feed-it" key={e.id}>
+                      <span className="cmd-tm">{new Date(e.timestamp).toLocaleTimeString()}</span>
+                      <span className="cmd-feed-msg">
+                        {e.kind === 'alert' ? (
+                          <>
+                            <b>{e.type ? alertLabel(profile, e.type) : 'Alert'}</b> · {e.severity} — {e.sender}
+                          </>
+                        ) : (
+                          <>All clear — {e.sender}</>
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           </section>
         </div>
