@@ -1374,3 +1374,82 @@ body {
 .op-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; }
 .op-bars i { width: 3px; background: var(--panel-border); border-radius: 1px; }
 .op-bars i.on { background: var(--cmd-safe); }
+
+/* --- Auth gate / entry screen --- */
+.boot-splash {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: 60vh; color: var(--muted); font-size: 0.95rem;
+}
+.boot-splash svg { width: 22px; height: 22px; color: var(--accent); }
+
+.auth {
+  min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+  padding: 24px; background: radial-gradient(1200px 600px at 50% -10%, var(--bg-2), var(--bg));
+}
+.auth-card {
+  width: 100%; max-width: 420px;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--panel-border); border-radius: 18px;
+  box-shadow: var(--shadow); padding: 28px 26px 30px;
+}
+.auth-brand { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.01em; }
+.auth-brand .auth-logo { width: 20px; height: 20px; color: var(--accent); }
+.auth-title { margin: 18px 0 6px; font-size: 1.5rem; font-weight: 700; color: var(--text); }
+.auth-sub { color: var(--muted); font-size: 0.9rem; line-height: 1.45; margin-bottom: 18px; }
+.auth-notice { margin-top: 14px; padding: 10px 12px; border-radius: 10px; font-size: 0.84rem;
+  color: var(--cmd-warn); background: color-mix(in srgb, var(--cmd-warn) 14%, transparent); }
+.auth-error { margin-top: 14px; padding: 10px 12px; border-radius: 10px; font-size: 0.84rem;
+  color: var(--cmd-crit); background: color-mix(in srgb, var(--cmd-crit) 14%, transparent); }
+
+.auth-choice {
+  display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
+  margin-top: 12px; padding: 16px; cursor: pointer;
+  background: var(--panel); border: 1px solid var(--panel-border); border-radius: 13px;
+  color: var(--text); transition: border-color 0.15s, background 0.15s;
+}
+.auth-choice:hover { background: var(--panel-hover); border-color: color-mix(in srgb, var(--accent) 45%, var(--panel-border)); }
+.auth-choice svg { width: 26px; height: 26px; color: var(--accent); flex: none; }
+.auth-choice span { display: flex; flex-direction: column; gap: 3px; }
+.auth-choice b { font-size: 0.98rem; font-weight: 650; }
+.auth-choice small { color: var(--muted); font-size: 0.8rem; }
+
+.auth-back {
+  display: inline-flex; align-items: center; gap: 5px; margin-bottom: 6px; padding: 4px 0;
+  background: none; border: none; color: var(--muted); font-size: 0.82rem; cursor: pointer;
+}
+.auth-back:hover { color: var(--text); }
+.auth-back svg { width: 15px; height: 15px; }
+.auth-field { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+.auth-field span { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+.auth-field input {
+  padding: 12px 13px; font-size: 0.95rem; color: var(--text);
+  background: var(--bg-2); border: 1px solid var(--panel-border); border-radius: 11px; outline: none;
+}
+.auth-field input:focus { border-color: var(--accent); }
+.auth-submit {
+  width: 100%; margin-top: 20px; padding: 13px; cursor: pointer;
+  font-size: 0.98rem; font-weight: 650; color: #fff;
+  background: var(--accent); border: none; border-radius: 12px;
+}
+.auth-submit:disabled { opacity: 0.6; cursor: default; }
+.auth-alt { margin-top: 16px; text-align: center; color: var(--muted); font-size: 0.84rem; }
+.auth-alt button { background: none; border: none; color: var(--accent); font-size: inherit; cursor: pointer; font-weight: 600; }
+
+/* --- Org bar (signed-in banner) --- */
+.org-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 16px; border-bottom: 1px solid var(--panel-border);
+  background: var(--panel); font-size: 0.82rem;
+}
+.org-info { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.org-info b { color: var(--text); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.org-code {
+  color: var(--muted); font-family: var(--mono, monospace); font-size: 0.76rem;
+  padding: 2px 8px; border-radius: 999px; background: var(--bg-2); white-space: nowrap;
+}
+.org-signout {
+  display: inline-flex; align-items: center; gap: 5px; margin-left: auto; padding: 5px 11px; cursor: pointer;
+  color: var(--muted); background: var(--bg-2); border: 1px solid var(--panel-border); border-radius: 9px; font-size: 0.8rem;
+}
+.org-signout:hover { color: var(--text); border-color: var(--accent); }
+.org-signout svg { width: 14px; height: 14px; }

@@ -54,13 +54,28 @@ variable `VITE_WS_URL` to the relay's public URL, e.g.
 `wss://smart-warning-relay.onrender.com`, and redeploy. Without it the client
 falls back to `ws(s)://<same-host>:3001` (the LAN behaviour).
 
-**4. Secure it with a shared token.** Pick a long random string. Set it as
-`RELAY_TOKEN` on the relay host **and** as `VITE_RELAY_TOKEN` on Vercel (same
-value), then redeploy both. The relay then rejects any client that doesn't
-present the token, so a stranger who finds the URL can't trigger alerts. Leave
-both unset only for a trusted LAN. See `client/.env.example` and
-`server/.env.example`. (This is a shared secret, not per-user accounts — full
-auth comes with the backend phase.)
+**4. Security is built in when a database is configured.** With `DATABASE_URL`
+set, the backend runs in **orgs mode**: every client belongs to an organization
+and only sees its own org's alerts, roster and history (see *Organizations &
+accounts* below). No shared token needed. The legacy `RELAY_TOKEN` /
+`VITE_RELAY_TOKEN` shared secret only applies to the **no-database** single-room
+mode (a trusted LAN); it's ignored once orgs are enabled.
+
+## Organizations & accounts
+
+When a database is configured the backend is **multi-tenant**:
+
+- **Supervisors** create an account (email + password) which also creates an
+  **organization** and its short **join code**. Sessions are JWTs signed with
+  `JWT_SECRET` (auto-generated on Render; set it yourself elsewhere).
+- **Workers** join with the org's code and a display name — no account needed,
+  fast under pressure.
+- Every alert, roster entry, incident and stat is **scoped to one org**: a room
+  at Company A never reaches Company B. Passwords are bcrypt-hashed; supervisors
+  only ever see their own org's data.
+
+With **no** database the app skips accounts entirely and runs as a single open
+room (LAN/dev), exactly as before.
 
 ## Backend API
 
@@ -68,9 +83,15 @@ The Node backend serves a small read-only REST API (JSON, CORS-open) alongside
 the WebSocket relay. History endpoints return data only when `DATABASE_URL` is
 set; otherwise they respond `200` with `persistence: false` and empty results.
 
+In orgs mode the history/roster endpoints require a supervisor bearer token
+(`Authorization: Bearer <jwt>`) and return only that supervisor's org data.
+
 | Method & path | Description |
 | --- | --- |
-| `GET /` | Health: `{ service, clients, persistence, uptime }` (Render health check). |
+| `GET /` | Health: `{ service, clients, persistence, orgs, uptime }` (Render health check). |
+| `POST /api/auth/signup` | Create an org + first supervisor `{ orgName, name, email, password }` → `{ token, user }`. |
+| `POST /api/auth/login` | `{ email, password }` → `{ token, user }`. |
+| `GET /api/auth/me` | The current supervisor + org (bearer token). |
 | `GET /api/incidents?limit=&status=` | Recent incidents, newest first. `status` = `active` \| `resolved`; `limit` ≤ 500 (default 50). |
 | `GET /api/incidents/:id` | A single incident by its alert id, or `404`. |
 | `GET /api/stats` | Totals: `{ total, active, last24h, avgResolveSeconds }`. |
@@ -78,8 +99,8 @@ set; otherwise they respond `200` with `persistence: false` and empty results.
 
 An **incident** is created when an alert is raised (enriched with the sender's
 last-known zone + coordinates from the roster) and marked `resolved` when an
-all-clear is broadcast. The WebSocket wire protocol is unchanged, so existing
-clients get persistence with no changes.
+all-clear is broadcast, both scoped to the raiser's org. The WebSocket wire
+protocol is unchanged apart from an org `join` handshake on connect.
 
 ## Features
 
@@ -95,4 +116,4 @@ clients get persistence with no changes.
 
 - Alerts reach a device only while the app is open (foreground tab or installed app). True push notifications with the app closed would need a push service (possible later phase).
 - iOS ignores `navigator.vibrate` and may require the tab to be foregrounded for audio.
-- The relay trusts all clients on the network — for real deployments add authentication/TLS.
+- In no-database (LAN) mode the relay trusts all clients on the network; use orgs mode (a database) for authenticated, isolated deployments. Hosts like Render/Vercel provide TLS.

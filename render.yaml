@@ -20,12 +20,18 @@ services:
     startCommand: node index.js
     healthCheckPath: /
     envVars:
-      # Durable incident history. Wired automatically from the database above.
+      # Durable incident history + multi-tenant orgs. Wired automatically from the
+      # database above. Its presence also switches the backend into orgs/accounts
+      # mode (per-org rooms + supervisor login).
       - key: DATABASE_URL
         fromDatabase:
           name: smart-warning-db
           property: connectionString
-      # Optional shared token. Set a value in the dashboard to lock the relay down;
-      # it must match VITE_RELAY_TOKEN in the client build. Left blank = open relay.
+      # Secret used to sign supervisor session tokens (JWT). Render generates a
+      # strong random value; keep it stable or existing sessions are invalidated.
+      - key: JWT_SECRET
+        generateValue: true
+      # Legacy shared token — only used when there is NO database (single-room
+      # relay). Ignored once orgs are enabled. Leave unset.
       - key: RELAY_TOKEN
         sync: false

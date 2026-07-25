@@ -19,6 +19,17 @@ import { CommandDashboard } from './components/CommandDashboard';
 import { Icon } from './components/Icon';
 import { getProfile, alertLabel } from './lib/profiles';
 import { useIncidentHistory } from './hooks/useIncidentHistory';
+import { AuthGate } from './components/AuthGate';
+import { fetchHealth, fetchMe } from './lib/api';
+import {
+  loadSession,
+  saveSession,
+  clearSession,
+  joinCredentials,
+  sessionToken,
+  sessionName,
+  type Session,
+} from './lib/session';
 
 const VIEW_KEY = 'alert-system-view';
 
@@ -31,6 +42,11 @@ export default function App() {
   const [sirenTesting, setSirenTesting] = useState(false);
   const [view, setView] = useState<AppView>(() => (localStorage.getItem(VIEW_KEY) === 'command' ? 'command' : 'worker'));
   const [showSettings, setShowSettings] = useState(false);
+  // Multi-tenant auth. orgsMode: null = still checking the backend, true =
+  // accounts required, false = legacy single-room (no login).
+  const [orgsMode, setOrgsMode] = useState<boolean | null>(null);
+  const [session, setSession] = useState<Session | null>(() => loadSession());
+  const [authNotice, setAuthNotice] = useState<string | null>(null);
   const { armed, arm, siren } = useSiren();
   const profile = useMemo(() => getProfile(settings.profileId), [settings.profileId]);
   const sessionId = useRef<string>(crypto.randomUUID());
@@ -63,6 +79,51 @@ export default function App() {
   const patchSettings = useCallback((patch: Partial<typeof settings>) => {
     setSettings((s) => ({ ...s, ...patch }));
   }, []);
+
+  // Discover whether the backend requires accounts, and validate a stored login.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const health = await fetchHealth();
+      if (cancelled) return;
+      setOrgsMode(health.orgs);
+      // A stale/expired supervisor token shouldn't strand us on a blank app.
+      const s = loadSession();
+      if (health.orgs && s?.kind === 'supervisor') {
+        const user = await fetchMe(s.token);
+        if (cancelled) return;
+        if (user) setSession({ kind: 'supervisor', token: s.token, user });
+        else { clearSession(); setSession(null); }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const onAuthed = useCallback((s: Session) => {
+    saveSession(s);
+    setSession(s);
+    setAuthNotice(null);
+    const nm = sessionName(s);
+    if (nm) setSettings((prev) => ({ ...prev, deviceName: nm }));
+    setView(s.kind === 'supervisor' ? 'command' : 'worker');
+  }, []);
+
+  const signOut = useCallback(() => {
+    clearSession();
+    setSession(null);
+    setView('worker');
+  }, []);
+
+  // Keep the device identity in sync with the active session.
+  useEffect(() => {
+    const nm = sessionName(session);
+    if (nm && nm !== settings.deviceName) patchSettings({ deviceName: nm });
+  }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The app only runs its socket/dashboard once we're past the auth gate.
+  const runApp = orgsMode === false || !!session;
+  const joinCreds = useMemo(() => joinCredentials(session), [session]);
+  const token = sessionToken(session);
 
   const handleWire = useCallback(
     (m: WireMessage) => {
@@ -136,10 +197,28 @@ export default function App() {
     [settings.deviceName, settings.zone, settings.shareLocation, view, selfStatus, telemetry],
   );
 
-  const { status, deviceCount, roster, send, sendHeartbeat } = useAlertSocket(handleWire, getSelfInfo);
+  const { status, deviceCount, roster, joinRejected, send, sendHeartbeat } = useAlertSocket(
+    handleWire,
+    getSelfInfo,
+    joinCreds,
+    runApp,
+  );
+
+  // A rejected join (bad code / expired token) sends the user back to the gate.
+  useEffect(() => {
+    if (!joinRejected) return;
+    clearSession();
+    setSession(null);
+    setView('worker');
+    setAuthNotice(
+      session?.kind === 'worker'
+        ? "That team code wasn't recognized. Check it and try again."
+        : 'Your session has expired. Please sign in again.',
+    );
+  }, [joinRejected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persisted incident history for the supervisor view (only polled while it's open).
-  const history = useIncidentHistory(view === 'command', incidentTick);
+  const history = useIncidentHistory(view === 'command', incidentTick, token);
 
   // Push a heartbeat immediately when meaningful telemetry changes, so the
   // command roster reflects SOS / location / battery without waiting for the tick.
@@ -255,6 +334,23 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alarmActive, view]);
 
+  // Still checking the backend — brief splash to avoid a flash of the wrong UI.
+  if (orgsMode === null) {
+    return (
+      <div className="app">
+        <div className="boot-splash"><Icon name="siren" /> <span>Connecting…</span></div>
+      </div>
+    );
+  }
+
+  // Accounts required but not signed in → the entry gate.
+  if (orgsMode && !session) {
+    return <AuthGate onAuthed={onAuthed} notice={authNotice} />;
+  }
+
+  const org = session?.kind === 'supervisor' ? session.user.org : undefined;
+  const workerCode = session?.kind === 'worker' ? session.orgCode : undefined;
+
   return (
     <div className="app">
       <ConnectionStatus
@@ -268,6 +364,22 @@ export default function App() {
         theme={settings.theme}
         onToggleTheme={() => patchSettings({ theme: settings.theme === 'dark' ? 'light' : 'dark' })}
       />
+
+      {session && (
+        <div className="org-bar">
+          {org ? (
+            <span className="org-info">
+              <b>{org.name}</b>
+              <span className="org-code" title="Share this code with your workers">Team code {org.joinCode}</span>
+            </span>
+          ) : (
+            <span className="org-info"><b>Team {workerCode}</b><span className="org-code">{settings.deviceName}</span></span>
+          )}
+          <button className="org-signout" onClick={signOut}>
+            <Icon name="exit" /> {org ? 'Sign out' : 'Leave'}
+          </button>
+        </div>
+      )}
 
       {view === 'command' ? (
         <CommandDashboard

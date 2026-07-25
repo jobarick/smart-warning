@@ -1,9 +1,9 @@
 // Persistence layer. Turns the live alert/all-clear stream into durable incident
-// records so the supervisor dashboard has real history that survives restarts.
+// records, and backs multi-tenant orgs + supervisor accounts.
 //
 // Degrades gracefully: with no DATABASE_URL the whole module is a no-op and the
-// relay runs exactly as before (in-memory only). That keeps local/LAN use
-// zero-config while a hosted deployment (Render Postgres) gets full persistence.
+// relay runs exactly as before (in-memory, single global room). Orgs and
+// accounts only exist when a database is configured.
 const { Pool } = require('pg');
 
 const connectionString = process.env.DATABASE_URL || '';
@@ -22,12 +22,31 @@ const enabled = () => pool !== null;
 
 const numOrNull = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
-// Create the schema on boot. Idempotent, so it's safe to run on every deploy.
+// Create/upgrade the schema on boot. Idempotent — safe on every deploy, and
+// migrates an existing incidents table (from before orgs) by adding org_id.
 async function init() {
   if (!pool) return false;
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS organizations (
+      id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name       TEXT NOT NULL,
+      join_code  TEXT NOT NULL UNIQUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS users (
+      id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id        UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      email         TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      name          TEXT NOT NULL,
+      role          TEXT NOT NULL DEFAULT 'supervisor',
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
     CREATE TABLE IF NOT EXISTS incidents (
       id           TEXT PRIMARY KEY,
+      org_id       UUID,
       type         TEXT NOT NULL,
       severity     TEXT NOT NULL,
       message      TEXT,
@@ -40,24 +59,94 @@ async function init() {
       resolved_by  TEXT,
       status       TEXT NOT NULL DEFAULT 'active'
     );
+    ALTER TABLE incidents ADD COLUMN IF NOT EXISTS org_id UUID;
     CREATE INDEX IF NOT EXISTS incidents_raised_at_idx ON incidents (raised_at DESC);
     CREATE INDEX IF NOT EXISTS incidents_status_idx ON incidents (status);
+    CREATE INDEX IF NOT EXISTS incidents_org_idx ON incidents (org_id);
   `);
   return true;
 }
 
+// --- Organizations & users -------------------------------------------------
+
+// Human-friendly join code: 6 chars, uppercase, no ambiguous 0/O/1/I/L.
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+function randomCode(len = 6) {
+  let s = '';
+  for (let i = 0; i < len; i++) s += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+  return s;
+}
+
+async function createOrg(name) {
+  if (!pool) throw new Error('persistence disabled');
+  // Retry on the (very unlikely) join_code collision.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = randomCode();
+    try {
+      const { rows } = await pool.query(
+        `INSERT INTO organizations (name, join_code) VALUES ($1, $2) RETURNING *`,
+        [name, code],
+      );
+      return rows[0];
+    } catch (e) {
+      if (e.code === '23505') continue; // unique_violation → new code
+      throw e;
+    }
+  }
+  throw new Error('could not allocate a unique join code');
+}
+
+async function getOrgByCode(code) {
+  if (!pool) return null;
+  const { rows } = await pool.query(
+    `SELECT * FROM organizations WHERE join_code = $1`,
+    [String(code || '').toUpperCase()],
+  );
+  return rows[0] || null;
+}
+
+async function getOrgById(id) {
+  if (!pool) return null;
+  const { rows } = await pool.query(`SELECT * FROM organizations WHERE id = $1`, [id]);
+  return rows[0] || null;
+}
+
+async function createUser({ orgId, email, passwordHash, name, role = 'supervisor' }) {
+  if (!pool) throw new Error('persistence disabled');
+  const { rows } = await pool.query(
+    `INSERT INTO users (org_id, email, password_hash, name, role)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [orgId, email.toLowerCase(), passwordHash, name, role],
+  );
+  return rows[0];
+}
+
+async function getUserByEmail(email) {
+  if (!pool) return null;
+  const { rows } = await pool.query(`SELECT * FROM users WHERE email = $1`, [String(email || '').toLowerCase()]);
+  return rows[0] || null;
+}
+
+async function getUserById(id) {
+  if (!pool) return null;
+  const { rows } = await pool.query(`SELECT * FROM users WHERE id = $1`, [id]);
+  return rows[0] || null;
+}
+
+// --- Incidents (all scoped to an org) --------------------------------------
+
 // Record a raised alert. `worker` is the triggering device's roster entry (if
-// known), which is where the alert's location comes from — the wire alert itself
-// carries no coordinates.
-async function recordAlert(alert, worker) {
+// known), the source of the alert's location — the wire alert carries none.
+async function recordAlert(alert, worker, orgId) {
   if (!pool) return;
   const ts = numOrNull(alert.timestamp) ?? Date.now();
   await pool.query(
-    `INSERT INTO incidents (id, type, severity, message, sender, zone, lat, lng, raised_at, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, to_timestamp($9 / 1000.0), 'active')
+    `INSERT INTO incidents (id, org_id, type, severity, message, sender, zone, lat, lng, raised_at, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, to_timestamp($10 / 1000.0), 'active')
      ON CONFLICT (id) DO NOTHING`,
     [
       String(alert.id),
+      orgId || null,
       String(alert.type),
       String(alert.severity),
       alert.message || null,
@@ -66,49 +155,52 @@ async function recordAlert(alert, worker) {
       numOrNull(worker?.lat),
       numOrNull(worker?.lng),
       ts,
-    ]
+    ],
   );
 }
 
-// Resolve the currently-active incident(s). The app runs one alarm at a time and
-// all-clears aren't tied to a specific alert id, so clear whatever is still open.
-async function resolveActive(allClear) {
+// Resolve the active incident(s) for one org only.
+async function resolveActive(allClear, orgId) {
   if (!pool) return;
   const ts = numOrNull(allClear.timestamp) ?? Date.now();
   await pool.query(
     `UPDATE incidents
         SET status = 'resolved', resolved_at = to_timestamp($1 / 1000.0), resolved_by = $2
-      WHERE status = 'active'`,
-    [ts, allClear.sender || null]
+      WHERE status = 'active' AND org_id IS NOT DISTINCT FROM $3`,
+    [ts, allClear.sender || null, orgId || null],
   );
 }
 
-async function listIncidents({ limit = 50, status } = {}) {
+async function listIncidents({ limit = 50, status, orgId } = {}) {
   if (!pool) return [];
   const capped = Math.max(1, Math.min(Number(limit) || 50, 500));
-  const params = [];
-  let where = '';
+  const params = [orgId || null];
+  let where = `WHERE org_id IS NOT DISTINCT FROM $1`;
   if (status === 'active' || status === 'resolved') {
     params.push(status);
-    where = `WHERE status = $1`;
+    where += ` AND status = $${params.length}`;
   }
   params.push(capped);
   const { rows } = await pool.query(
     `SELECT * FROM incidents ${where} ORDER BY raised_at DESC LIMIT $${params.length}`,
-    params
+    params,
   );
   return rows;
 }
 
-async function getIncident(id) {
+async function getIncident(id, orgId) {
   if (!pool) return null;
-  const { rows } = await pool.query(`SELECT * FROM incidents WHERE id = $1`, [String(id)]);
+  const { rows } = await pool.query(
+    `SELECT * FROM incidents WHERE id = $1 AND org_id IS NOT DISTINCT FROM $2`,
+    [String(id), orgId || null],
+  );
   return rows[0] || null;
 }
 
-async function stats() {
+async function stats(orgId) {
   if (!pool) return null;
-  const { rows } = await pool.query(`
+  const { rows } = await pool.query(
+    `
     SELECT
       count(*)::int                                              AS total,
       count(*) FILTER (WHERE status = 'active')::int             AS active,
@@ -116,7 +208,10 @@ async function stats() {
       avg(EXTRACT(EPOCH FROM (resolved_at - raised_at)))
         FILTER (WHERE resolved_at IS NOT NULL)                   AS avg_resolve_seconds
     FROM incidents
-  `);
+    WHERE org_id IS NOT DISTINCT FROM $1
+  `,
+    [orgId || null],
+  );
   const r = rows[0];
   return {
     total: r.total,
@@ -133,6 +228,12 @@ async function close() {
 module.exports = {
   enabled,
   init,
+  createOrg,
+  getOrgByCode,
+  getOrgById,
+  createUser,
+  getUserByEmail,
+  getUserById,
   recordAlert,
   resolveActive,
   listIncidents,

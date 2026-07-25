@@ -17,20 +17,42 @@ function relayUrl(): string {
 }
 const HEARTBEAT_MS = 5000;
 
+/** Credentials presented to join the org room: a supervisor JWT or a join code. */
+export interface JoinCredentials {
+  token?: string;
+  orgCode?: string;
+}
+
 /**
  * @param onMessage    handler for validated inbound messages
  * @param getSelfInfo  returns this device's current telemetry, or null to stay
  *                     anonymous (no roster entry). Read fresh on every heartbeat.
+ * @param join         org credentials to present on connect. Changing them
+ *                     reconnects. Omit for legacy single-room (no-DB) relays.
+ * @param enabled      when false, no socket is opened (e.g. before the user has
+ *                     passed the auth gate). Defaults to true.
  */
-export function useAlertSocket(onMessage: (m: WireMessage) => void, getSelfInfo?: () => WorkerInfo | null) {
+export function useAlertSocket(
+  onMessage: (m: WireMessage) => void,
+  getSelfInfo?: () => WorkerInfo | null,
+  join?: JoinCredentials,
+  enabled: boolean = true,
+) {
   const [status, setStatus] = useState<SocketStatus>('connecting');
   const [deviceCount, setDeviceCount] = useState(0);
   const [roster, setRoster] = useState<WorkerInfo[]>([]);
+  // Set when the relay rejects our credentials (close code 4001) — the caller
+  // uses this to send the user back to the entry screen.
+  const [joinRejected, setJoinRejected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const onMessageRef = useRef(onMessage);
   onMessageRef.current = onMessage;
   const getSelfInfoRef = useRef(getSelfInfo);
   getSelfInfoRef.current = getSelfInfo;
+  const joinRef = useRef(join);
+  joinRef.current = join;
+  // Reconnect when credentials change (e.g. worker → supervisor login).
+  const joinKey = JSON.stringify(join ?? null);
 
   const sendHeartbeat = useCallback(() => {
     const ws = wsRef.current;
@@ -40,10 +62,15 @@ export function useAlertSocket(onMessage: (m: WireMessage) => void, getSelfInfo?
   }, []);
 
   useEffect(() => {
+    if (!enabled) {
+      setStatus('connecting');
+      return;
+    }
     let disposed = false;
     let retries = 0;
     let timer = 0;
     let beat = 0;
+    setJoinRejected(false);
 
     const connect = () => {
       setStatus('connecting');
@@ -53,9 +80,15 @@ export function useAlertSocket(onMessage: (m: WireMessage) => void, getSelfInfo?
       ws.onopen = () => {
         retries = 0;
         setStatus('open');
-        // Authenticate first if a shared token is configured for this build.
-        const token = import.meta.env.VITE_RELAY_TOKEN as string | undefined;
-        if (token) ws.send(JSON.stringify({ kind: 'auth', token }));
+        // Join our org room if we have credentials; otherwise fall back to the
+        // legacy shared-token flow for a no-DB single-room relay.
+        const j = joinRef.current;
+        if (j && (j.token || j.orgCode)) {
+          ws.send(JSON.stringify({ kind: 'join', ...j }));
+        } else {
+          const token = import.meta.env.VITE_RELAY_TOKEN as string | undefined;
+          if (token) ws.send(JSON.stringify({ kind: 'auth', token }));
+        }
         const info = getSelfInfoRef.current?.();
         if (info) ws.send(JSON.stringify({ kind: 'hello', ...info }));
         beat = window.setInterval(() => {
@@ -78,12 +111,17 @@ export function useAlertSocket(onMessage: (m: WireMessage) => void, getSelfInfo?
         else if (msg.kind === 'roster') setRoster(msg.workers);
         onMessageRef.current(msg);
       };
-      ws.onclose = () => {
+      ws.onclose = (e) => {
         clearInterval(beat);
         if (disposed) return;
         setStatus('closed');
         setDeviceCount(0);
         setRoster([]);
+        // 4001 = credentials rejected. Reconnecting won't help — surface it.
+        if (e.code === 4001) {
+          setJoinRejected(true);
+          return;
+        }
         timer = window.setTimeout(connect, Math.min(1000 * 2 ** retries++, 10000));
       };
       ws.onerror = () => ws.close();
@@ -96,7 +134,8 @@ export function useAlertSocket(onMessage: (m: WireMessage) => void, getSelfInfo?
       clearInterval(beat);
       wsRef.current?.close();
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [joinKey, enabled]);
 
   /** Returns true if the message went out over the wire. */
   const send = useCallback((m: WireMessage): boolean => {
@@ -108,5 +147,5 @@ export function useAlertSocket(onMessage: (m: WireMessage) => void, getSelfInfo?
     return false;
   }, []);
 
-  return { status, deviceCount, roster, send, sendHeartbeat };
+  return { status, deviceCount, roster, joinRejected, send, sendHeartbeat };
 }
