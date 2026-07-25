@@ -276,10 +276,17 @@ wss.on('connection', (ws, req) => {
   ws.authed = ORGS ? false : !TOKEN;
   ws.on('pong', () => { ws.isAlive = true; });
 
-  // Drop clients that never join/authenticate in time.
+  // Drop clients that never join/authenticate in time. close() only *starts* a
+  // handshake; some proxies (Render's included) don't relay the close frame, so
+  // the socket would squat a slot until ws's ~30s timeout. Force it down shortly
+  // after asking politely.
   const needsJoin = ORGS || !!TOKEN;
   const authTimer = needsJoin
-    ? setTimeout(() => { if (!ws.authed) ws.close(4001, 'authentication required'); }, 5000)
+    ? setTimeout(() => {
+        if (ws.authed) return;
+        ws.close(4001, 'authentication required');
+        setTimeout(() => { if (ws.readyState !== 3) ws.terminate(); }, 1000).unref?.();
+      }, 5000)
     : null;
 
   console.log(`[+] client #${ws.connId} connected from ${req.socket.remoteAddress} (${wss.clients.size} online)`);
