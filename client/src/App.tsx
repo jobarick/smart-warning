@@ -20,6 +20,8 @@ import { Icon } from './components/Icon';
 import { getProfile, alertLabel } from './lib/profiles';
 import { useIncidentHistory } from './hooks/useIncidentHistory';
 import { AuthGate } from './components/AuthGate';
+import { PushToggle } from './components/PushToggle';
+import { unsubscribe as unsubscribePush } from './lib/push';
 import { fetchHealth, fetchMe } from './lib/api';
 import {
   loadSession,
@@ -109,6 +111,7 @@ export default function App() {
   }, []);
 
   const signOut = useCallback(() => {
+    void unsubscribePush(); // stop this device receiving the old org's alerts
     clearSession();
     setSession(null);
     setView('worker');
@@ -375,6 +378,7 @@ export default function App() {
           ) : (
             <span className="org-info"><b>Team {workerCode}</b><span className="org-code">{settings.deviceName}</span></span>
           )}
+          {joinCreds && <PushToggle creds={joinCreds} />}
           <button className="org-signout" onClick={signOut}>
             <Icon name="exit" /> {org ? 'Sign out' : 'Leave'}
           </button>

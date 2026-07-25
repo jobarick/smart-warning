@@ -7,7 +7,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon.svg'],
+      includeAssets: ['icon.svg', 'push-sw.js'],
+      // Pull our push / notificationclick handlers into the generated SW.
+      workbox: { importScripts: ['push-sw.js'] },
       devOptions: { enabled: true },
       manifest: {
         name: 'Smart Emergency Warning & Threat Alert System',

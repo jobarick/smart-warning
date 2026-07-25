@@ -133,3 +133,35 @@ export async function fetchMe(token: string): Promise<AuthUser | null> {
   const body = await res.json();
   return body.user as AuthUser;
 }
+
+// --- Web push ---
+
+export async function fetchVapidKey(): Promise<{ enabled: boolean; publicKey: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/api/push/vapid`);
+    if (!res.ok) return { enabled: false, publicKey: '' };
+    return res.json();
+  } catch {
+    return { enabled: false, publicKey: '' };
+  }
+}
+
+export async function savePushSubscription(
+  subscription: unknown,
+  creds: { token?: string; orgCode?: string },
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/push/subscribe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(creds.token) },
+    body: JSON.stringify({ subscription, orgCode: creds.orgCode }),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not enable notifications'));
+}
+
+export async function deletePushSubscription(endpoint: string): Promise<void> {
+  await fetch(`${API_BASE}/api/push/unsubscribe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ endpoint }),
+  });
+}

@@ -13,6 +13,7 @@ const http = require('http');
 const { WebSocketServer } = require('ws');
 const db = require('./db');
 const auth = require('./auth');
+const push = require('./push');
 
 const PORT = process.env.PORT || 3001;
 // Legacy shared token (only used when orgs are disabled — i.e. no database).
@@ -105,6 +106,28 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { user: auth.publicUser(ctx.user, ctx.org) });
     }
 
+    // --- Web push ---
+    if (path === '/api/push/vapid' && req.method === 'GET') {
+      return sendJson(res, 200, { enabled: push.enabled(), publicKey: push.getPublicKey() });
+    }
+    if (path === '/api/push/subscribe' && req.method === 'POST') {
+      if (!push.enabled()) return sendJson(res, 501, { error: 'push notifications are not available' });
+      const body = await readJson(req);
+      const orgId = await orgIdFromRequest(req, body);
+      if (!orgId) return sendJson(res, 401, { error: 'org credentials required' });
+      const sub = body.subscription;
+      if (!sub || !sub.endpoint || !sub.keys || !sub.keys.p256dh || !sub.keys.auth) {
+        return sendJson(res, 400, { error: 'invalid subscription' });
+      }
+      await db.createPushSubscription({ orgId, endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth });
+      return sendJson(res, 201, { ok: true });
+    }
+    if (path === '/api/push/unsubscribe' && req.method === 'POST') {
+      const body = await readJson(req);
+      if (body.endpoint) await db.deletePushSubscription(body.endpoint);
+      return sendJson(res, 200, { ok: true });
+    }
+
     // --- History (org-scoped once orgs are enabled) ---
     if (path === '/api/incidents' && req.method === 'GET') {
       const ctx = await guardOrg(req, res);
@@ -154,6 +177,23 @@ async function guardOrg(req, res) {
   const ctx = await requireAuth(req);
   if (!ctx) { sendJson(res, 401, { error: 'not authenticated' }); return false; }
   return ctx;
+}
+
+// Resolve an org for a push subscription: a supervisor's bearer token, or a
+// worker's join code in the body. Returns an org id or null.
+async function orgIdFromRequest(req, body) {
+  const ctx = await requireAuth(req);
+  if (ctx) return ctx.orgId;
+  if (body && body.orgCode) {
+    const org = await db.getOrgByCode(body.orgCode);
+    if (org) return org.id;
+  }
+  return null;
+}
+
+// Title-cased alert type for notification copy, e.g. "fire" → "Fire".
+function titleCase(s) {
+  return typeof s === 'string' && s ? s[0].toUpperCase() + s.slice(1) : 'Alert';
 }
 
 // ---------------------------------------------------------------------------
@@ -285,9 +325,22 @@ wss.on('connection', (ws, req) => {
       if (msg.kind === 'alert') {
         console.log(`[!] ALERT ${msg.type}/${msg.severity} from #${ws.connId} "${msg.sender}" (org ${ws.orgId ?? 'global'}): ${msg.message || '(no message)'}`);
         db.recordAlert(msg, ws.worker, ws.orgId).catch((e) => console.error('[db] recordAlert:', e.message));
+        // Reach devices that don't have the app open.
+        push.notifyOrg(ws.orgId, {
+          title: `🚨 ${titleCase(msg.type)} alert`,
+          body: msg.message || `${titleCase(msg.severity)} severity — raised by ${msg.sender || 'a worker'}`,
+          type: msg.type,
+          severity: msg.severity,
+          tag: 'sw-alert',
+        }).catch((e) => console.error('[push] notifyOrg:', e.message));
       } else {
         console.log(`[.] all-clear from #${ws.connId} "${msg.sender}" (org ${ws.orgId ?? 'global'})`);
         db.resolveActive(msg, ws.orgId).catch((e) => console.error('[db] resolveActive:', e.message));
+        push.notifyOrg(ws.orgId, {
+          title: '✓ All clear',
+          body: `Stood down by ${msg.sender || 'a supervisor'}`,
+          tag: 'sw-alert',
+        }).catch((e) => console.error('[push] notifyOrg:', e.message));
       }
       broadcast(ws.orgId, msg);
       return;
@@ -341,6 +394,11 @@ async function start() {
   } catch (err) {
     // A DB hiccup must never keep the life-safety relay from starting.
     console.error('[db] init failed, continuing without persistence:', err.message);
+  }
+  try {
+    await push.init();
+  } catch (err) {
+    console.error('[push] init failed, continuing without web push:', err.message);
   }
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`Alert backend listening on http://0.0.0.0:${PORT} (ws + REST, orgs ${ORGS ? 'ON' : 'OFF'})`);

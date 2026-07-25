@@ -17,7 +17,9 @@ export type IconName =
   | 'settings'
   | 'arrow-left'
   | 'sun'
-  | 'moon';
+  | 'moon'
+  | 'bell'
+  | 'bell-off';
 
 const PATHS: Record<IconName, React.ReactNode> = {
   flame: (
@@ -115,6 +117,19 @@ const PATHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   moon: <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />,
+  bell: (
+    <>
+      <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+    </>
+  ),
+  'bell-off': (
+    <>
+      <path d="M8.7 3A6 6 0 0 1 18 8c0 3 .5 5 1.3 6.4M6 8c0 7-3 9-3 9h13" />
+      <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+      <path d="M3 3l18 18" />
+    </>
+  ),
 };
 
 export function Icon({ name, ...props }: { name: IconName } & SVGProps<SVGSVGElement>) {

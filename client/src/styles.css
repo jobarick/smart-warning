@@ -1441,15 +1441,18 @@ body {
   padding: 8px 16px; border-bottom: 1px solid var(--panel-border);
   background: var(--panel); font-size: 0.82rem;
 }
-.org-info { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.org-info { display: flex; align-items: baseline; gap: 10px; min-width: 0; margin-right: auto; }
 .org-info b { color: var(--text); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .org-code {
   color: var(--muted); font-family: var(--mono, monospace); font-size: 0.76rem;
   padding: 2px 8px; border-radius: 999px; background: var(--bg-2); white-space: nowrap;
 }
-.org-signout {
-  display: inline-flex; align-items: center; gap: 5px; margin-left: auto; padding: 5px 11px; cursor: pointer;
+.org-signout, .push-toggle {
+  display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; cursor: pointer;
   color: var(--muted); background: var(--bg-2); border: 1px solid var(--panel-border); border-radius: 9px; font-size: 0.8rem;
+  white-space: nowrap;
 }
-.org-signout:hover { color: var(--text); border-color: var(--accent); }
-.org-signout svg { width: 14px; height: 14px; }
+.org-signout:hover, .push-toggle:hover:not(:disabled) { color: var(--text); border-color: var(--accent); }
+.org-signout svg, .push-toggle svg { width: 14px; height: 14px; }
+.push-toggle.is-on { color: var(--cmd-safe); border-color: color-mix(in srgb, var(--cmd-safe) 45%, var(--panel-border)); }
+.push-toggle:disabled { opacity: 0.6; cursor: default; }

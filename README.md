@@ -96,6 +96,9 @@ In orgs mode the history/roster endpoints require a supervisor bearer token
 | `GET /api/incidents/:id` | A single incident by its alert id, or `404`. |
 | `GET /api/stats` | Totals: `{ total, active, last24h, avgResolveSeconds }`. |
 | `GET /api/roster` | The live connected-device roster (from memory, not persisted). |
+| `GET /api/push/vapid` | `{ enabled, publicKey }` — the VAPID key a device needs to subscribe. |
+| `POST /api/push/subscribe` | Register a Web Push subscription (bearer token or `{ orgCode }`). |
+| `POST /api/push/unsubscribe` | Remove a subscription by `{ endpoint }`. |
 
 An **incident** is created when an alert is raised (enriched with the sender's
 last-known zone + coordinates from the roster) and marked `resolved` when an
@@ -114,6 +117,6 @@ protocol is unchanged apart from an org `join` handshake on connect.
 
 ## Notes & limitations
 
-- Alerts reach a device only while the app is open (foreground tab or installed app). True push notifications with the app closed would need a push service (possible later phase).
+- **Push notifications** (orgs mode) reach devices even when the app is closed: each device can opt in with the bell toggle, and alerts/all-clears are delivered via the Web Push API. Requires HTTPS, notification permission, and — on iOS — an installed (Add to Home Screen) PWA. Without opting in, alerts still arrive whenever the app is open.
 - iOS ignores `navigator.vibrate` and may require the tab to be foregrounded for audio.
 - In no-database (LAN) mode the relay trusts all clients on the network; use orgs mode (a database) for authenticated, isolated deployments. Hosts like Render/Vercel provide TLS.

@@ -44,6 +44,22 @@ async function init() {
       created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id     UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      endpoint   TEXT NOT NULL UNIQUE,
+      p256dh     TEXT NOT NULL,
+      auth       TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS push_subscriptions_org_idx ON push_subscriptions (org_id);
+
+    -- Small key/value store for server-managed config (e.g. the VAPID keypair).
+    CREATE TABLE IF NOT EXISTS app_kv (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS incidents (
       id           TEXT PRIMARY KEY,
       org_id       UUID,
@@ -221,6 +237,47 @@ async function stats(orgId) {
   };
 }
 
+// --- Push subscriptions (org-scoped) ---------------------------------------
+
+async function createPushSubscription({ orgId, endpoint, p256dh, auth }) {
+  if (!pool) return;
+  // A device may re-subscribe (new keys) — key on the endpoint.
+  await pool.query(
+    `INSERT INTO push_subscriptions (org_id, endpoint, p256dh, auth)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (endpoint) DO UPDATE SET org_id = EXCLUDED.org_id, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth`,
+    [orgId, endpoint, p256dh, auth],
+  );
+}
+
+async function listPushSubscriptions(orgId) {
+  if (!pool) return [];
+  const { rows } = await pool.query(`SELECT * FROM push_subscriptions WHERE org_id = $1`, [orgId]);
+  return rows;
+}
+
+async function deletePushSubscription(endpoint) {
+  if (!pool) return;
+  await pool.query(`DELETE FROM push_subscriptions WHERE endpoint = $1`, [endpoint]);
+}
+
+// --- Key/value config ------------------------------------------------------
+
+async function getKv(key) {
+  if (!pool) return null;
+  const { rows } = await pool.query(`SELECT value FROM app_kv WHERE key = $1`, [key]);
+  return rows[0] ? rows[0].value : null;
+}
+
+async function setKv(key, value) {
+  if (!pool) return;
+  await pool.query(
+    `INSERT INTO app_kv (key, value) VALUES ($1, $2)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+    [key, value],
+  );
+}
+
 async function close() {
   if (pool) await pool.end();
 }
@@ -239,5 +296,10 @@ module.exports = {
   listIncidents,
   getIncident,
   stats,
+  createPushSubscription,
+  listPushSubscriptions,
+  deletePushSubscription,
+  getKv,
+  setKv,
   close,
 };
