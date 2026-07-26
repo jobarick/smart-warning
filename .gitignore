@@ -20,6 +20,9 @@ npm-debug.log*
 .env
 .env.*
 !.env.example
+# Committed deliberately: only the public relay URL, so production builds need
+# no dashboard env vars. Never put secrets in it.
+!client/.env.production
 
 # Editor / OS
 .vscode/*
