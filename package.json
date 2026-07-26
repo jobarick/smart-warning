@@ -1,0 +1,9 @@
+{
+  "name": "smart-warning",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Smart Emergency Warning & Threat Alert System — client (client/) and backend relay (server/)",
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
