@@ -64,6 +64,7 @@ export default function App() {
   const [sirenTesting, setSirenTesting] = useState(false);
   const [view, setView] = useState<AppView>(() => (localStorage.getItem(VIEW_KEY) === 'command' ? 'command' : 'worker'));
   const [showSettings, setShowSettings] = useState(false);
+  const [showMore, setShowMore] = useState(false);
   // Multi-tenant auth. orgsMode: null = still checking the backend, true =
   // accounts required, false = legacy single-room (no login).
   const [orgsMode, setOrgsMode] = useState<boolean | null>(null);
@@ -535,17 +536,28 @@ export default function App() {
             alarm={alarm}
             now={now}
           />
-          <MapPanel
-            userLat={telemetry.lat}
-            userLng={telemetry.lng}
-            assembly={{ lat: settings.assemblyLat, lng: settings.assemblyLng, label: settings.assemblyLabel }}
-          />
+          {/* The map and the history are reference, not action. Keeping them on
+              the primary screen pushed the SOS and the live telemetry into a
+              second scroll; behind a toggle, the screen someone opens under
+              pressure is only the parts they act on. */}
+          {showMore && (
+            <>
+              <MapPanel
+                userLat={telemetry.lat}
+                userLng={telemetry.lng}
+                assembly={{ lat: settings.assemblyLat, lng: settings.assemblyLng, label: settings.assemblyLabel }}
+              />
+              <AlertLog entries={log} />
+            </>
+          )}
           <div className="worker-tools">
+            <button className="btn settings-link" onClick={() => setShowMore((v) => !v)}>
+              {showMore ? 'Hide map & history' : 'Map & history'}
+            </button>
             <button className="btn settings-link" onClick={() => setShowSettings(true)}>
-              <Icon name="settings" /> Settings &amp; alarm options
+              <Icon name="settings" /> Settings
             </button>
           </div>
-          <AlertLog entries={log} />
         </main>
       )}
 

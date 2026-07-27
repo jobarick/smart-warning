@@ -1951,3 +1951,169 @@ body {
   background: var(--panel-2);
   border-color: var(--accent);
 }
+
+/* ===================================================================
+   Monochrome type + compressed worker screen.
+
+   Text is greyscale everywhere: offwhite for values, silver for copy,
+   grey for labels. Red survives on one thing only — a live critical
+   state — which is what the reference reserves it for.
+
+   Green and amber stop being text colours and become small square
+   indicators instead. That keeps All Clear / Advisory / Emergency
+   separable without a coloured word anywhere on screen.
+   =================================================================== */
+
+/* --- status strip: from a full-bleed colour bar to a quiet rule --- */
+:root:not([data-theme="light"]) .sysbar,
+:root:not([data-theme="light"]) .sysbar-clear,
+:root:not([data-theme="light"]) .sysbar-watch,
+:root:not([data-theme="light"]) .sysbar-emergency {
+  background: var(--panel);
+  border-bottom: 1px solid var(--panel-border);
+  min-height: 40px;
+  color: var(--text);
+}
+:root:not([data-theme="light"]) .sysbar-label {
+  color: var(--text);
+  font-size: 0.76rem;
+}
+:root:not([data-theme="light"]) .sysbar-note,
+:root:not([data-theme="light"]) .sysbar-time { color: var(--faint); }
+/* the square is now the only thing carrying state colour */
+:root:not([data-theme="light"]) .sysbar-dot {
+  border-radius: 0;
+  width: 7px;
+  height: 7px;
+  animation: none;
+}
+:root:not([data-theme="light"]) .sysbar-clear .sysbar-dot { background: var(--cmd-safe); }
+:root:not([data-theme="light"]) .sysbar-watch .sysbar-dot { background: var(--cmd-warn); }
+:root:not([data-theme="light"]) .sysbar-emergency .sysbar-dot { background: var(--cmd-crit); }
+:root:not([data-theme="light"]) .sysbar-emergency .sysbar-label { color: var(--cmd-crit); }
+
+/* --- greyscale the remaining coloured text --- */
+:root:not([data-theme="light"]) .cmd-kpi b.safe,
+:root:not([data-theme="light"]) .cmd-kpi b.warn,
+:root:not([data-theme="light"]) .op-badge.safe,
+:root:not([data-theme="light"]) .mapcard-h svg,
+:root:not([data-theme="light"]) .log-sender,
+:root:not([data-theme="light"]) .cmd-inc-badge {
+  color: var(--muted);
+}
+:root:not([data-theme="light"]) .op-badge.safe,
+:root:not([data-theme="light"]) .op-badge.danger { background: var(--panel-2); }
+:root:not([data-theme="light"]) .op-badge.danger { color: var(--cmd-crit); }
+:root:not([data-theme="light"]) .op-badge-dot { border-radius: 0; }
+
+/* --- compress the worker screen so it stops being a long scroll --- */
+:root:not([data-theme="light"]) .worker {
+  max-width: 640px;
+  padding: 12px;
+  gap: 10px;
+}
+:root:not([data-theme="light"]) .sos { padding: 12px; gap: 10px; }
+:root:not([data-theme="light"]) .sos-title { font-size: 0.9rem; }
+:root:not([data-theme="light"]) .sos-hero { height: 128px; }
+:root:not([data-theme="light"]) .sos-hero-word { font-size: 2.5rem; }
+:root:not([data-theme="light"]) .sos-hero-sub { font-size: 0.66rem; }
+:root:not([data-theme="light"]) .sos-types { gap: 6px; }
+:root:not([data-theme="light"]) .sos-type { padding: 9px 4px; gap: 4px; font-size: 0.78rem; }
+:root:not([data-theme="light"]) .sos-type-ic { font-size: 1.05rem; }
+:root:not([data-theme="light"]) .sos-sev-opt { padding: 7px; font-size: 0.78rem; }
+:root:not([data-theme="light"]) .sos-pick,
+:root:not([data-theme="light"]) .sos-hint { font-size: 0.76rem; }
+
+:root:not([data-theme="light"]) .op { padding: 12px; gap: 10px; }
+:root:not([data-theme="light"]) .op-name { font-size: 1.15rem; }
+:root:not([data-theme="light"]) .op-tiles { gap: 6px; }
+:root:not([data-theme="light"]) .op-tile { padding: 8px 10px; gap: 3px; }
+:root:not([data-theme="light"]) .op-tile b { font-size: 0.95rem; }
+
+/* Map and history keep their own scroll instead of extending the page. */
+:root:not([data-theme="light"]) .mapcard .map-el { height: 150px; }
+:root:not([data-theme="light"]) .log-list { max-height: 164px; overflow-y: auto; }
+
+/* --- second compression pass, measured on a 375x812 phone ---
+   The header was wrapping to three rows (191px) and the SOS panel ran to
+   662px. These are the two that decide whether the screen scrolls. */
+:root:not([data-theme="light"]) .status-bar {
+  padding: 8px 12px;
+  gap: 8px;
+  row-gap: 6px;
+}
+:root:not([data-theme="light"]) .brand { font-size: 0.95rem; }
+:root:not([data-theme="light"]) .brand svg { width: 18px; height: 18px; }
+:root:not([data-theme="light"]) .view-tab { padding: 6px 12px; font-size: 0.72rem; }
+:root:not([data-theme="light"]) .btn-arm { padding: 6px 10px; font-size: 0.64rem; }
+
+/* Chips carry an icon and a word; at this size neither needs the room it had. */
+:root:not([data-theme="light"]) .sos-type { padding: 7px 3px; gap: 3px; font-size: 0.7rem; }
+:root:not([data-theme="light"]) .sos-type-ic { font-size: 0.95rem; }
+:root:not([data-theme="light"]) .sos-msg { padding: 8px 10px; font-size: 0.82rem; }
+
+/* Two lines said the same thing under the button; one is enough. */
+:root:not([data-theme="light"]) .sos-hint { display: none; }
+
+:root:not([data-theme="light"]) .op-tiles { gap: 5px; }
+:root:not([data-theme="light"]) .op-tile { padding: 6px 9px; }
+:root:not([data-theme="light"]) .op-tile b { font-size: 0.88rem; }
+:root:not([data-theme="light"]) .op-t-lbl { font-size: 0.6rem; }
+
+:root:not([data-theme="light"]) .mapcard .map-el { height: 108px; }
+:root:not([data-theme="light"]) .log-list { max-height: 116px; }
+
+/* On a phone the status line's device count is the first thing that can go. */
+@media (max-width: 560px) {
+  :root:not([data-theme="light"]) .devices { display: none; }
+}
+
+/* The two rules that actually governed the height: a 96px floor on each chip,
+   and a 116px minimum column that dropped the grid to two columns on a phone —
+   six chips became three rows. Three fixed columns and a lower floor put the
+   whole selector in two short rows. */
+:root:not([data-theme="light"]) .sos-types {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+:root:not([data-theme="light"]) .sos-type {
+  min-height: 54px;
+  border-width: 1px;
+}
+:root:not([data-theme="light"]) .status-items { gap: 8px; }
+:root:not([data-theme="light"]) .op-tiles {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  margin-top: 10px;
+}
+:root:not([data-theme="light"]) .op-tile-wide { grid-column: 1 / -1; }
+
+/* Tighter identity block — the name no longer needs display size next to a
+   red slab, and the two tool links sit on one row. */
+:root:not([data-theme="light"]) .op-head { gap: 8px; }
+:root:not([data-theme="light"]) .op-name { font-size: 1rem; }
+:root:not([data-theme="light"]) .op-hello { font-size: 0.72rem; }
+:root:not([data-theme="light"]) .op-id { font-size: 0.66rem; }
+:root:not([data-theme="light"]) .worker-tools { gap: 8px; }
+
+/* Signal strength is a magnitude, not a state — the filled bars already say it,
+   so they read in offwhite rather than borrowing the all-clear green. */
+:root:not([data-theme="light"]) .op-bars i.on { background: var(--text); }
+
+/* The header stacked four rows on a phone: brand, tabs, connection, audio.
+   The device count is the one line nobody acts on, and the brand name is
+   already in the tab bar's context. */
+@media (max-width: 560px) {
+  :root:not([data-theme="light"]) .device-count { display: none; }
+  :root:not([data-theme="light"]) .status-bar { padding: 6px 12px; row-gap: 4px; }
+  :root:not([data-theme="light"]) .brand-name { font-size: 0.85rem; }
+}
+
+/* Selected site status: the state colour moves to the border, the label stays
+   offwhite. Last solid colour field outside the SOS. */
+:root:not([data-theme="light"]) .cmd-status-btn.on {
+  background: var(--panel-2);
+  color: var(--text);
+}
+:root:not([data-theme="light"]) .cmd-status-btn.on.clear { border-color: var(--cmd-safe); }
+:root:not([data-theme="light"]) .cmd-status-btn.on.watch { border-color: var(--cmd-warn); }
