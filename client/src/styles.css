@@ -3,27 +3,36 @@
   margin: 0;
 }
 
+/* Monochrome ground with a single red accent — hairline rules instead of
+   raised cards, no glow, no ambient shadow.
+
+   The three state colours are the deliberate exception. Everything decorative
+   is greyscale, but All Clear / Advisory / Emergency must stay separable at a
+   glance, and hue is what does that work on a screen someone reads under
+   pressure. Stripping green and amber would leave an advisory and an all-clear
+   looking identical. */
 :root {
-  --bg: #060608;
-  --bg-2: #0d0d11;
-  --panel: #121217;
-  --panel-2: #17171d;
-  --panel-border: #26262e;
-  --panel-hover: #1c1c23;
-  --text: #f4f4f6;
-  --muted: #8a8a95;
-  --faint: #5c5c66;
-  --accent: #ff3b30;
-  --shadow: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 12px 32px rgba(0, 0, 0, 0.55);
-  --shadow-sm: 0 6px 18px rgba(0, 0, 0, 0.45);
-  --cmd-crit: #ff453a;
-  --cmd-warn: #ff9f0a;
-  --cmd-safe: #30d158;
-  --cmd-info: #4aa3ff;
-  --cmd-nosig: #6b7280;
-  --glow: #14141b;
-  --bar-bg: rgba(8, 8, 11, 0.72);
-  --mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+  --bg: #080808;
+  --bg-2: #0a0a0a;
+  --panel: #0a0a0a;
+  --panel-2: #111111;
+  --panel-border: #1a1a1a;
+  --panel-hover: #141414;
+  --text: #f5f5f5;
+  --muted: #9a9a9a;
+  --faint: #707070;
+  --accent: #e53e3e;
+  --shadow: none;
+  --shadow-sm: none;
+  --cmd-crit: #e53e3e;
+  --cmd-warn: #ff9f0a; /* state only — advisory, low battery */
+  --cmd-safe: #30d158; /* state only — all clear, worker safe */
+  --cmd-info: #8a8a8a; /* demoted: informational, no longer a blue accent */
+  --cmd-nosig: #555555;
+  --glow: #080808; /* flattens the body radial-gradient */
+  --bar-bg: rgba(8, 8, 8, 0.9);
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+  --sans: "DM Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
 /* Light background option */
@@ -59,7 +68,7 @@ body {
   background-image: radial-gradient(1200px 600px at 50% -10%, var(--glow) 0%, var(--bg) 60%);
   background-repeat: no-repeat;
   color: var(--text);
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -1822,3 +1831,123 @@ body {
 }
 
 .org-public:hover { text-decoration: underline; }
+
+/* ===================================================================
+   Monochrome restyle — hairline rules, squared corners, mono labels.
+
+   Layered as overrides rather than rewritten in place so the structural
+   CSS above stays readable and the change is reversible in one block.
+   Dark only: the light theme keeps its own palette (see :root[data-theme]).
+   =================================================================== */
+
+/* Square the geometry. Cards become panels divided by rules, not floating
+   objects — the reason the shadow tokens are now `none`. */
+:root:not([data-theme="light"]) .cmd-card,
+:root:not([data-theme="light"]) .cmd-kpi,
+:root:not([data-theme="light"]) .cmd-stat,
+:root:not([data-theme="light"]) .cmd-status,
+:root:not([data-theme="light"]) .panel,
+:root:not([data-theme="light"]) .rep-item,
+:root:not([data-theme="light"]) .pub-card,
+:root:not([data-theme="light"]) .join-card,
+:root:not([data-theme="light"]) .auth-card,
+:root:not([data-theme="light"]) .tile,
+:root:not([data-theme="light"]) .op-tile {
+  border-radius: 2px;
+  box-shadow: none;
+}
+
+/* The SOS block. The mock replaces the disc with a slab — it reads as a
+   control surface rather than a badge, and gains target area at the same
+   width. Keep it unmistakably red: this is the one accent in the palette. */
+:root:not([data-theme="light"]) .sos-hero {
+  width: 100%;
+  max-width: 340px;
+  height: 176px;
+  border-radius: 2px;
+  box-shadow: none;
+}
+:root:not([data-theme="light"]) .sos-hero-ring { border-radius: 2px; }
+:root:not([data-theme="light"]) .sos-hero-word { font-size: 3.4rem; font-weight: 700; }
+
+/* Data labels in mono, uppercase, letterspaced — the strongest single cue
+   of the terminal look, and it costs no colour. */
+:root:not([data-theme="light"]) .cmd-lbl,
+:root:not([data-theme="light"]) .cmd-sub,
+:root:not([data-theme="light"]) .cmd-h-note,
+:root:not([data-theme="light"]) .op-label,
+:root:not([data-theme="light"]) .rep-meta,
+:root:not([data-theme="light"]) .sysfoot,
+:root:not([data-theme="light"]) .sysbar-time,
+:root:not([data-theme="light"]) .org-code {
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+
+/* Buttons: hairline outlines, mono caps. One filled button per view. */
+:root:not([data-theme="light"]) .btn,
+:root:not([data-theme="light"]) .cmd-status-btn,
+:root:not([data-theme="light"]) .rep-btn,
+:root:not([data-theme="light"]) .org-signout {
+  border-radius: 2px;
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+}
+
+/* The public page's submit is the one non-red filled control: inverted,
+   so it reads as primary without borrowing the emergency colour. */
+:root:not([data-theme="light"]) .pub-submit {
+  background: var(--text);
+  color: var(--bg);
+  border-radius: 2px;
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+:root:not([data-theme="light"]) .pub-input,
+:root:not([data-theme="light"]) .pub-again { border-radius: 2px; }
+
+/* The status bar keeps its state colour but loses the pill softness. */
+:root:not([data-theme="light"]) .sysbar {
+  border-radius: 0;
+}
+:root:not([data-theme="light"]) .sysbar-label {
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* Remaining rounded surfaces on the worker screen, plus the audio prompt —
+   which was the last non-state colour competing with the SOS for attention. */
+:root:not([data-theme="light"]) .sos,
+:root:not([data-theme="light"]) .sos-types,
+:root:not([data-theme="light"]) .sos-type,
+:root:not([data-theme="light"]) .sos-sev,
+:root:not([data-theme="light"]) .sos-sev-opt,
+:root:not([data-theme="light"]) .sos-msg,
+:root:not([data-theme="light"]) .btn-arm,
+:root:not([data-theme="light"]) .audio-ok,
+:root:not([data-theme="light"]) .log,
+:root:not([data-theme="light"]) .log-item,
+:root:not([data-theme="light"]) .map-panel,
+:root:not([data-theme="light"]) .op-card,
+:root:not([data-theme="light"]) .view-tabs,
+:root:not([data-theme="light"]) .view-tab {
+  border-radius: 2px;
+}
+
+/* The arm-audio prompt is advice, not a state — greyscale it so amber keeps
+   meaning "advisory" and nothing else. */
+:root:not([data-theme="light"]) .btn-arm {
+  background: var(--panel-2);
+  border-color: var(--panel-border);
+  color: var(--muted);
+}
+
+:root:not([data-theme="light"]) .sos-type.active {
+  background: var(--panel-2);
+  border-color: var(--accent);
+}
