@@ -30,7 +30,7 @@ export interface AuthUser {
   email: string;
   name: string;
   role: string;
-  org: { id: string; name: string; joinCode: string };
+  org: { id: string; name: string; joinCode: string; publicCode: string | null };
 }
 
 export interface AuthResult {
@@ -139,6 +139,68 @@ export async function fetchMe(token: string): Promise<AuthUser | null> {
   if (!res.ok) return null;
   const body = await res.json();
   return body.user as AuthUser;
+}
+
+// --- Public reporting ---
+
+export interface Report {
+  id: string;
+  message: string;
+  location: string | null;
+  status: 'pending' | 'escalated' | 'dismissed';
+  created_at: string;
+  handled_at: string | null;
+  handled_by: string | null;
+}
+
+/** Resolve a site's public code to its name. Returns null for an unknown code. */
+export async function fetchSite(publicCode: string): Promise<{ name: string } | null> {
+  const res = await fetch(`${API_BASE}/api/public/site/${encodeURIComponent(publicCode)}`);
+  if (!res.ok) return null;
+  const body = await res.json();
+  return body.site ?? null;
+}
+
+/** File a report from the public page. Queued for review — never an alert. */
+export async function submitReport(input: {
+  publicCode: string;
+  message: string;
+  location?: string;
+}): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/public/reports`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not submit the report'));
+}
+
+export async function fetchReports(token?: string): Promise<Report[]> {
+  const res = await fetch(`${API_BASE}/api/reports?status=pending`, { headers: authHeaders(token) });
+  if (!res.ok) throw new Error(`reports request failed (${res.status})`);
+  const body = await res.json();
+  return body.reports ?? [];
+}
+
+export async function escalateReport(
+  id: string,
+  input: { type: string; severity: string },
+  token?: string,
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/reports/${encodeURIComponent(id)}/escalate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not escalate the report'));
+}
+
+export async function dismissReport(id: string, token?: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/reports/${encodeURIComponent(id)}/dismiss`, {
+    method: 'POST',
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not dismiss the report'));
 }
 
 // --- Web push ---

@@ -34,7 +34,7 @@ import { useIncidentHistory } from './hooks/useIncidentHistory';
 import { AuthGate } from './components/AuthGate';
 import { PushToggle } from './components/PushToggle';
 import { unsubscribe as unsubscribePush } from './lib/push';
-import { fetchHealth, fetchMe } from './lib/api';
+import { fetchHealth, fetchMe, fetchReports, escalateReport, dismissReport, type Report } from './lib/api';
 import {
   loadSession,
   saveSession,
@@ -58,6 +58,9 @@ export default function App() {
   const [standing, setStanding] = useState<{ level: SystemStatusLevel; note: string }>({ level: 'clear', note: '' });
   const [lastAlert, setLastAlert] = useState<number | null>(null);
   const [lastSync, setLastSync] = useState<number | null>(null);
+  const [reports, setReports] = useState<Report[]>([]);
+  const [reportsError, setReportsError] = useState<string | null>(null);
+  const [reportTick, setReportTick] = useState(0);
   const [sirenTesting, setSirenTesting] = useState(false);
   const [view, setView] = useState<AppView>(() => (localStorage.getItem(VIEW_KEY) === 'command' ? 'command' : 'worker'));
   const [showSettings, setShowSettings] = useState(false);
@@ -156,6 +159,11 @@ export default function App() {
         return;
       }
 
+      if (m.kind === 'reports') {
+        setReportTick((t) => t + 1);
+        return;
+      }
+
       if (m.kind === 'alert') {
         setSirenTesting(false);
         setLastAlert(m.timestamp);
@@ -249,6 +257,38 @@ export default function App() {
 
   // Persisted incident history for the supervisor view (only polled while it's open).
   const history = useIncidentHistory(view === 'command', incidentTick, token);
+
+  // Public reports awaiting review. Only supervisors can see or act on them,
+  // and the relay pokes us (reportTick) whenever the queue changes.
+  useEffect(() => {
+    if (view !== 'command' || !token) {
+      setReports([]);
+      return;
+    }
+    let cancelled = false;
+    fetchReports(token)
+      .then((r) => !cancelled && (setReports(r), setReportsError(null)))
+      .catch((e: unknown) => !cancelled && setReportsError(e instanceof Error ? e.message : 'could not load reports'));
+    return () => {
+      cancelled = true;
+    };
+  }, [view, token, reportTick]);
+
+  const onEscalateReport = useCallback(
+    async (id: string, type: AlertType, severity: Severity) => {
+      await escalateReport(id, { type, severity }, token);
+      setReportTick((t) => t + 1);
+    },
+    [token],
+  );
+
+  const onDismissReport = useCallback(
+    async (id: string) => {
+      await dismissReport(id, token);
+      setReportTick((t) => t + 1);
+    },
+    [token],
+  );
 
   // Push a heartbeat immediately when meaningful telemetry changes, so the
   // command roster reflects SOS / location / battery without waiting for the tick.
@@ -426,6 +466,17 @@ export default function App() {
             <span className="org-info">
               <b>{org.name}</b>
               <span className="org-code" title="Share this code with your workers">Team code {org.joinCode}</span>
+              {org.publicCode && (
+                <a
+                  className="org-public"
+                  href={`/r/${org.publicCode}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Public reporting page — safe to print or share. Reports queue for your review."
+                >
+                  Public report link
+                </a>
+              )}
             </span>
           ) : (
             <span className="org-info"><b>Team {workerCode}</b><span className="org-code">{settings.deviceName}</span></span>
@@ -453,6 +504,10 @@ export default function App() {
           onAllClear={allClear}
           standing={standing.level}
           onSetStatus={setSystemStatus}
+          reports={reports}
+          reportsError={reportsError}
+          onEscalateReport={onEscalateReport}
+          onDismissReport={onDismissReport}
         />
       ) : showSettings ? (
         <main className="worker">

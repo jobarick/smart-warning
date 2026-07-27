@@ -79,8 +79,49 @@ async function init() {
     CREATE INDEX IF NOT EXISTS incidents_raised_at_idx ON incidents (raised_at DESC);
     CREATE INDEX IF NOT EXISTS incidents_status_idx ON incidents (status);
     CREATE INDEX IF NOT EXISTS incidents_org_idx ON incidents (org_id);
+
+    -- Unauthenticated reports from the public page. These are NOT alerts: they
+    -- sit here until a supervisor escalates one, which is what makes a public
+    -- reporting URL safe to put on a wall.
+    CREATE TABLE IF NOT EXISTS reports (
+      id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id      UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      message     TEXT NOT NULL,
+      location    TEXT,
+      status      TEXT NOT NULL DEFAULT 'pending',
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      handled_at  TIMESTAMPTZ,
+      handled_by  TEXT,
+      incident_id TEXT
+    );
+    CREATE INDEX IF NOT EXISTS reports_org_status_idx ON reports (org_id, status);
+    CREATE INDEX IF NOT EXISTS reports_created_idx ON reports (created_at DESC);
+
+    -- Separate from join_code on purpose: the join code admits a device to the
+    -- relay room and lets it raise real alarms, so a code printed on a public
+    -- poster must not be that one.
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS public_code TEXT;
+    CREATE UNIQUE INDEX IF NOT EXISTS organizations_public_code_idx ON organizations (public_code);
   `);
+  await backfillPublicCodes();
   return true;
+}
+
+// Give any organization created before public reporting existed a code, so the
+// feature works on an already-deployed database without a manual migration.
+async function backfillPublicCodes() {
+  if (!pool) return;
+  const { rows } = await pool.query(`SELECT id FROM organizations WHERE public_code IS NULL`);
+  for (const row of rows) {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        await pool.query(`UPDATE organizations SET public_code = $1 WHERE id = $2`, [randomCode(8), row.id]);
+        break;
+      } catch (e) {
+        if (e.code !== '23505') throw e; // anything but a collision is real
+      }
+    }
+  }
 }
 
 // --- Organizations & users -------------------------------------------------
@@ -100,8 +141,8 @@ async function createOrg(name) {
     const code = randomCode();
     try {
       const { rows } = await pool.query(
-        `INSERT INTO organizations (name, join_code) VALUES ($1, $2) RETURNING *`,
-        [name, code],
+        `INSERT INTO organizations (name, join_code, public_code) VALUES ($1, $2, $3) RETURNING *`,
+        [name, code, randomCode(8)],
       );
       return rows[0];
     } catch (e) {
@@ -117,6 +158,59 @@ async function getOrgByCode(code) {
   const { rows } = await pool.query(
     `SELECT * FROM organizations WHERE join_code = $1`,
     [String(code || '').toUpperCase()],
+  );
+  return rows[0] || null;
+}
+
+async function getOrgByPublicCode(code) {
+  if (!pool) return null;
+  const { rows } = await pool.query(
+    `SELECT * FROM organizations WHERE public_code = $1`,
+    [String(code || '').toUpperCase()],
+  );
+  return rows[0] || null;
+}
+
+// --- Public reports --------------------------------------------------------
+
+async function createReport({ orgId, message, location }) {
+  if (!pool) throw new Error('persistence disabled');
+  const { rows } = await pool.query(
+    `INSERT INTO reports (org_id, message, location) VALUES ($1, $2, $3) RETURNING *`,
+    [orgId, message, location || null],
+  );
+  return rows[0];
+}
+
+async function listReports({ orgId, status = 'pending', limit = 50 } = {}) {
+  if (!pool) return [];
+  const params = [orgId];
+  let sql = `SELECT * FROM reports WHERE org_id = $1`;
+  if (status) { params.push(status); sql += ` AND status = $${params.length}`; }
+  params.push(Math.min(Math.max(1, limit), 200));
+  sql += ` ORDER BY created_at DESC LIMIT $${params.length}`;
+  const { rows } = await pool.query(sql, params);
+  return rows;
+}
+
+async function countPendingReports(orgId) {
+  if (!pool) return 0;
+  const { rows } = await pool.query(
+    `SELECT COUNT(*)::int AS n FROM reports WHERE org_id = $1 AND status = 'pending'`,
+    [orgId],
+  );
+  return rows[0]?.n || 0;
+}
+
+// Move a report out of the queue. Scoped by org so one site's supervisor can
+// never act on another's report, even with a guessed id.
+async function handleReport({ id, orgId, status, handledBy, incidentId = null }) {
+  if (!pool) return null;
+  const { rows } = await pool.query(
+    `UPDATE reports SET status = $1, handled_at = now(), handled_by = $2, incident_id = $3
+      WHERE id = $4 AND org_id = $5 AND status = 'pending'
+      RETURNING *`,
+    [status, handledBy || null, incidentId, id, orgId],
   );
   return rows[0] || null;
 }
@@ -287,7 +381,12 @@ module.exports = {
   init,
   createOrg,
   getOrgByCode,
+  getOrgByPublicCode,
   getOrgById,
+  createReport,
+  listReports,
+  countPendingReports,
+  handleReport,
   createUser,
   getUserByEmail,
   getUserById,

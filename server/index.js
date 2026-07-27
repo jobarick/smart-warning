@@ -10,6 +10,7 @@
 //             in-memory as a single global room, exactly as before (optionally
 //             gated by a shared RELAY_TOKEN). Keeps LAN/dev zero-config.
 const http = require('http');
+const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const db = require('./db');
 const auth = require('./auth');
@@ -140,6 +141,88 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { ok: true });
     }
 
+    // --- Public reporting (unauthenticated) ---
+    // Anyone with a site's public code can file a report. Nothing here reaches
+    // a device: a report is queued and only becomes an alert when a supervisor
+    // escalates it, which is what makes the URL safe to print on a poster.
+    const siteMatch = path.match(/^\/api\/public\/site\/([^/]+)$/);
+    if (siteMatch && req.method === 'GET') {
+      if (!ORGS) return sendJson(res, 501, { error: 'public reporting requires a database' });
+      const org = await db.getOrgByPublicCode(decodeURIComponent(siteMatch[1]));
+      if (!org) return sendJson(res, 404, { error: 'unknown site code' });
+      // Name only — never the join code, which would grant relay access.
+      return sendJson(res, 200, { site: { name: org.name } });
+    }
+
+    if (path === '/api/public/reports' && req.method === 'POST') {
+      if (!ORGS) return sendJson(res, 501, { error: 'public reporting requires a database' });
+      if (!allowReport(req)) return sendJson(res, 429, { error: 'too many reports — please wait a few minutes' });
+      const body = await readJson(req);
+      const org = await db.getOrgByPublicCode(body.publicCode);
+      if (!org) return sendJson(res, 404, { error: 'unknown site code' });
+      const message = String(body.message || '').trim().slice(0, 500);
+      if (!message) return sendJson(res, 400, { error: 'a description is required' });
+      const location = String(body.location || '').trim().slice(0, 200) || null;
+      await db.createReport({ orgId: org.id, message, location });
+      const pending = await db.countPendingReports(org.id);
+      broadcast(org.id, { kind: 'reports', pending });
+      console.log(`[?] public report for org ${org.id} (${pending} pending)`);
+      return sendJson(res, 201, { ok: true });
+    }
+
+    // --- Report queue (supervisor) ---
+    if (path === '/api/reports' && req.method === 'GET') {
+      const ctx = await guardOrg(req, res);
+      if (ctx === false) return;
+      if (!ctx) return sendJson(res, 501, { error: 'reports require a database' });
+      const status = url.searchParams.get('status') || 'pending';
+      const reports = await db.listReports({ orgId: ctx.orgId, status });
+      return sendJson(res, 200, { reports });
+    }
+
+    const handleMatch = path.match(/^\/api\/reports\/([^/]+)\/(escalate|dismiss)$/);
+    if (handleMatch && req.method === 'POST') {
+      const ctx = await guardOrg(req, res);
+      if (ctx === false) return;
+      if (!ctx) return sendJson(res, 501, { error: 'reports require a database' });
+      const [, reportId, action] = handleMatch;
+      const by = ctx.user?.name || 'Supervisor';
+
+      if (action === 'dismiss') {
+        const row = await db.handleReport({ id: reportId, orgId: ctx.orgId, status: 'dismissed', handledBy: by });
+        if (!row) return sendJson(res, 404, { error: 'no pending report with that id' });
+        broadcast(ctx.orgId, { kind: 'reports', pending: await db.countPendingReports(ctx.orgId) });
+        return sendJson(res, 200, { ok: true, report: row });
+      }
+
+      // Escalate: this is the moment a report becomes a real alarm, so the
+      // supervisor must say what kind — the reporter never gets to choose.
+      const body = await readJson(req);
+      if (!ALERT_TYPES.has(body.type) || !SEVERITIES.has(body.severity)) {
+        return sendJson(res, 400, { error: 'a valid type and severity are required' });
+      }
+      const pendingRows = await db.listReports({ orgId: ctx.orgId, status: 'pending', limit: 200 });
+      const report = pendingRows.find((r) => r.id === reportId);
+      if (!report) return sendJson(res, 404, { error: 'no pending report with that id' });
+
+      const alert = {
+        kind: 'alert',
+        id: crypto.randomUUID(),
+        type: body.type,
+        severity: body.severity,
+        message: report.location ? `${report.message} (${report.location})` : report.message,
+        sender: `${by} · public report`,
+        timestamp: Date.now(),
+      };
+      const row = await db.handleReport({
+        id: reportId, orgId: ctx.orgId, status: 'escalated', handledBy: by, incidentId: alert.id,
+      });
+      if (!row) return sendJson(res, 409, { error: 'report was already handled' });
+      await raiseAlert(ctx.orgId, alert, null, `public report ${reportId}`);
+      broadcast(ctx.orgId, { kind: 'reports', pending: await db.countPendingReports(ctx.orgId) });
+      return sendJson(res, 200, { ok: true, report: row, alert });
+    }
+
     // --- History (org-scoped once orgs are enabled) ---
     if (path === '/api/incidents' && req.method === 'GET') {
       const ctx = await guardOrg(req, res);
@@ -210,6 +293,50 @@ async function orgIdFromRequest(req, body) {
 // Title-cased alert type for notification copy, e.g. "fire" → "Fire".
 function titleCase(s) {
   return typeof s === 'string' && s ? s[0].toUpperCase() + s.slice(1) : 'Alert';
+}
+
+// Mirrors the client's ALERT_META / SEVERITY_META keys. An escalation arrives
+// over REST rather than the relay, so it gets the same strict enum check the
+// socket path relies on.
+const ALERT_TYPES = new Set(['fire', 'medical', 'security', 'hazard', 'cyber', 'evacuation']);
+const SEVERITIES = new Set(['low', 'medium', 'high', 'critical']);
+
+// Everything that makes an alert real: stored, pushed to closed apps, and sent
+// to every device in the org. Shared so an escalated report is indistinguishable
+// from one raised on a device.
+async function raiseAlert(orgId, alert, worker = null, origin = 'unknown') {
+  // Logged here rather than at each call site so every alert is recorded once,
+  // however it was raised — an escalated public report most of all.
+  console.log(`[!] ALERT ${alert.type}/${alert.severity} from ${origin} "${alert.sender}" (org ${orgId ?? 'global'}): ${alert.message || '(no message)'}`);
+  db.recordAlert(alert, worker, orgId).catch((e) => console.error('[db] recordAlert:', e.message));
+  push.notifyOrg(orgId, {
+    title: `🚨 ${titleCase(alert.type)} alert`,
+    body: alert.message || `${titleCase(alert.severity)} severity — raised by ${alert.sender || 'a worker'}`,
+    type: alert.type,
+    severity: alert.severity,
+    tag: 'sw-alert',
+  }).catch((e) => console.error('[push] notifyOrg:', e.message));
+  broadcast(orgId, alert);
+}
+
+// Rate limit for the one endpoint anyone on the internet can POST to. In memory
+// and per-IP: enough to stop a bored passer-by flooding a supervisor's queue,
+// and it costs nothing when idle.
+const REPORT_WINDOW_MS = 10 * 60 * 1000;
+const REPORT_MAX = 5;
+const reportHits = new Map(); // ip → timestamps
+
+function allowReport(req) {
+  const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  const recent = (reportHits.get(ip) || []).filter((t) => now - t < REPORT_WINDOW_MS);
+  if (recent.length >= REPORT_MAX) { reportHits.set(ip, recent); return false; }
+  recent.push(now);
+  reportHits.set(ip, recent);
+  if (reportHits.size > 5000) { // bound the map; stale entries can only be old
+    for (const [k, v] of reportHits) if (v.every((t) => now - t >= REPORT_WINDOW_MS)) reportHits.delete(k);
+  }
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -384,16 +511,8 @@ wss.on('connection', (ws, req) => {
 
     if (msg.kind === 'alert' || msg.kind === 'all-clear') {
       if (msg.kind === 'alert') {
-        console.log(`[!] ALERT ${msg.type}/${msg.severity} from #${ws.connId} "${msg.sender}" (org ${ws.orgId ?? 'global'}): ${msg.message || '(no message)'}`);
-        db.recordAlert(msg, ws.worker, ws.orgId).catch((e) => console.error('[db] recordAlert:', e.message));
-        // Reach devices that don't have the app open.
-        push.notifyOrg(ws.orgId, {
-          title: `🚨 ${titleCase(msg.type)} alert`,
-          body: msg.message || `${titleCase(msg.severity)} severity — raised by ${msg.sender || 'a worker'}`,
-          type: msg.type,
-          severity: msg.severity,
-          tag: 'sw-alert',
-        }).catch((e) => console.error('[push] notifyOrg:', e.message));
+        await raiseAlert(ws.orgId, msg, ws.worker, `#${ws.connId}`);
+        return; // raiseAlert already broadcast it
       } else {
         console.log(`[.] all-clear from #${ws.connId} "${msg.sender}" (org ${ws.orgId ?? 'global'})`);
         db.resolveActive(msg, ws.orgId).catch((e) => console.error('[db] resolveActive:', e.message));

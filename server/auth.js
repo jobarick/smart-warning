@@ -35,7 +35,9 @@ function publicUser(user, org) {
     email: user.email,
     name: user.name,
     role: user.role,
-    org: org ? { id: org.id, name: org.name, joinCode: org.join_code } : undefined,
+    org: org
+      ? { id: org.id, name: org.name, joinCode: org.join_code, publicCode: org.public_code || null }
+      : undefined,
   };
 }
 

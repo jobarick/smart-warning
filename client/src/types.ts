@@ -74,11 +74,18 @@ export interface RosterMessage {
   workers: WorkerInfo[];
 }
 
+/** Pushed to an org when its public-report queue changes, so open dashboards refresh. */
+export interface ReportsMessage {
+  kind: 'reports';
+  pending: number;
+}
+
 export type WireMessage =
   | AlertMessage
   | AllClearMessage
   | PresenceMessage
   | SystemStatusMessage
+  | ReportsMessage
   | HelloMessage
   | HeartbeatMessage
   | RosterMessage;

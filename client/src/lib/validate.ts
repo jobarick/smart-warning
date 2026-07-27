@@ -102,6 +102,8 @@ export function parseWireMessage(raw: unknown): WireMessage | null {
         timestamp: num(m.timestamp, Date.now()),
       };
     }
+    case 'reports':
+      return { kind: 'reports', pending: Math.max(0, Math.trunc(num(m.pending, 0))) };
     case 'roster': {
       if (!Array.isArray(m.workers)) return null;
       const workers = m.workers.map(parseWorker).filter((w): w is WorkerInfo => w !== null);

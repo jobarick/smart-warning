@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { AlarmState } from '../hooks/useAlarmState';
 import type { SocketStatus } from '../hooks/useAlertSocket';
-import type { AlertType, LogEntry, SystemStatusLevel, WorkerInfo } from '../types';
+import type { AlertType, LogEntry, Severity, SystemStatusLevel, WorkerInfo } from '../types';
 import { ALERT_META, SEVERITY_META } from '../types';
 import { alertLabel, alertProtocol, type IndustryProfile } from '../lib/profiles';
-import type { Incident, Stats } from '../lib/api';
+import type { Incident, Report, Stats } from '../lib/api';
 import { Icon } from './Icon';
+import { PendingReports } from './PendingReports';
 
 interface Props {
   roster: WorkerInfo[];
@@ -26,6 +27,11 @@ interface Props {
   /** Current standing status (ignores any active alarm, which outranks it). */
   standing: SystemStatusLevel;
   onSetStatus: (level: SystemStatusLevel, note?: string) => void;
+  /** Public reports awaiting a supervisor decision. */
+  reports: Report[];
+  reportsError: string | null;
+  onEscalateReport: (id: string, type: AlertType, severity: Severity) => Promise<void>;
+  onDismissReport: (id: string) => Promise<void>;
 }
 
 /** Human duration between two ISO timestamps, e.g. "2m 5s". */
@@ -94,7 +100,7 @@ function useMapPoints(roster: WorkerInfo[]) {
   }, [roster]);
 }
 
-export function CommandDashboard({ roster, alarm, log, history, stats, persistence, historyError, profile, selfName, status, onAcknowledge, onAllClear, standing, onSetStatus }: Props) {
+export function CommandDashboard({ roster, alarm, log, history, stats, persistence, historyError, profile, selfName, status, onAcknowledge, onAllClear, standing, onSetStatus, reports, reportsError, onEscalateReport, onDismissReport }: Props) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -148,6 +154,15 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
 
       <div className="cmd-main">
         <div className="cmd-col">
+          {persistence && (
+            <PendingReports
+              reports={reports}
+              profile={profile}
+              error={reportsError}
+              onEscalate={onEscalateReport}
+              onDismiss={onDismissReport}
+            />
+          )}
           {persistence && stats && (
             <section className="cmd-card">
               <header className="cmd-h">
