@@ -1,9 +1,15 @@
-# Render Blueprint for the alert backend (WebSocket relay + REST history API).
+# Render Blueprint for the whole app: the built client, the REST API, and the
+# WebSocket relay, all served by one service from one URL.
 #
 # Deploy: on render.com, New → Blueprint → point at this repo. Render provisions
 # the Postgres database, injects DATABASE_URL and PORT into the web service, and
-# gives it a public https/wss URL. Then set VITE_WS_URL on the Vercel project to
-# wss://<this-service>.onrender.com and redeploy the client.
+# gives it a public https/wss URL. Nothing else to configure — because the client
+# is served from the same origin as the API, there are no cross-host URLs to keep
+# in sync.
+#
+# The build runs from the repository root so it can compile client/ before
+# installing the server. Hosting the client elsewhere (a CDN, Vercel) still
+# works: without client/dist the server simply runs API-only.
 databases:
   - name: smart-warning-db
     plan: free
@@ -14,11 +20,10 @@ services:
   - type: web
     name: smart-warning-relay
     runtime: node
-    rootDir: server
     plan: free
-    buildCommand: npm install
-    startCommand: node index.js
-    healthCheckPath: /
+    buildCommand: cd client && npm ci && npm run build && cd ../server && npm ci
+    startCommand: node server/index.js
+    healthCheckPath: /api/health
     envVars:
       # Durable incident history + multi-tenant orgs. Wired automatically from the
       # database above. Its presence also switches the backend into orgs/accounts

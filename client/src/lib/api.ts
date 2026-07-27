@@ -56,15 +56,22 @@ export interface Health {
 
 // Whether this backend runs in multi-tenant orgs/accounts mode. Falls back to
 // orgs-off (legacy single-room) if the backend can't be reached.
+//
+// Health moved to /api/health so that "/" can serve the app when the client is
+// hosted by the backend itself; "/" is still tried for older backends, where it
+// returns the same payload.
 export async function fetchHealth(): Promise<Health> {
-  try {
-    const res = await fetch(`${API_BASE}/`);
-    if (!res.ok) throw new Error(String(res.status));
-    const body = await res.json();
-    return { persistence: !!body.persistence, orgs: !!body.orgs };
-  } catch {
-    return { persistence: false, orgs: false };
+  for (const path of ['/api/health', '/']) {
+    try {
+      const res = await fetch(`${API_BASE}${path}`);
+      if (!res.ok) continue;
+      const body = await res.json();
+      return { persistence: !!body.persistence, orgs: !!body.orgs };
+    } catch {
+      /* try the next one */
+    }
   }
+  return { persistence: false, orgs: false };
 }
 
 function authHeaders(token?: string): Record<string, string> {

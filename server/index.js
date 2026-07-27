@@ -14,6 +14,7 @@ const { WebSocketServer } = require('ws');
 const db = require('./db');
 const auth = require('./auth');
 const push = require('./push');
+const staticFiles = require('./static');
 
 const PORT = process.env.PORT || 3001;
 // Legacy shared token (only used when orgs are disabled — i.e. no database).
@@ -75,16 +76,27 @@ const server = http.createServer(async (req, res) => {
   }
   const path = url.pathname.replace(/\/+$/, '') || '/';
 
+  const health = () => ({
+    service: 'alert-backend',
+    clients: wss.clients.size,
+    persistence: db.enabled(),
+    orgs: ORGS,
+    client: staticFiles.enabled(),
+    uptime: process.uptime(),
+  });
+
   try {
-    // Health check (also Render's healthCheckPath).
-    if (path === '/' && req.method === 'GET') {
-      return sendJson(res, 200, {
-        service: 'alert-backend',
-        clients: wss.clients.size,
-        persistence: db.enabled(),
-        orgs: ORGS,
-        uptime: process.uptime(),
-      });
+    // Health check. Lives under /api so that "/" is free to serve the app when
+    // the built client is bundled in; it is also Render's healthCheckPath.
+    if (path === '/api/health' && req.method === 'GET') {
+      return sendJson(res, 200, health());
+    }
+
+    // Legacy health at "/" — kept for older clients and for server-only
+    // deploys. When the client is bundled, "/" belongs to the app instead and
+    // falls through to the static handler below.
+    if (path === '/' && req.method === 'GET' && !staticFiles.enabled()) {
+      return sendJson(res, 200, health());
     }
 
     // --- Auth ---
@@ -160,6 +172,10 @@ const server = http.createServer(async (req, res) => {
       if (ctx === false) return;
       return sendJson(res, 200, { workers: rosterList(ctx?.orgId ?? null), count: orgCount(ctx?.orgId ?? null) });
     }
+
+    // Anything left that is not an API route may be the built client: an asset,
+    // or a deep link that should return the app shell.
+    if (!path.startsWith('/api/') && staticFiles.serve(req, res, url.pathname)) return;
 
     return sendJson(res, 404, { error: 'not found' });
   } catch (err) {
@@ -408,7 +424,8 @@ async function start() {
     console.error('[push] init failed, continuing without web push:', err.message);
   }
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Alert backend listening on http://0.0.0.0:${PORT} (ws + REST, orgs ${ORGS ? 'ON' : 'OFF'})`);
+    const client = staticFiles.enabled() ? `client from ${staticFiles.distDir()}` : 'client not bundled (API only)';
+    console.log(`Alert backend listening on http://0.0.0.0:${PORT} (ws + REST, orgs ${ORGS ? 'ON' : 'OFF'}, ${client})`);
   });
 }
 
