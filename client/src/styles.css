@@ -1456,3 +1456,164 @@ body {
 .org-signout svg, .push-toggle svg { width: 14px; height: 14px; }
 .push-toggle.is-on { color: var(--cmd-safe); border-color: color-mix(in srgb, var(--cmd-safe) 45%, var(--panel-border)); }
 .push-toggle:disabled { opacity: 0.6; cursor: default; }
+
+/* ---------- system status bar + footer ---------- */
+/* The spec's palette (#10B981 / #F59E0B / #EF4444) is expressed through the
+   existing --cmd-safe / --cmd-warn / --cmd-crit tokens, which already carry
+   theme-tuned variants so the bar stays legible on the light background too. */
+.sysbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-height: 48px;
+  padding: 0 20px;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: background 0.3s ease;
+}
+
+.sysbar-clear { background: var(--cmd-safe); }
+.sysbar-watch { background: var(--cmd-warn); }
+.sysbar-emergency { background: var(--cmd-crit); }
+
+.sysbar-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.sysbar-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fff;
+  flex-shrink: 0;
+  animation: sysbar-pulse 2s ease-in-out infinite;
+}
+
+.sysbar-emergency .sysbar-dot { animation-duration: 0.9s; }
+
+@keyframes sysbar-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.sysbar-note {
+  font-weight: 500;
+  opacity: 0.9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sysbar-time {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 500;
+  opacity: 0.92;
+}
+
+.sysfoot {
+  position: sticky;
+  bottom: 0;
+  z-index: 100;
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
+  padding: 0 20px;
+  background: var(--bar-bg);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--panel-border);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+}
+
+.sysfoot-health {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sysfoot-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cmd-safe);
+  flex-shrink: 0;
+}
+
+.sysfoot-degraded { color: var(--cmd-warn); }
+.sysfoot-degraded .sysfoot-dot { background: var(--cmd-warn); }
+
+/* ---------- supervisor: site status control ---------- */
+.cmd-status {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  margin-bottom: 14px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.cmd-status-set {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.cmd-status-btn {
+  padding: 7px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.cmd-status-btn:hover:not(:disabled) {
+  background: var(--panel-hover);
+  color: var(--text);
+}
+
+.cmd-status-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cmd-status-btn.on {
+  color: #fff;
+  border-color: transparent;
+}
+
+.cmd-status-btn.on.clear { background: var(--cmd-safe); }
+.cmd-status-btn.on.watch { background: var(--cmd-warn); }
+
+.cmd-status-hint {
+  color: var(--faint);
+  font-size: 0.75rem;
+  flex: 1 1 220px;
+}
+
+@media (max-width: 560px) {
+  .sysbar { padding: 6px 14px; }
+  .sysbar-time { font-size: 0.7rem; }
+  .sysfoot { padding: 0 14px; }
+}

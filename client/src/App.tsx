@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { AlertMessage, AlertType, AllClearMessage, LogEntry, Severity, SirenTone, WireMessage, WorkerInfo } from './types';
+import type {
+  AlertMessage,
+  AlertType,
+  AllClearMessage,
+  LogEntry,
+  Severity,
+  SirenTone,
+  SystemStatusLevel,
+  WireMessage,
+  WorkerInfo,
+} from './types';
 import { ALERT_META, severityWants } from './types';
 import { loadSettings, saveSettings, makeOperatorId } from './lib/settings';
 import { startVibration, stopVibration } from './lib/haptics';
@@ -16,6 +26,8 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { ConnectionStatus, type AppView } from './components/ConnectionStatus';
 import { AlertLog } from './components/AlertLog';
 import { CommandDashboard } from './components/CommandDashboard';
+import { SystemStatusBar } from './components/SystemStatusBar';
+import { SystemFooter } from './components/SystemFooter';
 import { Icon } from './components/Icon';
 import { getProfile, alertLabel } from './lib/profiles';
 import { useIncidentHistory } from './hooks/useIncidentHistory';
@@ -41,6 +53,11 @@ export default function App() {
   const [log, setLog] = useState<LogEntry[]>([]);
   // Bumped on every local alert/all-clear so the supervisor history refetches.
   const [incidentTick, setIncidentTick] = useState(0);
+  // Standing status set by a supervisor, plus the liveness facts the status bar
+  // and footer report. 'emergency' is derived from an active alert, not stored.
+  const [standing, setStanding] = useState<{ level: SystemStatusLevel; note: string }>({ level: 'clear', note: '' });
+  const [lastAlert, setLastAlert] = useState<number | null>(null);
+  const [lastSync, setLastSync] = useState<number | null>(null);
   const [sirenTesting, setSirenTesting] = useState(false);
   const [view, setView] = useState<AppView>(() => (localStorage.getItem(VIEW_KEY) === 'command' ? 'command' : 'worker'));
   const [showSettings, setShowSettings] = useState(false);
@@ -130,8 +147,18 @@ export default function App() {
 
   const handleWire = useCallback(
     (m: WireMessage) => {
+      // Any message at all is proof the relay is alive — including the roster
+      // that arrives every few seconds while nothing is happening.
+      setLastSync(Date.now());
+
+      if (m.kind === 'status') {
+        setStanding({ level: m.status, note: m.note });
+        return;
+      }
+
       if (m.kind === 'alert') {
         setSirenTesting(false);
+        setLastAlert(m.timestamp);
         setIncidentTick((t) => t + 1);
         dispatch({ type: 'RAISE', alert: m });
         const id = crypto.randomUUID();
@@ -257,6 +284,22 @@ export default function App() {
     if (!send(msg)) handleWire(msg);
   }, [send, handleWire, settings.deviceName]);
 
+  // Supervisor sets the standing status. Applied locally too, so a relay that
+  // is briefly down doesn't leave the person who pressed it staring at nothing.
+  const setSystemStatus = useCallback(
+    (level: SystemStatusLevel, note = '') => {
+      const msg: WireMessage = {
+        kind: 'status',
+        status: level,
+        note,
+        sender: settings.deviceName,
+        timestamp: Date.now(),
+      };
+      if (!send(msg)) handleWire(msg);
+    },
+    [send, handleWire, settings.deviceName],
+  );
+
   const testAlarm = useCallback(() => {
     void arm();
     handleWire({
@@ -354,8 +397,17 @@ export default function App() {
   const org = session?.kind === 'supervisor' ? session.user.org : undefined;
   const workerCode = session?.kind === 'worker' ? session.orgCode : undefined;
 
+  // An active alarm outranks anything a supervisor set by hand.
+  const statusLevel: SystemStatusLevel = alarm.alert ? 'emergency' : standing.level;
+
   return (
     <div className="app">
+      <SystemStatusBar
+        level={statusLevel}
+        note={alarm.alert ? '' : standing.note}
+        lastAlert={lastAlert}
+        now={now}
+      />
       <ConnectionStatus
         status={status}
         deviceCount={deviceCount}
@@ -399,6 +451,8 @@ export default function App() {
           status={status}
           onAcknowledge={() => dispatch({ type: 'ACKNOWLEDGE' })}
           onAllClear={allClear}
+          standing={standing.level}
+          onSetStatus={setSystemStatus}
         />
       ) : showSettings ? (
         <main className="worker">
@@ -450,6 +504,8 @@ export default function App() {
           onAllClear={allClear}
         />
       )}
+
+      <SystemFooter connected={status === 'open'} lastSync={lastSync} now={now} />
     </div>
   );
 }

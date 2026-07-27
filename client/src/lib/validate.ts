@@ -1,4 +1,12 @@
-import type { AlertType, Severity, WireMessage, WorkerInfo, WorkerRole, WorkerStatus } from '../types';
+import type {
+  AlertType,
+  Severity,
+  SystemStatusLevel,
+  WireMessage,
+  WorkerInfo,
+  WorkerRole,
+  WorkerStatus,
+} from '../types';
 import { ALERT_META, SEVERITY_META } from '../types';
 
 // Allowlists derived from the metadata tables so they can never drift out of
@@ -6,8 +14,12 @@ import { ALERT_META, SEVERITY_META } from '../types';
 const ALERT_TYPES = new Set<string>(Object.keys(ALERT_META));
 const SEVERITIES = new Set<string>(Object.keys(SEVERITY_META));
 
+const STATUS_LEVELS = new Set<string>(['clear', 'watch', 'emergency']);
+
 export const isAlertType = (v: unknown): v is AlertType => typeof v === 'string' && ALERT_TYPES.has(v);
 export const isSeverity = (v: unknown): v is Severity => typeof v === 'string' && SEVERITIES.has(v);
+export const isStatusLevel = (v: unknown): v is SystemStatusLevel =>
+  typeof v === 'string' && STATUS_LEVELS.has(v);
 
 const str = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : fallback);
 const num = (v: unknown, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
@@ -77,6 +89,19 @@ export function parseWireMessage(raw: unknown): WireMessage | null {
       };
     case 'presence':
       return { kind: 'presence', count: Math.max(0, Math.trunc(num(m.count, 0))) };
+    case 'status': {
+      // Strict, like alert's enums: the status bar keys its colour off this, so
+      // an unknown level must be dropped rather than coerced to a safe-looking
+      // 'clear' that would hide a real advisory.
+      if (!isStatusLevel(m.status)) return null;
+      return {
+        kind: 'status',
+        status: m.status,
+        note: str(m.note).slice(0, 120),
+        sender: str(m.sender, 'Unknown'),
+        timestamp: num(m.timestamp, Date.now()),
+      };
+    }
     case 'roster': {
       if (!Array.isArray(m.workers)) return null;
       const workers = m.workers.map(parseWorker).filter((w): w is WorkerInfo => w !== null);

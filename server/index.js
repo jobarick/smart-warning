@@ -269,16 +269,45 @@ function broadcastRoster(orgId) {
 
 // Resolve the org a joining client belongs to, from a supervisor JWT or a
 // worker's join code. Returns an org id, or null if the credentials are invalid.
+// Resolve a join request to { orgId, supervisor }, or null when the credentials
+// are no good. A JWT identifies a supervisor; a join code only proves someone
+// knows the team code, so those connections are workers.
 async function resolveJoin(msg) {
   if (msg.token) {
     const ctx = await auth.userFromToken(msg.token);
-    return ctx ? ctx.orgId : null;
+    return ctx ? { orgId: ctx.orgId, supervisor: true } : null;
   }
   if (msg.orgCode) {
     const org = await db.getOrgByCode(msg.orgCode);
-    return org ? org.id : null;
+    return org ? { orgId: org.id, supervisor: false } : null;
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Standing system status (clear / watch / emergency), per org
+// ---------------------------------------------------------------------------
+// Deliberately in memory, not the database: it describes right now, and a relay
+// restart should leave a site reading "clear" rather than restoring a stale
+// advisory nobody is watching any more.
+const orgStatus = new Map(); // orgId (or null) → SystemStatusMessage
+
+const STATUS_LEVELS = new Set(['clear', 'watch', 'emergency']);
+
+function statusFor(orgId) {
+  return orgStatus.get(orgId ?? null) || null;
+}
+
+function setStatus(orgId, msg) {
+  if (msg.status === 'clear') orgStatus.delete(orgId ?? null);
+  else orgStatus.set(orgId ?? null, msg);
+}
+
+// Bring one just-joined client up to date. Nothing is sent when the site is
+// clear — absence of a status message already means "all clear" on the client.
+function sendStatus(ws) {
+  const current = statusFor(ws.orgId);
+  if (current && ws.readyState === 1) ws.send(JSON.stringify(current));
 }
 
 let nextId = 1;
@@ -306,7 +335,12 @@ wss.on('connection', (ws, req) => {
     : null;
 
   console.log(`[+] client #${ws.connId} connected from ${req.socket.remoteAddress} (${wss.clients.size} online)`);
-  if (ws.authed) broadcast(ws.orgId, { kind: 'presence', count: orgCount(ws.orgId) });
+  if (ws.authed) {
+    // Open LAN mode: authed from the start, so this is the only chance to hand
+    // the newcomer the current status.
+    broadcast(ws.orgId, { kind: 'presence', count: orgCount(ws.orgId) });
+    sendStatus(ws);
+  }
 
   ws.on('message', async (raw) => {
     let msg;
@@ -316,14 +350,17 @@ wss.on('connection', (ws, req) => {
     // Org mode: join a room with a supervisor JWT or a worker join code.
     if (msg.kind === 'join') {
       if (!ORGS) return; // no orgs without a database
-      const orgId = await resolveJoin(msg);
-      if (!orgId) { ws.close(4001, 'invalid org credentials'); return; }
+      const joined = await resolveJoin(msg);
+      if (!joined) { ws.close(4001, 'invalid org credentials'); return; }
+      const { orgId } = joined;
       ws.orgId = orgId;
+      ws.supervisor = joined.supervisor;
       ws.authed = true;
       clearTimeout(authTimer);
-      console.log(`[+] client #${ws.connId} joined org ${orgId}`);
+      console.log(`[+] client #${ws.connId} joined org ${orgId}${joined.supervisor ? ' (supervisor)' : ''}`);
       broadcast(orgId, { kind: 'presence', count: orgCount(orgId) });
       broadcastRoster(orgId);
+      sendStatus(ws); // a late joiner must see a standing advisory
       return;
     }
 
@@ -336,6 +373,7 @@ wss.on('connection', (ws, req) => {
         console.log(`[+] client #${ws.connId} authenticated`);
         broadcast(ws.orgId, { kind: 'presence', count: orgCount(ws.orgId) });
         broadcastRoster(ws.orgId);
+        sendStatus(ws);
       } else {
         ws.close(4001, 'invalid token');
       }
@@ -366,6 +404,32 @@ wss.on('connection', (ws, req) => {
         }).catch((e) => console.error('[push] notifyOrg:', e.message));
       }
       broadcast(ws.orgId, msg);
+
+      // A hand-set 'emergency' would otherwise outlive the incident it described
+      // and leave every device reading red after the stand-down.
+      if (msg.kind === 'all-clear' && statusFor(ws.orgId)?.status === 'emergency') {
+        const cleared = { kind: 'status', status: 'clear', note: '', sender: msg.sender || 'System', timestamp: Date.now() };
+        setStatus(ws.orgId, cleared);
+        broadcast(ws.orgId, cleared);
+      }
+      return;
+    }
+
+    // Standing status. Supervisors only — a worker holding the team code must
+    // not be able to put a whole site under advisory.
+    if (msg.kind === 'status') {
+      if (ORGS && !ws.supervisor) return;
+      if (!STATUS_LEVELS.has(msg.status)) return;
+      const out = {
+        kind: 'status',
+        status: msg.status,
+        note: typeof msg.note === 'string' ? msg.note.slice(0, 120) : '',
+        sender: typeof msg.sender === 'string' ? msg.sender.slice(0, 80) : 'Supervisor',
+        timestamp: Date.now(),
+      };
+      setStatus(ws.orgId, out);
+      console.log(`[~] status ${out.status} from #${ws.connId} "${out.sender}" (org ${ws.orgId ?? 'global'})${out.note ? `: ${out.note}` : ''}`);
+      broadcast(ws.orgId, out);
       return;
     }
 

@@ -25,6 +25,24 @@ export interface PresenceMessage {
   count: number;
 }
 
+/**
+ * Standing system status, independent of any single alert.
+ *
+ * 'watch' is the missing middle ground: a site can be under an advisory —
+ * weather closing in, a process running hot, a lockdown lifting — without an
+ * alarm sounding on every device. 'emergency' is normally derived from an
+ * active alert rather than set by hand.
+ */
+export type SystemStatusLevel = 'clear' | 'watch' | 'emergency';
+
+export interface SystemStatusMessage {
+  kind: 'status';
+  status: SystemStatusLevel;
+  note: string; // optional one-line reason shown beside the status
+  sender: string;
+  timestamp: number;
+}
+
 export type WorkerStatus = 'safe' | 'sos' | 'idle';
 export type WorkerRole = 'worker' | 'supervisor';
 
@@ -60,6 +78,7 @@ export type WireMessage =
   | AlertMessage
   | AllClearMessage
   | PresenceMessage
+  | SystemStatusMessage
   | HelloMessage
   | HeartbeatMessage
   | RosterMessage;

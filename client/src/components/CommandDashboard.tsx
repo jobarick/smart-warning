@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { AlarmState } from '../hooks/useAlarmState';
 import type { SocketStatus } from '../hooks/useAlertSocket';
-import type { AlertType, LogEntry, WorkerInfo } from '../types';
+import type { AlertType, LogEntry, SystemStatusLevel, WorkerInfo } from '../types';
 import { ALERT_META, SEVERITY_META } from '../types';
 import { alertLabel, alertProtocol, type IndustryProfile } from '../lib/profiles';
 import type { Incident, Stats } from '../lib/api';
@@ -23,6 +23,9 @@ interface Props {
   status: SocketStatus;
   onAcknowledge: () => void;
   onAllClear: () => void;
+  /** Current standing status (ignores any active alarm, which outranks it). */
+  standing: SystemStatusLevel;
+  onSetStatus: (level: SystemStatusLevel, note?: string) => void;
 }
 
 /** Human duration between two ISO timestamps, e.g. "2m 5s". */
@@ -91,7 +94,7 @@ function useMapPoints(roster: WorkerInfo[]) {
   }, [roster]);
 }
 
-export function CommandDashboard({ roster, alarm, log, history, stats, persistence, historyError, profile, selfName, status, onAcknowledge, onAllClear }: Props) {
+export function CommandDashboard({ roster, alarm, log, history, stats, persistence, historyError, profile, selfName, status, onAcknowledge, onAllClear, standing, onSetStatus }: Props) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -117,6 +120,31 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
         <div className="cmd-kpi"><span className="cmd-lbl">Low battery</span><b className={lowBattery.length ? 'warn' : ''}>{lowBattery.length}</b><span className="cmd-sub">under 20%</span></div>
         <div className="cmd-kpi"><span className="cmd-lbl">Relay</span><b className={status === 'open' ? 'safe' : 'warn'} style={{ fontSize: '1rem' }}>{status === 'open' ? 'Online' : 'Offline'}</b><span className="cmd-sub">{status === 'open' ? 'mesh live' : 'retrying'}</span></div>
       </div>
+
+      <section className="cmd-status">
+        <span className="cmd-lbl">Site status</span>
+        <div className="cmd-status-set">
+          <button
+            className={`cmd-status-btn ${standing === 'clear' ? 'on clear' : ''}`}
+            onClick={() => onSetStatus('clear')}
+            disabled={!!alert}
+          >
+            All Clear
+          </button>
+          <button
+            className={`cmd-status-btn ${standing === 'watch' ? 'on watch' : ''}`}
+            onClick={() => onSetStatus('watch', 'Advisory in effect')}
+            disabled={!!alert}
+          >
+            Advisory
+          </button>
+        </div>
+        <span className="cmd-status-hint">
+          {alert
+            ? 'An active alert holds the site at Emergency — stand down to change this.'
+            : 'Advisory warns the site without sounding an alarm.'}
+        </span>
+      </section>
 
       <div className="cmd-main">
         <div className="cmd-col">
@@ -291,7 +319,7 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
                   <span className="cmd-av">{w.name.replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase() || '??'}</span>
                   <div className="cmd-wk-id">
                     <b>{w.name}{w.name === selfName ? ' (you)' : ''}{w.role === 'supervisor' ? ' · sup' : ''}</b>
-                    <span>{w.zone || (w.lat !== null ? `${w.lat.toFixed(3)}, ${w.lng!.toFixed(3)}` : 'no zone set')}</span>
+                    <span>{w.zone || (w.lat !== null && w.lng !== null ? `${w.lat.toFixed(3)}, ${w.lng.toFixed(3)}` : 'no zone set')}</span>
                   </div>
                   <div className="cmd-wk-rt">
                     <span className={`cmd-bat ${w.battery !== null && w.battery < 0.2 ? 'crit' : ''}`}>{batteryLabel(w.battery)}{w.charging ? '⚡' : ''}</span>
