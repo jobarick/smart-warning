@@ -113,14 +113,18 @@ async function backfillPublicCodes() {
   if (!pool) return;
   const { rows } = await pool.query(`SELECT id FROM organizations WHERE public_code IS NULL`);
   for (const row of rows) {
-    for (let attempt = 0; attempt < 5; attempt++) {
+    let assigned = false;
+    for (let attempt = 0; attempt < 5 && !assigned; attempt++) {
       try {
         await pool.query(`UPDATE organizations SET public_code = $1 WHERE id = $2`, [randomCode(8), row.id]);
-        break;
+        assigned = true;
       } catch (e) {
         if (e.code !== '23505') throw e; // anything but a collision is real
       }
     }
+    // Leaving it null is not fatal — that org simply has no public reporting
+    // link — but it must not happen silently.
+    if (!assigned) console.error(`[db] could not allocate a public_code for org ${row.id}`);
   }
 }
 

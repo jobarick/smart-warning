@@ -186,6 +186,9 @@ const server = http.createServer(async (req, res) => {
       if (ctx === false) return;
       if (!ctx) return sendJson(res, 501, { error: 'reports require a database' });
       const [, reportId, action] = handleMatch;
+      // report ids are UUIDs; anything else makes Postgres raise 22P02, which
+      // would surface as a 500 for what is really just an unknown id.
+      if (!UUID_RE.test(reportId)) return sendJson(res, 404, { error: 'no pending report with that id' });
       const by = ctx.user?.name || 'Supervisor';
 
       if (action === 'dismiss') {
@@ -201,23 +204,27 @@ const server = http.createServer(async (req, res) => {
       if (!ALERT_TYPES.has(body.type) || !SEVERITIES.has(body.severity)) {
         return sendJson(res, 400, { error: 'a valid type and severity are required' });
       }
-      const pendingRows = await db.listReports({ orgId: ctx.orgId, status: 'pending', limit: 200 });
-      const report = pendingRows.find((r) => r.id === reportId);
-      if (!report) return sendJson(res, 404, { error: 'no pending report with that id' });
+
+      // Claim the report first and build the alert from the row it returns. The
+      // UPDATE matches only a pending row in this org, so two supervisors acting
+      // at once cannot both raise an alarm from the same report — and reading it
+      // separately first would both re-open that race and miss any report older
+      // than the page size.
+      const alertId = crypto.randomUUID();
+      const row = await db.handleReport({
+        id: reportId, orgId: ctx.orgId, status: 'escalated', handledBy: by, incidentId: alertId,
+      });
+      if (!row) return sendJson(res, 404, { error: 'no pending report with that id' });
 
       const alert = {
         kind: 'alert',
-        id: crypto.randomUUID(),
+        id: alertId,
         type: body.type,
         severity: body.severity,
-        message: report.location ? `${report.message} (${report.location})` : report.message,
+        message: row.location ? `${row.message} (${row.location})` : row.message,
         sender: `${by} · public report`,
         timestamp: Date.now(),
       };
-      const row = await db.handleReport({
-        id: reportId, orgId: ctx.orgId, status: 'escalated', handledBy: by, incidentId: alert.id,
-      });
-      if (!row) return sendJson(res, 409, { error: 'report was already handled' });
       await raiseAlert(ctx.orgId, alert, null, `public report ${reportId}`);
       broadcast(ctx.orgId, { kind: 'reports', pending: await db.countPendingReports(ctx.orgId) });
       return sendJson(res, 200, { ok: true, report: row, alert });
@@ -300,6 +307,7 @@ function titleCase(s) {
 // socket path relies on.
 const ALERT_TYPES = new Set(['fire', 'medical', 'security', 'hazard', 'cyber', 'evacuation']);
 const SEVERITIES = new Set(['low', 'medium', 'high', 'critical']);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Everything that makes an alert real: stored, pushed to closed apps, and sent
 // to every device in the org. Shared so an escalated report is indistinguishable
