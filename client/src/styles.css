@@ -31,31 +31,31 @@
   --cmd-nosig: #555555;
   --glow: #080808; /* flattens the body radial-gradient */
   --bar-bg: rgba(8, 8, 8, 0.9);
-  --mono: "JetBrains Mono", ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
-  --sans: "DM Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+  --sans: "DM Sans Variable", "DM Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
 /* Light background option */
 :root[data-theme="light"] {
-  --bg: #eef1f5;
+  --bg: #f7f7f7;
   --bg-2: #ffffff;
   --panel: #ffffff;
-  --panel-2: #f4f6fa;
-  --panel-border: #e0e4ec;
-  --panel-hover: #e9edf3;
-  --text: #151a22;
-  --muted: #5c6675;
-  --faint: #97a0b0;
-  --accent: #e5261c;
+  --panel-2: #f2f2f2;
+  --panel-border: #e4e4e4;
+  --panel-hover: #ededed;
+  --text: #111111;
+  --muted: #666666;
+  --faint: #8a8a8a;
+  --accent: #d32f2f;
   --shadow: 0 1px 2px rgba(20, 25, 34, 0.05), 0 12px 28px rgba(20, 25, 34, 0.09);
   --shadow-sm: 0 4px 12px rgba(20, 25, 34, 0.08);
-  --cmd-crit: #d70015;
-  --cmd-warn: #b26a00;
-  --cmd-safe: #1a8a3c;
-  --cmd-info: #0a6bd6;
-  --cmd-nosig: #8792a3;
-  --glow: #ffffff;
-  --bar-bg: rgba(255, 255, 255, 0.82);
+  --cmd-crit: #d32f2f;
+  --cmd-warn: #a86400;
+  --cmd-safe: #17803d;
+  --cmd-info: #666666;
+  --cmd-nosig: #9a9a9a;
+  --glow: #f7f7f7;
+  --bar-bg: rgba(255, 255, 255, 0.92);
 }
 
 html,
@@ -1842,17 +1842,17 @@ body {
 
 /* Square the geometry. Cards become panels divided by rules, not floating
    objects — the reason the shadow tokens are now `none`. */
-:root:not([data-theme="light"]) .cmd-card,
-:root:not([data-theme="light"]) .cmd-kpi,
-:root:not([data-theme="light"]) .cmd-stat,
-:root:not([data-theme="light"]) .cmd-status,
-:root:not([data-theme="light"]) .panel,
-:root:not([data-theme="light"]) .rep-item,
-:root:not([data-theme="light"]) .pub-card,
-:root:not([data-theme="light"]) .join-card,
-:root:not([data-theme="light"]) .auth-card,
-:root:not([data-theme="light"]) .tile,
-:root:not([data-theme="light"]) .op-tile {
+:root .cmd-card,
+:root .cmd-kpi,
+:root .cmd-stat,
+:root .cmd-status,
+:root .panel,
+:root .rep-item,
+:root .pub-card,
+:root .join-card,
+:root .auth-card,
+:root .tile,
+:root .op-tile {
   border-radius: 2px;
   box-shadow: none;
 }
@@ -1860,36 +1860,36 @@ body {
 /* The SOS block. The mock replaces the disc with a slab — it reads as a
    control surface rather than a badge, and gains target area at the same
    width. Keep it unmistakably red: this is the one accent in the palette. */
-:root:not([data-theme="light"]) .sos-hero {
+:root .sos-hero {
   width: 100%;
   max-width: 340px;
   height: 176px;
   border-radius: 2px;
   box-shadow: none;
 }
-:root:not([data-theme="light"]) .sos-hero-ring { border-radius: 2px; }
-:root:not([data-theme="light"]) .sos-hero-word { font-size: 3.4rem; font-weight: 700; }
+:root .sos-hero-ring { border-radius: 2px; }
+:root .sos-hero-word { font-size: 3.4rem; font-weight: 700; }
 
 /* Data labels in mono, uppercase, letterspaced — the strongest single cue
    of the terminal look, and it costs no colour. */
-:root:not([data-theme="light"]) .cmd-lbl,
-:root:not([data-theme="light"]) .cmd-sub,
-:root:not([data-theme="light"]) .cmd-h-note,
-:root:not([data-theme="light"]) .op-label,
-:root:not([data-theme="light"]) .rep-meta,
-:root:not([data-theme="light"]) .sysfoot,
-:root:not([data-theme="light"]) .sysbar-time,
-:root:not([data-theme="light"]) .org-code {
+:root .cmd-lbl,
+:root .cmd-sub,
+:root .cmd-h-note,
+:root .op-label,
+:root .rep-meta,
+:root .sysfoot,
+:root .sysbar-time,
+:root .org-code {
   font-family: var(--mono);
   text-transform: uppercase;
   letter-spacing: 0.09em;
 }
 
 /* Buttons: hairline outlines, mono caps. One filled button per view. */
-:root:not([data-theme="light"]) .btn,
-:root:not([data-theme="light"]) .cmd-status-btn,
-:root:not([data-theme="light"]) .rep-btn,
-:root:not([data-theme="light"]) .org-signout {
+:root .btn,
+:root .cmd-status-btn,
+:root .rep-btn,
+:root .org-signout {
   border-radius: 2px;
   font-family: var(--mono);
   text-transform: uppercase;
@@ -1899,7 +1899,7 @@ body {
 
 /* The public page's submit is the one non-red filled control: inverted,
    so it reads as primary without borrowing the emergency colour. */
-:root:not([data-theme="light"]) .pub-submit {
+:root .pub-submit {
   background: var(--text);
   color: var(--bg);
   border-radius: 2px;
@@ -1907,14 +1907,14 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
-:root:not([data-theme="light"]) .pub-input,
-:root:not([data-theme="light"]) .pub-again { border-radius: 2px; }
+:root .pub-input,
+:root .pub-again { border-radius: 2px; }
 
 /* The status bar keeps its state colour but loses the pill softness. */
-:root:not([data-theme="light"]) .sysbar {
+:root .sysbar {
   border-radius: 0;
 }
-:root:not([data-theme="light"]) .sysbar-label {
+:root .sysbar-label {
   font-family: var(--mono);
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -1922,32 +1922,32 @@ body {
 
 /* Remaining rounded surfaces on the worker screen, plus the audio prompt —
    which was the last non-state colour competing with the SOS for attention. */
-:root:not([data-theme="light"]) .sos,
-:root:not([data-theme="light"]) .sos-types,
-:root:not([data-theme="light"]) .sos-type,
-:root:not([data-theme="light"]) .sos-sev,
-:root:not([data-theme="light"]) .sos-sev-opt,
-:root:not([data-theme="light"]) .sos-msg,
-:root:not([data-theme="light"]) .btn-arm,
-:root:not([data-theme="light"]) .audio-ok,
-:root:not([data-theme="light"]) .log,
-:root:not([data-theme="light"]) .log-item,
-:root:not([data-theme="light"]) .map-panel,
-:root:not([data-theme="light"]) .op-card,
-:root:not([data-theme="light"]) .view-tabs,
-:root:not([data-theme="light"]) .view-tab {
+:root .sos,
+:root .sos-types,
+:root .sos-type,
+:root .sos-sev,
+:root .sos-sev-opt,
+:root .sos-msg,
+:root .btn-arm,
+:root .audio-ok,
+:root .log,
+:root .log-item,
+:root .map-panel,
+:root .op-card,
+:root .view-tabs,
+:root .view-tab {
   border-radius: 2px;
 }
 
 /* The arm-audio prompt is advice, not a state — greyscale it so amber keeps
    meaning "advisory" and nothing else. */
-:root:not([data-theme="light"]) .btn-arm {
+:root .btn-arm {
   background: var(--panel-2);
   border-color: var(--panel-border);
   color: var(--muted);
 }
 
-:root:not([data-theme="light"]) .sos-type.active {
+:root .sos-type.active {
   background: var(--panel-2);
   border-color: var(--accent);
 }
@@ -1965,155 +1965,155 @@ body {
    =================================================================== */
 
 /* --- status strip: from a full-bleed colour bar to a quiet rule --- */
-:root:not([data-theme="light"]) .sysbar,
-:root:not([data-theme="light"]) .sysbar-clear,
-:root:not([data-theme="light"]) .sysbar-watch,
-:root:not([data-theme="light"]) .sysbar-emergency {
+:root .sysbar,
+:root .sysbar-clear,
+:root .sysbar-watch,
+:root .sysbar-emergency {
   background: var(--panel);
   border-bottom: 1px solid var(--panel-border);
   min-height: 40px;
   color: var(--text);
 }
-:root:not([data-theme="light"]) .sysbar-label {
+:root .sysbar-label {
   color: var(--text);
   font-size: 0.76rem;
 }
-:root:not([data-theme="light"]) .sysbar-note,
-:root:not([data-theme="light"]) .sysbar-time { color: var(--faint); }
+:root .sysbar-note,
+:root .sysbar-time { color: var(--faint); }
 /* the square is now the only thing carrying state colour */
-:root:not([data-theme="light"]) .sysbar-dot {
+:root .sysbar-dot {
   border-radius: 0;
   width: 7px;
   height: 7px;
   animation: none;
 }
-:root:not([data-theme="light"]) .sysbar-clear .sysbar-dot { background: var(--cmd-safe); }
-:root:not([data-theme="light"]) .sysbar-watch .sysbar-dot { background: var(--cmd-warn); }
-:root:not([data-theme="light"]) .sysbar-emergency .sysbar-dot { background: var(--cmd-crit); }
-:root:not([data-theme="light"]) .sysbar-emergency .sysbar-label { color: var(--cmd-crit); }
+:root .sysbar-clear .sysbar-dot { background: var(--cmd-safe); }
+:root .sysbar-watch .sysbar-dot { background: var(--cmd-warn); }
+:root .sysbar-emergency .sysbar-dot { background: var(--cmd-crit); }
+:root .sysbar-emergency .sysbar-label { color: var(--cmd-crit); }
 
 /* --- greyscale the remaining coloured text --- */
-:root:not([data-theme="light"]) .cmd-kpi b.safe,
-:root:not([data-theme="light"]) .cmd-kpi b.warn,
-:root:not([data-theme="light"]) .op-badge.safe,
-:root:not([data-theme="light"]) .mapcard-h svg,
-:root:not([data-theme="light"]) .log-sender,
-:root:not([data-theme="light"]) .cmd-inc-badge {
+:root .cmd-kpi b.safe,
+:root .cmd-kpi b.warn,
+:root .op-badge.safe,
+:root .mapcard-h svg,
+:root .log-sender,
+:root .cmd-inc-badge {
   color: var(--muted);
 }
-:root:not([data-theme="light"]) .op-badge.safe,
-:root:not([data-theme="light"]) .op-badge.danger { background: var(--panel-2); }
-:root:not([data-theme="light"]) .op-badge.danger { color: var(--cmd-crit); }
-:root:not([data-theme="light"]) .op-badge-dot { border-radius: 0; }
+:root .op-badge.safe,
+:root .op-badge.danger { background: var(--panel-2); }
+:root .op-badge.danger { color: var(--cmd-crit); }
+:root .op-badge-dot { border-radius: 0; }
 
 /* --- compress the worker screen so it stops being a long scroll --- */
-:root:not([data-theme="light"]) .worker {
+:root .worker {
   max-width: 640px;
   padding: 12px;
   gap: 10px;
 }
-:root:not([data-theme="light"]) .sos { padding: 12px; gap: 10px; }
-:root:not([data-theme="light"]) .sos-title { font-size: 0.9rem; }
-:root:not([data-theme="light"]) .sos-hero { height: 128px; }
-:root:not([data-theme="light"]) .sos-hero-word { font-size: 2.5rem; }
-:root:not([data-theme="light"]) .sos-hero-sub { font-size: 0.66rem; }
-:root:not([data-theme="light"]) .sos-types { gap: 6px; }
-:root:not([data-theme="light"]) .sos-type { padding: 9px 4px; gap: 4px; font-size: 0.78rem; }
-:root:not([data-theme="light"]) .sos-type-ic { font-size: 1.05rem; }
-:root:not([data-theme="light"]) .sos-sev-opt { padding: 7px; font-size: 0.78rem; }
-:root:not([data-theme="light"]) .sos-pick,
-:root:not([data-theme="light"]) .sos-hint { font-size: 0.76rem; }
+:root .sos { padding: 12px; gap: 10px; }
+:root .sos-title { font-size: 0.9rem; }
+:root .sos-hero { height: 128px; }
+:root .sos-hero-word { font-size: 2.5rem; }
+:root .sos-hero-sub { font-size: 0.66rem; }
+:root .sos-types { gap: 6px; }
+:root .sos-type { padding: 9px 4px; gap: 4px; font-size: 0.78rem; }
+:root .sos-type-ic { font-size: 1.05rem; }
+:root .sos-sev-opt { padding: 7px; font-size: 0.78rem; }
+:root .sos-pick,
+:root .sos-hint { font-size: 0.76rem; }
 
-:root:not([data-theme="light"]) .op { padding: 12px; gap: 10px; }
-:root:not([data-theme="light"]) .op-name { font-size: 1.15rem; }
-:root:not([data-theme="light"]) .op-tiles { gap: 6px; }
-:root:not([data-theme="light"]) .op-tile { padding: 8px 10px; gap: 3px; }
-:root:not([data-theme="light"]) .op-tile b { font-size: 0.95rem; }
+:root .op { padding: 12px; gap: 10px; }
+:root .op-name { font-size: 1.15rem; }
+:root .op-tiles { gap: 6px; }
+:root .op-tile { padding: 8px 10px; gap: 3px; }
+:root .op-tile b { font-size: 0.95rem; }
 
 /* Map and history keep their own scroll instead of extending the page. */
-:root:not([data-theme="light"]) .mapcard .map-el { height: 150px; }
-:root:not([data-theme="light"]) .log-list { max-height: 164px; overflow-y: auto; }
+:root .mapcard .map-el { height: 150px; }
+:root .log-list { max-height: 164px; overflow-y: auto; }
 
 /* --- second compression pass, measured on a 375x812 phone ---
    The header was wrapping to three rows (191px) and the SOS panel ran to
    662px. These are the two that decide whether the screen scrolls. */
-:root:not([data-theme="light"]) .status-bar {
+:root .status-bar {
   padding: 8px 12px;
   gap: 8px;
   row-gap: 6px;
 }
-:root:not([data-theme="light"]) .brand { font-size: 0.95rem; }
-:root:not([data-theme="light"]) .brand svg { width: 18px; height: 18px; }
-:root:not([data-theme="light"]) .view-tab { padding: 6px 12px; font-size: 0.72rem; }
-:root:not([data-theme="light"]) .btn-arm { padding: 6px 10px; font-size: 0.64rem; }
+:root .brand { font-size: 0.95rem; }
+:root .brand svg { width: 18px; height: 18px; }
+:root .view-tab { padding: 6px 12px; font-size: 0.72rem; }
+:root .btn-arm { padding: 6px 10px; font-size: 0.64rem; }
 
 /* Chips carry an icon and a word; at this size neither needs the room it had. */
-:root:not([data-theme="light"]) .sos-type { padding: 7px 3px; gap: 3px; font-size: 0.7rem; }
-:root:not([data-theme="light"]) .sos-type-ic { font-size: 0.95rem; }
-:root:not([data-theme="light"]) .sos-msg { padding: 8px 10px; font-size: 0.82rem; }
+:root .sos-type { padding: 7px 3px; gap: 3px; font-size: 0.7rem; }
+:root .sos-type-ic { font-size: 0.95rem; }
+:root .sos-msg { padding: 8px 10px; font-size: 0.82rem; }
 
 /* Two lines said the same thing under the button; one is enough. */
-:root:not([data-theme="light"]) .sos-hint { display: none; }
+:root .sos-hint { display: none; }
 
-:root:not([data-theme="light"]) .op-tiles { gap: 5px; }
-:root:not([data-theme="light"]) .op-tile { padding: 6px 9px; }
-:root:not([data-theme="light"]) .op-tile b { font-size: 0.88rem; }
-:root:not([data-theme="light"]) .op-t-lbl { font-size: 0.6rem; }
+:root .op-tiles { gap: 5px; }
+:root .op-tile { padding: 6px 9px; }
+:root .op-tile b { font-size: 0.88rem; }
+:root .op-t-lbl { font-size: 0.6rem; }
 
-:root:not([data-theme="light"]) .mapcard .map-el { height: 108px; }
-:root:not([data-theme="light"]) .log-list { max-height: 116px; }
+:root .mapcard .map-el { height: 108px; }
+:root .log-list { max-height: 116px; }
 
 /* On a phone the status line's device count is the first thing that can go. */
 @media (max-width: 560px) {
-  :root:not([data-theme="light"]) .devices { display: none; }
+  :root .devices { display: none; }
 }
 
 /* The two rules that actually governed the height: a 96px floor on each chip,
    and a 116px minimum column that dropped the grid to two columns on a phone —
    six chips became three rows. Three fixed columns and a lower floor put the
    whole selector in two short rows. */
-:root:not([data-theme="light"]) .sos-types {
+:root .sos-types {
   grid-template-columns: repeat(3, 1fr);
   gap: 6px;
 }
-:root:not([data-theme="light"]) .sos-type {
+:root .sos-type {
   min-height: 54px;
   border-width: 1px;
 }
-:root:not([data-theme="light"]) .status-items { gap: 8px; }
-:root:not([data-theme="light"]) .op-tiles {
+:root .status-items { gap: 8px; }
+:root .op-tiles {
   grid-template-columns: repeat(3, 1fr);
   gap: 5px;
   margin-top: 10px;
 }
-:root:not([data-theme="light"]) .op-tile-wide { grid-column: 1 / -1; }
+:root .op-tile-wide { grid-column: 1 / -1; }
 
 /* Tighter identity block — the name no longer needs display size next to a
    red slab, and the two tool links sit on one row. */
-:root:not([data-theme="light"]) .op-head { gap: 8px; }
-:root:not([data-theme="light"]) .op-name { font-size: 1rem; }
-:root:not([data-theme="light"]) .op-hello { font-size: 0.72rem; }
-:root:not([data-theme="light"]) .op-id { font-size: 0.66rem; }
-:root:not([data-theme="light"]) .worker-tools { gap: 8px; }
+:root .op-head { gap: 8px; }
+:root .op-name { font-size: 1rem; }
+:root .op-hello { font-size: 0.72rem; }
+:root .op-id { font-size: 0.66rem; }
+:root .worker-tools { gap: 8px; }
 
 /* Signal strength is a magnitude, not a state — the filled bars already say it,
    so they read in offwhite rather than borrowing the all-clear green. */
-:root:not([data-theme="light"]) .op-bars i.on { background: var(--text); }
+:root .op-bars i.on { background: var(--text); }
 
 /* The header stacked four rows on a phone: brand, tabs, connection, audio.
    The device count is the one line nobody acts on, and the brand name is
    already in the tab bar's context. */
 @media (max-width: 560px) {
-  :root:not([data-theme="light"]) .device-count { display: none; }
-  :root:not([data-theme="light"]) .status-bar { padding: 6px 12px; row-gap: 4px; }
-  :root:not([data-theme="light"]) .brand-name { font-size: 0.85rem; }
+  :root .device-count { display: none; }
+  :root .status-bar { padding: 6px 12px; row-gap: 4px; }
+  :root .brand-name { font-size: 0.85rem; }
 }
 
 /* Selected site status: the state colour moves to the border, the label stays
    offwhite. Last solid colour field outside the SOS. */
-:root:not([data-theme="light"]) .cmd-status-btn.on {
+:root .cmd-status-btn.on {
   background: var(--panel-2);
   color: var(--text);
 }
-:root:not([data-theme="light"]) .cmd-status-btn.on.clear { border-color: var(--cmd-safe); }
-:root:not([data-theme="light"]) .cmd-status-btn.on.watch { border-color: var(--cmd-warn); }
+:root .cmd-status-btn.on.clear { border-color: var(--cmd-safe); }
+:root .cmd-status-btn.on.watch { border-color: var(--cmd-warn); }

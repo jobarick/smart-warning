@@ -1,0 +1,379 @@
+/* ===================================================================
+   COMMAND CENTRE — supervisor view
+
+   Two columns pinned to the viewport. The left column is what you act
+   on; the right is what you watch. The page itself never scrolls: the
+   list panels scroll inside themselves, so the state of the site is
+   never below the fold.
+
+   One set of rules for both themes — only the tokens differ.
+   =================================================================== */
+.mc {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 10px;
+  padding: 10px;
+}
+
+/* ---------- status band ---------- */
+.mc-band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  padding: 11px 16px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  transition: border-color 0.4s ease, background 0.4s ease;
+}
+.mc-band-state {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.mc-marker {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  background: var(--cmd-safe);
+  transition: background 0.4s ease;
+}
+.mc-band[data-state="watch"] .mc-marker { background: var(--cmd-warn); }
+.mc-band[data-state="emergency"] .mc-marker { background: var(--cmd-crit); }
+.mc-band[data-state="emergency"] { border-color: var(--cmd-crit); }
+
+.mc-band-label {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.mc-band[data-state="emergency"] .mc-band-label { color: var(--cmd-crit); }
+.mc-band-sub {
+  color: var(--muted);
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mc-band-read {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.mc-read { display: flex; align-items: baseline; gap: 7px; }
+.mc-read i {
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  color: var(--faint);
+}
+.mc-read b { font-size: 0.85rem; font-weight: 500; }
+.mc-mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* ---------- split ---------- */
+.mc-split {
+  display: grid;
+  grid-template-columns: minmax(320px, 380px) 1fr;
+  gap: 10px;
+  min-height: 0;
+}
+.mc-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow: hidden;
+}
+.mc-block {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  padding: 14px 16px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mc-h {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 0.63rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.13em;
+  color: var(--faint);
+}
+.mc-h-note {
+  margin-left: auto;
+  color: var(--faint);
+  text-transform: none;
+  letter-spacing: 0.06em;
+}
+.mc-quiet { color: var(--muted); font-size: 0.82rem; }
+.mc-hint { color: var(--faint); font-size: 0.74rem; line-height: 1.45; }
+
+/* ---------- active incident ---------- */
+.mc-incident.on { border-color: var(--cmd-crit); }
+.mc-inc-top { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.mc-inc-type { font-size: 1.9rem; font-weight: 600; line-height: 1; }
+.mc-inc-sev {
+  font-family: var(--mono);
+  font-size: 0.63rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+.mc-inc-msg { font-size: 0.9rem; line-height: 1.45; }
+.mc-live {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--cmd-crit);
+  letter-spacing: 0.12em;
+}
+.mc-live-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--cmd-crit);
+  animation: mc-pulse 1.8s ease-in-out infinite;
+}
+
+.mc-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+.mc-facts dt {
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  color: var(--faint);
+  margin-bottom: 3px;
+}
+.mc-facts dd { font-size: 0.82rem; }
+
+.mc-proto {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--panel-border);
+}
+.mc-proto li { display: flex; gap: 12px; font-size: 0.8rem; color: var(--muted); }
+.mc-step-n { font-family: var(--mono); font-size: 0.68rem; color: var(--cmd-crit); }
+
+/* ---------- controls ---------- */
+.mc-actions { display: flex; gap: 8px; }
+.mc-btn {
+  flex: 1;
+  padding: 10px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--panel-border);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.mc-btn:hover:not(:disabled) { background: var(--panel-hover); color: var(--text); }
+.mc-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.mc-btn-crit:not(:disabled) {
+  background: var(--cmd-crit);
+  border-color: var(--cmd-crit);
+  color: #fff;
+}
+.mc-btn-crit:not(:disabled):hover {
+  background: var(--cmd-crit);
+  color: #fff;
+  filter: brightness(1.08);
+}
+.mc-seg.on { color: var(--text); background: var(--panel-hover); }
+.mc-seg.on.clear { border-color: var(--cmd-safe); }
+.mc-seg.on.watch { border-color: var(--cmd-warn); }
+
+/* ---------- readout ---------- */
+.mc-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--panel-border);
+  border: 1px solid var(--panel-border);
+}
+.mc-metric {
+  background: var(--panel);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.mc-metric i {
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  color: var(--faint);
+}
+.mc-metric b { font-size: 1.4rem; font-weight: 600; line-height: 1.1; }
+.mc-metric em { font-style: normal; font-size: 0.62rem; color: var(--faint); }
+.mc-metric.crit b { color: var(--cmd-crit); }
+.mc-metric.warn b { color: var(--cmd-warn); }
+
+/* ---------- map ---------- */
+.mc-map { flex: 1 1 auto; min-height: 200px; }
+.mc-map-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mc-map-body svg { flex: 1; min-height: 0; width: 100%; }
+/* Positions ease to their new place instead of teleporting on each roster tick. */
+.mc-pin { transition: transform 0.6s ease; }
+.mc-tray { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.mc-tray-lbl {
+  font-family: var(--mono);
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  color: var(--faint);
+}
+
+/* ---------- lists ---------- */
+.mc-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+.mc-scroll { min-height: 0; }
+.mc-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.mc-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--panel-border);
+  font-size: 0.8rem;
+}
+.mc-row:last-child { border-bottom: none; }
+.mc-dot { width: 7px; height: 7px; flex: none; }
+.mc-row-id { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.mc-row-id b {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mc-row-id span {
+  font-size: 0.68rem;
+  color: var(--faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mc-row-rt { font-size: 0.66rem; color: var(--faint); flex: none; }
+.mc-tm { font-size: 0.66rem; color: var(--faint); flex: none; }
+.mc-tag {
+  font-family: var(--mono);
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--faint);
+  flex: none;
+}
+.mc-tag.on { color: var(--cmd-crit); }
+
+/* ---------- motion ----------
+   One pulse on the live marker, one border transition when the state
+   changes, and eased map pins. Anything more competes with the alarm. */
+@keyframes mc-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+/* Motion here is decoration — the state is fully legible without it. */
+@media (prefers-reduced-motion: reduce) {
+  .mc *,
+  .mc *::before,
+  .mc *::after {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* ---------- tablet ---------- */
+@media (max-width: 1100px) {
+  .mc-split { grid-template-columns: minmax(260px, 1fr) 1.25fr; }
+  .mc-inc-type { font-size: 1.5rem; }
+  .mc-grid { grid-template-columns: repeat(2, 1fr); }
+  .mc-block { padding: 12px 13px; }
+}
+
+/* ---------- mobile ----------
+   One column. The page scrolls here by necessity, but the band and the
+   incident are what land in the first viewport, and the long lists keep
+   their own scroll so they cannot push everything else down. */
+@media (max-width: 780px) {
+  .mc {
+    padding: 8px;
+    gap: 8px;
+    grid-template-rows: auto auto;
+  }
+  .mc-split { grid-template-columns: 1fr; gap: 8px; }
+  .mc-col { overflow: visible; }
+  .mc-two { grid-template-columns: 1fr; }
+  .mc-map { min-height: 168px; }
+  .mc-list { max-height: 208px; }
+  .mc-band-read { gap: 12px; }
+  .mc-band-sub { white-space: normal; }
+  .mc-inc-type { font-size: 1.35rem; }
+}
+
+/* The command view owns the viewport: the shell stops growing so the split can
+   size itself against the screen rather than against its own content. The
+   worker view is untouched and still scrolls normally. */
+.app:has(.mc) {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+.app:has(.mc) > .sysbar,
+.app:has(.mc) > .status-bar,
+.app:has(.mc) > .org-bar,
+.app:has(.mc) > .sysfoot {
+  flex: none;
+}
+@media (max-width: 780px) {
+  /* Below the split breakpoint the page is allowed to scroll again. */
+  .app:has(.mc) { height: auto; min-height: 100dvh; overflow: visible; }
+}
+
+/* The right column splits its height rather than letting the map take all of
+   it: positions matter, but so does seeing who is responding and what just
+   happened without scrolling for them. */
+.mc-split > .mc-col:last-child {
+  display: grid;
+  grid-template-rows: 1.25fr 1fr;
+}
+@media (max-width: 780px) {
+  .mc-split > .mc-col:last-child { display: flex; }
+}

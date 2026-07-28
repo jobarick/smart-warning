@@ -5,7 +5,6 @@ import type { AlertType, LogEntry, Severity, SystemStatusLevel, WorkerInfo } fro
 import { ALERT_META, SEVERITY_META } from '../types';
 import { alertLabel, alertProtocol, type IndustryProfile } from '../lib/profiles';
 import type { Incident, Report, Stats } from '../lib/api';
-import { Icon } from './Icon';
 import { PendingReports } from './PendingReports';
 
 interface Props {
@@ -67,8 +66,8 @@ function batteryLabel(b: number | null): string {
 function lastSeen(updatedAt: number, now: number): string {
   const s = Math.max(0, Math.round((now - updatedAt) / 1000));
   if (s < 5) return 'now';
-  if (s < 60) return `${s}s ago`;
-  return `${Math.floor(s / 60)}m ago`;
+  if (s < 60) return `${s}s`;
+  return `${Math.floor(s / 60)}m`;
 }
 
 /** Places located workers inside the SVG by normalising their lat/lng bounds. */
@@ -100,6 +99,15 @@ function useMapPoints(roster: WorkerInfo[]) {
   }, [roster]);
 }
 
+/**
+ * Supervisor command centre.
+ *
+ * Two columns, both fixed to the viewport: the left is what you *do* — the
+ * active incident, the controls that change it, the numbers that qualify it.
+ * The right is what you *watch* — positions, responders, activity. Nothing
+ * about the page scrolls; the three list panels scroll inside themselves, so
+ * the state of the site is never below the fold.
+ */
 export function CommandDashboard({ roster, alarm, log, history, stats, persistence, historyError, profile, selfName, status, onAcknowledge, onAllClear, standing, onSetStatus, reports, reportsError, onEscalateReport, onDismissReport }: Props) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -117,43 +125,121 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
   const meta = alert ? ALERT_META[alert.type] : null;
   const protocol = alert ? alertProtocol(profile, alert.type) : [];
 
+  // An active alarm always outranks whatever standing status was set by hand.
+  const bandState = alert ? 'emergency' : standing;
+  const bandLabel = alert ? 'Emergency' : standing === 'watch' ? 'Advisory' : 'All clear';
+  const bandSub = alert
+    ? `${alertLabel(profile, alert.type)} · ${SEVERITY_META[alert.severity].label} · ${alert.sender}`
+    : standing === 'watch'
+      ? 'Advisory in effect — no alarm sounding'
+      : `${roster.length} checked in · ${sos.length ? `${sos.length} needing help` : 'all report safe'}`;
+
+  const unaccounted = Math.max(0, roster.length - roster.filter((w) => w.status === 'safe').length);
+
   return (
-    <div className="cmd">
-      <div className="cmd-kpis">
-        <div className="cmd-kpi"><span className="cmd-lbl">Checked in</span><b>{roster.length}</b><span className="cmd-sub">{located.length} sharing location</span></div>
-        <div className="cmd-kpi"><span className="cmd-lbl">Active alerts</span><b className={alert ? 'crit' : ''}>{alert ? 1 : 0}</b><span className="cmd-sub">{alert ? SEVERITY_META[alert.severity].label.toLowerCase() : 'all clear'}</span></div>
-        <div className="cmd-kpi"><span className="cmd-lbl">SOS now</span><b className={sos.length ? 'crit' : ''}>{sos.length}</b><span className="cmd-sub">need help</span></div>
-        <div className="cmd-kpi"><span className="cmd-lbl">Low battery</span><b className={lowBattery.length ? 'warn' : ''}>{lowBattery.length}</b><span className="cmd-sub">under 20%</span></div>
-        <div className="cmd-kpi"><span className="cmd-lbl">Relay</span><b className={status === 'open' ? 'safe' : 'warn'} style={{ fontSize: '1rem' }}>{status === 'open' ? 'Online' : 'Offline'}</b><span className="cmd-sub">{status === 'open' ? 'mesh live' : 'retrying'}</span></div>
-      </div>
-
-      <section className="cmd-status">
-        <span className="cmd-lbl">Site status</span>
-        <div className="cmd-status-set">
-          <button
-            className={`cmd-status-btn ${standing === 'clear' ? 'on clear' : ''}`}
-            onClick={() => onSetStatus('clear')}
-            disabled={!!alert}
-          >
-            All Clear
-          </button>
-          <button
-            className={`cmd-status-btn ${standing === 'watch' ? 'on watch' : ''}`}
-            onClick={() => onSetStatus('watch', 'Advisory in effect')}
-            disabled={!!alert}
-          >
-            Advisory
-          </button>
+    <div className={`mc${alert ? ' is-critical' : ''}`}>
+      {/* Status band: the state, then the few numbers that qualify it. */}
+      <header className="mc-band" data-state={bandState}>
+        <div className="mc-band-state">
+          <span className="mc-marker" aria-hidden="true" />
+          <b className="mc-band-label">{bandLabel}</b>
+          <span className="mc-band-sub">{bandSub}</span>
         </div>
-        <span className="cmd-status-hint">
-          {alert
-            ? 'An active alert holds the site at Emergency — stand down to change this.'
-            : 'Advisory warns the site without sounding an alarm.'}
-        </span>
-      </section>
+        <div className="mc-band-read">
+          {alert && (
+            <span className="mc-read"><i>Elapsed</i><b className="mc-mono">{elapsed(alert.timestamp, now)}</b></span>
+          )}
+          <span className="mc-read"><i>Relay</i><b>{status === 'open' ? 'Online' : 'Offline'}</b></span>
+          <span className="mc-read"><i>Devices</i><b>{roster.length}</b></span>
+          <span className="mc-read mc-clock"><i>Local</i><b className="mc-mono">{new Date(now).toLocaleTimeString()}</b></span>
+        </div>
+      </header>
 
-      <div className="cmd-main">
-        <div className="cmd-col">
+      <div className="mc-split">
+        {/* ---------------- left: command ---------------- */}
+        <aside className="mc-col">
+          <section className={`mc-block mc-incident${alert ? ' on' : ''}`}>
+            <h4 className="mc-h">
+              {alert ? 'Active emergency' : 'Standby'}
+              {alert && <span className="mc-live"><span className="mc-live-dot" />live</span>}
+            </h4>
+
+            {!alert ? (
+              <p className="mc-quiet">
+                Nothing active. {roster.length ? `${roster.length} device${roster.length === 1 ? '' : 's'} reporting.` : 'Waiting for devices.'}
+              </p>
+            ) : (
+              <>
+                <div className="mc-inc-top">
+                  <span className="mc-inc-type" style={{ color: meta!.color }}>{alertLabel(profile, alert.type)}</span>
+                  <span className="mc-inc-sev">{SEVERITY_META[alert.severity].label}</span>
+                </div>
+                {alert.message && <p className="mc-inc-msg">{alert.message}</p>}
+                <dl className="mc-facts">
+                  <div><dt>From</dt><dd>{alert.sender}</dd></div>
+                  <div><dt>Zone</dt><dd>{sender?.zone || '—'}</dd></div>
+                  <div>
+                    <dt>Position</dt>
+                    <dd className="mc-mono">{sender && sender.lat !== null && sender.lng !== null ? `${sender.lat.toFixed(4)}, ${sender.lng.toFixed(4)}` : 'not shared'}</dd>
+                  </div>
+                  <div><dt>Battery</dt><dd>{sender ? batteryLabel(sender.battery) : '—'}</dd></div>
+                </dl>
+                <ol className="mc-proto">
+                  {protocol.map((step, i) => (
+                    <li key={i}><span className="mc-step-n">{String(i + 1).padStart(2, '0')}</span>{step}</li>
+                  ))}
+                </ol>
+              </>
+            )}
+          </section>
+
+          <section className="mc-block">
+            <h4 className="mc-h">Controls</h4>
+            <div className="mc-actions">
+              <button className="mc-btn mc-btn-crit" onClick={onAllClear} disabled={!alert}>Stand down</button>
+              <button className="mc-btn" onClick={onAcknowledge} disabled={!alert || alarm.acknowledged}>
+                {alarm.acknowledged ? 'Acknowledged' : 'Acknowledge'}
+              </button>
+            </div>
+            <div className="mc-actions">
+              <button
+                className={`mc-btn mc-seg${standing === 'clear' ? ' on clear' : ''}`}
+                onClick={() => onSetStatus('clear')}
+                disabled={!!alert}
+              >
+                All clear
+              </button>
+              <button
+                className={`mc-btn mc-seg${standing === 'watch' ? ' on watch' : ''}`}
+                onClick={() => onSetStatus('watch', 'Advisory in effect')}
+                disabled={!!alert}
+              >
+                Advisory
+              </button>
+            </div>
+            <p className="mc-hint">
+              {alert
+                ? 'An active alert holds the site at Emergency. Stand down to change it.'
+                : 'Advisory warns the site without sounding an alarm.'}
+            </p>
+          </section>
+
+          <section className="mc-block">
+            <h4 className="mc-h">Readout</h4>
+            <div className="mc-grid">
+              <div className="mc-metric"><i>Checked in</i><b>{roster.length}</b><em>{located.length} located</em></div>
+              <div className={`mc-metric${unaccounted ? ' warn' : ''}`}><i>Unaccounted</i><b>{unaccounted}</b><em>not reporting safe</em></div>
+              <div className={`mc-metric${sos.length ? ' crit' : ''}`}><i>SOS</i><b>{sos.length}</b><em>need help</em></div>
+              <div className={`mc-metric${lowBattery.length ? ' warn' : ''}`}><i>Low battery</i><b>{lowBattery.length}</b><em>under 20%</em></div>
+              {persistence && stats && (
+                <>
+                  <div className="mc-metric"><i>Last 24h</i><b>{stats.last24h}</b><em>incidents</em></div>
+                  <div className="mc-metric"><i>Avg response</i><b>{formatSeconds(stats.avgResolveSeconds)}</b><em>to stand down</em></div>
+                </>
+              )}
+            </div>
+          </section>
+
           {persistence && (
             <PendingReports
               reports={reports}
@@ -163,44 +249,33 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
               onDismiss={onDismissReport}
             />
           )}
-          {persistence && stats && (
-            <section className="cmd-card">
-              <header className="cmd-h">
-                <Icon name="check-circle" /> <h3>Response overview</h3>
-                <span className="cmd-h-note">stored · all devices</span>
-              </header>
-              <div className="cmd-stats">
-                <div className="cmd-stat"><span className="cmd-lbl">Total incidents</span><b>{stats.total}</b></div>
-                <div className="cmd-stat"><span className="cmd-lbl">Last 24h</span><b>{stats.last24h}</b></div>
-                <div className="cmd-stat"><span className="cmd-lbl">Avg response</span><b>{formatSeconds(stats.avgResolveSeconds)}</b></div>
-                <div className="cmd-stat"><span className="cmd-lbl">Resolved</span><b>{Math.max(0, stats.total - stats.active)}</b></div>
-              </div>
-            </section>
-          )}
+        </aside>
 
-          <section className="cmd-card">
-            <header className="cmd-h">
-              <Icon name="hazard" /> <h3>Live location map</h3>
-              <span className="cmd-h-note">{located.length} of {roster.length} located</span>
-            </header>
-            <div className="cmd-map">
-              <svg viewBox="0 0 760 380" role="img" aria-label="Map of worker locations">
+        {/* ---------------- right: situational awareness ---------------- */}
+        <main className="mc-col">
+          <section className="mc-block mc-map">
+            <h4 className="mc-h">
+              Live positions
+              <span className="mc-h-note">{located.length} of {roster.length} located</span>
+            </h4>
+            <div className="mc-map-body">
+              <svg viewBox="0 0 760 380" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Map of worker locations">
                 {points.length === 0 ? (
                   <text x="380" y="190" textAnchor="middle" className="cmd-map-empty">No devices are sharing location yet</text>
                 ) : (
                   points.map(({ worker, x, y }) => (
-                    <g key={worker.id} transform={`translate(${x.toFixed(1)},${y.toFixed(1)})`}>
+                    <g key={worker.id} transform={`translate(${x.toFixed(1)},${y.toFixed(1)})`} className="mc-pin">
                       {worker.status === 'sos' && <circle className="cmd-ring" r="10" fill="none" stroke="var(--cmd-crit)" strokeWidth="2" />}
-                      <circle r="8" fill={STATUS_COLOR[worker.status] ?? 'var(--cmd-nosig)'} />
-                      <text y="24" textAnchor="middle" className="cmd-map-name">{worker.name}</text>
+                      <circle r="7" fill={STATUS_COLOR[worker.status] ?? 'var(--cmd-nosig)'} />
+                      <text y="22" textAnchor="middle" className="cmd-map-name">{worker.name}</text>
                     </g>
                   ))
                 )}
               </svg>
               {unlocated.length > 0 && (
-                <div className="cmd-map-tray">
-                  <span className="cmd-lbl">No location ({unlocated.length})</span>
-                  {unlocated.slice(0, 8).map((w) => (
+                <div className="mc-tray">
+                  <span className="mc-tray-lbl">No location ({unlocated.length})</span>
+                  {unlocated.slice(0, 6).map((w) => (
                     <span key={w.id} className="cmd-tray-chip"><i style={{ background: STATUS_COLOR[w.status] }} />{w.name}</span>
                   ))}
                 </div>
@@ -208,143 +283,68 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
             </div>
           </section>
 
-          <section className="cmd-card">
-            <header className="cmd-h">
-              <Icon name="siren" /> <h3>Incident history</h3>
-              <span className="cmd-h-note">
-                {persistence ? `${history.length} stored` : persistence === false ? 'this session only' : '…'}
-              </span>
-            </header>
-            <div className="cmd-feed">
-              {persistence && historyError && (
-                <p className="cmd-empty">Couldn’t reach history service — retrying.</p>
-              )}
-              {/* DB-backed: durable incidents that survive refreshes and span devices. */}
-              {persistence ? (
-                history.length === 0 ? (
-                  <p className="cmd-empty">No incidents recorded yet.</p>
+          <div className="mc-two">
+            <section className="mc-block mc-scroll">
+              <h4 className="mc-h">Responders<span className="mc-h-note">{roster.length}</span></h4>
+              <div className="mc-list">
+                {roster.length === 0 && <p className="mc-quiet">Waiting for devices to check in.</p>}
+                {roster.map((w) => (
+                  <div className="mc-row" key={w.id}>
+                    <span className="mc-dot" style={{ background: STATUS_COLOR[w.status] }} />
+                    <div className="mc-row-id">
+                      <b>{w.name}{w.name === selfName ? ' (you)' : ''}</b>
+                      <span>{w.zone || (w.lat !== null && w.lng !== null ? `${w.lat.toFixed(3)}, ${w.lng.toFixed(3)}` : 'no zone')}</span>
+                    </div>
+                    <span className="mc-row-rt mc-mono">{batteryLabel(w.battery)}{w.charging ? '+' : ''} · {lastSeen(w.updatedAt, now)}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="mc-block mc-scroll">
+              <h4 className="mc-h">
+                Activity
+                <span className="mc-h-note">{persistence ? `${history.length} stored` : persistence === false ? 'session' : '…'}</span>
+              </h4>
+              <div className="mc-list">
+                {persistence && historyError && <p className="mc-quiet">History unavailable — retrying.</p>}
+                {persistence ? (
+                  history.length === 0 ? (
+                    <p className="mc-quiet">No incidents recorded yet.</p>
+                  ) : (
+                    history.slice(0, 20).map((inc) => (
+                      <div className="mc-row" key={inc.id}>
+                        <span className="mc-tm mc-mono">{new Date(inc.raised_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <div className="mc-row-id">
+                          <b>{alertLabel(profile, inc.type as AlertType)}</b>
+                          <span>{inc.sender || 'unknown'}{inc.zone ? ` · ${inc.zone}` : ''}</span>
+                        </div>
+                        <span className={`mc-tag${inc.status === 'active' ? ' on' : ''}`}>
+                          {inc.status === 'active'
+                            ? 'active'
+                            : inc.resolved_at ? durationBetween(inc.raised_at, inc.resolved_at) : 'resolved'}
+                        </span>
+                      </div>
+                    ))
+                  )
                 ) : (
-                  history.slice(0, 12).map((inc) => (
-                    <div className="cmd-feed-it" key={inc.id}>
-                      <span className="cmd-tm">{new Date(inc.raised_at).toLocaleTimeString()}</span>
-                      <span className="cmd-feed-msg">
-                        <b>{alertLabel(profile, inc.type as AlertType)}</b> · {inc.severity} — {inc.sender || 'unknown'}
-                        {inc.zone ? ` · ${inc.zone}` : ''}
-                        {inc.status === 'active' ? (
-                          <span className="cmd-inc-badge active">active</span>
-                        ) : (
-                          <span className="cmd-inc-badge resolved">
-                            resolved{inc.resolved_at ? ` · ${durationBetween(inc.raised_at, inc.resolved_at)}` : ''}
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                  ))
-                )
-              ) : (
-                // Relay-only backend (or history not yet loaded): fall back to the session log.
-                <>
-                  {log.length === 0 && <p className="cmd-empty">No incidents recorded this session.</p>}
-                  {log.slice(0, 8).map((e) => (
-                    <div className="cmd-feed-it" key={e.id}>
-                      <span className="cmd-tm">{new Date(e.timestamp).toLocaleTimeString()}</span>
-                      <span className="cmd-feed-msg">
-                        {e.kind === 'alert' ? (
-                          <>
-                            <b>{e.type ? alertLabel(profile, e.type) : 'Alert'}</b> · {e.severity} — {e.sender}
-                          </>
-                        ) : (
-                          <>All clear — {e.sender}</>
-                        )}
-                      </span>
-                    </div>
-                  ))}
-                </>
-              )}
-            </div>
-          </section>
-        </div>
-
-        <div className="cmd-col">
-          <section className={`cmd-card ${alert ? 'is-crit' : ''}`}>
-            <header className="cmd-h">
-              <Icon name={meta ? meta.icon : 'check-circle'} /> <h3>Active emergency</h3>
-              {alert && <span className="cmd-live"><span className="cmd-live-dot" />live</span>}
-            </header>
-            {!alert ? (
-              <div className="cmd-clear">
-                <Icon name="check-circle" className="cmd-clear-ic" />
-                <p>No active emergency</p>
-                <span>All checked-in devices report safe.</span>
+                  <>
+                    {log.length === 0 && <p className="mc-quiet">No incidents this session.</p>}
+                    {log.slice(0, 20).map((e) => (
+                      <div className="mc-row" key={e.id}>
+                        <span className="mc-tm mc-mono">{new Date(e.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <div className="mc-row-id">
+                          <b>{e.kind === 'alert' ? (e.type ? alertLabel(profile, e.type) : 'Alert') : 'All clear'}</b>
+                          <span>{e.sender}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
               </div>
-            ) : (
-              <div className="cmd-ae">
-                <div className="cmd-ae-top">
-                  <div className="cmd-ae-badge" style={{ color: meta!.color, background: 'color-mix(in srgb, var(--panel-2) 60%, transparent)' }}>
-                    <Icon name={meta!.icon} />
-                  </div>
-                  <div>
-                    <div className="cmd-ae-type">{alertLabel(profile, alert.type)}</div>
-                    <span className="cmd-ae-sev" style={{ color: meta!.color }}>{SEVERITY_META[alert.severity].label} severity</span>
-                  </div>
-                  <div className="cmd-ae-timer">
-                    <span className="cmd-lbl">Elapsed</span>
-                    <b>{elapsed(alert.timestamp, now)}</b>
-                  </div>
-                </div>
-                {alert.message && <p className="cmd-ae-msg">“{alert.message}”</p>}
-                <div className="cmd-ae-grid">
-                  <div className="cmd-fact"><span className="cmd-lbl">Triggered by</span><b>{alert.sender}</b></div>
-                  <div className="cmd-fact"><span className="cmd-lbl">Zone</span><b>{sender?.zone || '—'}</b></div>
-                  <div className="cmd-fact">
-                    <span className="cmd-lbl">Coordinates</span>
-                    <b className="cmd-mono">{sender && sender.lat !== null && sender.lng !== null ? `${sender.lat.toFixed(5)}, ${sender.lng.toFixed(5)}` : 'not shared'}</b>
-                  </div>
-                  <div className="cmd-fact">
-                    <span className="cmd-lbl">Their battery</span>
-                    <b className={sender && sender.battery !== null && sender.battery < 0.2 ? 'crit' : ''}>{sender ? batteryLabel(sender.battery) : '—'}</b>
-                  </div>
-                </div>
-                <div className="cmd-actions">
-                  <button className="cmd-btn crit" onClick={onAcknowledge} disabled={alarm.acknowledged}>
-                    <Icon name="check" /> {alarm.acknowledged ? 'Acknowledged' : 'Acknowledge'}
-                  </button>
-                  <button className="cmd-btn" onClick={onAllClear}><Icon name="stop" /> All clear</button>
-                </div>
-                <div className="cmd-proto">
-                  <span className="cmd-proto-h">Safety protocol</span>
-                  {protocol.map((step, i) => (
-                    <div className="cmd-step" key={i}><span className="cmd-step-n">{i + 1}</span>{step}</div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </section>
-
-          <section className="cmd-card">
-            <header className="cmd-h">
-              <Icon name="lock" /> <h3>Worker check-in</h3>
-              <span className="cmd-h-note">{roster.length} inside</span>
-            </header>
-            <div className="cmd-roster">
-              {roster.length === 0 && <p className="cmd-empty">Waiting for devices to check in…</p>}
-              {roster.map((w) => (
-                <div className="cmd-wk" key={w.id}>
-                  <span className="cmd-sdot" style={{ background: STATUS_COLOR[w.status] }} />
-                  <span className="cmd-av">{w.name.replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase() || '??'}</span>
-                  <div className="cmd-wk-id">
-                    <b>{w.name}{w.name === selfName ? ' (you)' : ''}{w.role === 'supervisor' ? ' · sup' : ''}</b>
-                    <span>{w.zone || (w.lat !== null && w.lng !== null ? `${w.lat.toFixed(3)}, ${w.lng.toFixed(3)}` : 'no zone set')}</span>
-                  </div>
-                  <div className="cmd-wk-rt">
-                    <span className={`cmd-bat ${w.battery !== null && w.battery < 0.2 ? 'crit' : ''}`}>{batteryLabel(w.battery)}{w.charging ? '⚡' : ''}</span>
-                    <span>{lastSeen(w.updatedAt, now)}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
+            </section>
+          </div>
+        </main>
       </div>
     </div>
   );
