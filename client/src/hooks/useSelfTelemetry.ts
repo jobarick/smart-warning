@@ -29,18 +29,21 @@ export function useSelfTelemetry(shareLocation: boolean): Telemetry {
     const getBattery = (navigator as unknown as { getBattery?: () => Promise<BatteryLike> }).getBattery;
     if (!getBattery) return;
     let bat: BatteryLike | null = null;
+    let cancelled = false;
     const update = () => {
       if (!bat) return;
       setBattery(bat.level);
       setCharging(bat.charging);
     };
     getBattery.call(navigator).then((b) => {
+      if (cancelled) return;
       bat = b;
       update();
       b.addEventListener('levelchange', update);
       b.addEventListener('chargingchange', update);
     });
     return () => {
+      cancelled = true;
       bat?.removeEventListener('levelchange', update);
       bat?.removeEventListener('chargingchange', update);
     };
