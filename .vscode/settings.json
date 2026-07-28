@@ -1,0 +1,37 @@
+{
+  // Use the TypeScript that ships with the repo, not whatever the editor
+  // bundles — otherwise type errors differ between the editor and `tsc`.
+  "typescript.tsdk": "client/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+
+  // Keep search and file watching off build output and dependencies. The
+  // client bundles fonts, so dist/assets is full of woff2 noise.
+  "files.exclude": {
+    "**/node_modules": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/dev-dist": true,
+    "**/package-lock.json": true
+  },
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/dist/**": true
+  },
+
+  // The repo is LF in git; committing CRLF churns every line on Windows.
+  "files.eol": "\n",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+
+  "editor.tabSize": 2,
+  "[css]": { "editor.tabSize": 2 },
+  "[javascript]": { "editor.tabSize": 2 },
+  "[typescriptreact]": { "editor.tabSize": 2 },
+
+  // .env.example files are env files, not plain text.
+  "files.associations": {
+    "*.env.example": "dotenv"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  // Deliberately short. The repo has no ESLint or Prettier config, so
+  // recommending those would only produce formatting that fights the existing
+  // code. Add them here if and when the repo gains a config to match.
+  "recommendations": [
+    "ms-vscode.vscode-typescript-next"
+  ],
+  "unwantedRecommendations": []
+}

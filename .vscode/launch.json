@@ -1,0 +1,49 @@
+{
+  // Run both halves from the editor. "Full stack" is the one you usually want:
+  // it starts the relay, then the Vite dev server, and opens a debugger on the
+  // relay so breakpoints in server/*.js work.
+  //
+  // The relay runs with no DATABASE_URL here, which puts it in single-room LAN
+  // mode — no accounts, no join codes, nothing to provision. Set DATABASE_URL
+  // in the env block below to exercise orgs, history, public reports and push.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Relay (server)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/server/index.js",
+      "cwd": "${workspaceFolder}/server",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "env": {
+        "PORT": "3001"
+      }
+    },
+    {
+      "name": "Client (vite dev)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "${workspaceFolder}/client",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Client in Chrome",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/client/src",
+      "sourceMaps": true
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full stack",
+      "configurations": ["Relay (server)", "Client (vite dev)"],
+      "stopAll": true
+    }
+  ]
+}

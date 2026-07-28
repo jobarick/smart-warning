@@ -25,8 +25,13 @@ npm-debug.log*
 !client/.env.production
 
 # Editor / OS
+# Shared editor config is committed on purpose: the TS SDK pin keeps editor
+# errors identical to `tsc`, and the launch configs are how you run the two
+# halves together. Everything else under .vscode stays local.
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
 .idea/
 .DS_Store
 Thumbs.db
