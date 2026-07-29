@@ -47,7 +47,12 @@ export function SafeRoutePanel({ alertType, lat, lng, creds, operatorId }: Props
     setError(null);
     fetchSafeRoute({ type: alertType, lat, lng, operatorId }, creds)
       .then((r) => { if (!cancelled) setRoute(r); })
-      .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : 'could not work out where to go'); })
+      .catch(() => {
+        // Whatever went wrong, the person reading this is in an emergency and a
+        // raw fetch error tells them nothing. Point them at what still works:
+        // their own procedure, and the call pocket directly below.
+        if (!cancelled) setError('Can’t reach the server. Follow your site’s procedure — emergency numbers are below.');
+      })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
     // Position is deliberately coarse here: re-routing on every GPS jitter would
