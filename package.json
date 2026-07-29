@@ -5,5 +5,8 @@
   "description": "Smart Emergency Warning & Threat Alert System — client (client/) and backend relay (server/)",
   "engines": {
     "node": "22.x"
+  },
+  "dependencies": {
+    "@vercel/analytics": "^2.0.1"
   }
 }

@@ -4,6 +4,7 @@ import { registerSW } from 'virtual:pwa-register';
 import App from './App';
 import { PublicReport } from './components/PublicReport';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { VercelInsights } from './components/VercelInsights';
 // Bundled, not fetched. An emergency PWA has to render identically on a locked
 // -down site network or offline, so the typefaces ship with the app rather than
 // coming from a font CDN. Variable weights keep that to two files.
@@ -24,6 +25,11 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
       {publicCode ? <PublicReport publicCode={publicCode.toUpperCase()} /> : <App />}
+      {/* Inside the boundary on purpose: if analytics ever threw during render,
+          it should degrade through the same recoverable fallback as anything
+          else rather than take the tree down unprotected. It renders nothing
+          off Vercel — see VercelInsights. */}
+      <VercelInsights />
     </ErrorBoundary>
   </StrictMode>,
 );
