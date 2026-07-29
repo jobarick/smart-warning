@@ -1,11 +1,15 @@
 {
-  // Run both halves from the editor. "Full stack" is the one you usually want:
-  // it starts the relay, then the Vite dev server, and opens a debugger on the
-  // relay so breakpoints in server/*.js work.
+  // Run both halves from the editor.
   //
-  // The relay runs with no DATABASE_URL here, which puts it in single-room LAN
-  // mode — no accounts, no join codes, nothing to provision. Set DATABASE_URL
-  // in the env block below to exercise orgs, history, public reports and push.
+  // "Full stack" starts the relay with no DATABASE_URL, which puts it in
+  // single-room LAN mode: no accounts, no join codes, nothing to provision.
+  // That is the quickest way in, but it also switches OFF everything that needs
+  // a database — organizations, supervisor login, incident history, public
+  // reports, push, safe destinations, incident tracking and the feedback
+  // centre. Use "Full stack (database)" to exercise any of those.
+  //
+  // The emergency call directory is the one new feature that works in either
+  // mode: the numbers are bundled, not stored.
   "version": "0.2.0",
   "configurations": [
     {
@@ -21,6 +25,27 @@
       }
     },
     {
+      // Same relay, with the features that need Postgres switched on.
+      // Point DATABASE_URL at any Postgres you can reach; db.init() creates and
+      // migrates the schema on boot, so an empty database is fine.
+      //
+      // Optional extras:
+      //   SMTP_URL   turns feedback email delivery on (stored either way)
+      //   OVERPASS_URL / OVERPASS_TIMEOUT_MS  nearby-facility lookups
+      "name": "Relay (database)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/server/index.js",
+      "cwd": "${workspaceFolder}/server",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "env": {
+        "PORT": "3001",
+        "DATABASE_URL": "postgres://postgres:postgres@localhost:5432/smartwarning",
+        "JWT_SECRET": "dev-only-not-a-secret"
+      }
+    },
+    {
       "name": "Client (vite dev)",
       "type": "node",
       "request": "launch",
@@ -31,10 +56,11 @@
       "skipFiles": ["<node_internals>/**"]
     },
     {
+      // Port 5300, pinned by strictPort in vite.config.ts — not Vite's default.
       "name": "Client in Chrome",
       "type": "chrome",
       "request": "launch",
-      "url": "http://localhost:5173",
+      "url": "http://localhost:5300",
       "webRoot": "${workspaceFolder}/client/src",
       "sourceMaps": true
     }
@@ -43,6 +69,11 @@
     {
       "name": "Full stack",
       "configurations": ["Relay (server)", "Client (vite dev)"],
+      "stopAll": true
+    },
+    {
+      "name": "Full stack (database)",
+      "configurations": ["Relay (database)", "Client (vite dev)"],
       "stopAll": true
     }
   ]
