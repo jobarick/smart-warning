@@ -85,19 +85,24 @@ export function OperatorStatus({ name, operatorId, telemetry, network, shareLoca
           </b>
         </div>
 
-        <div className="op-tile op-tile-wide">
-          <span className="op-t-lbl"><Icon name="exit" /> Distance to {assembly.label}</span>
-          {distance !== null ? (
-            <b>
-              {formatDistance(distance)} <span className="op-dir">{direction} · ~{walkMinutes(distance)} min</span>
-              <span className="op-safe" style={{ color: SAFETY_COLOR[level] }}>
-                {level === 'safe' ? 'Safe' : level === 'caution' ? 'Caution' : 'Move now'}
-              </span>
-            </b>
-          ) : (
-            <b className="op-muted">{!shareLocation ? 'Turn on location sharing' : !hasAssembly ? 'Set the assembly zone in settings' : 'Locating…'}</b>
-          )}
-        </div>
+        {/* Assembly distance is opt-in: with no assembly point configured the
+            tile is not shown at all, rather than nagging every operator on a
+            site that measures safety some other way. */}
+        {hasAssembly && (
+          <div className="op-tile op-tile-wide">
+            <span className="op-t-lbl"><Icon name="exit" /> Distance to {assembly.label}</span>
+            {distance !== null ? (
+              <b>
+                {formatDistance(distance)} <span className="op-dir">{direction} · ~{walkMinutes(distance)} min</span>
+                <span className="op-safe" style={{ color: SAFETY_COLOR[level] }}>
+                  {level === 'safe' ? 'Safe' : level === 'caution' ? 'Caution' : 'Move now'}
+                </span>
+              </b>
+            ) : (
+              <b className="op-muted">{!shareLocation ? 'Turn on location sharing' : 'Locating…'}</b>
+            )}
+          </div>
+        )}
 
         <div className={`op-tile op-tile-wide ${alarmActive ? 'op-tile-active' : ''}`}>
           <span className="op-t-lbl"><Icon name="check-circle" /> Response time (lap)</span>

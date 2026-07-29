@@ -11,6 +11,7 @@ import '@fontsource-variable/dm-sans';
 import '@fontsource-variable/jetbrains-mono';
 import './styles.css';
 import './command-center.css';
+import './platform.css';
 
 registerSW({ immediate: true });
 

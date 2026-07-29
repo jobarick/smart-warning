@@ -1,0 +1,454 @@
+/* Emergency call pocket, safe-route guidance, support, feedback and safe
+   destinations.
+
+   Everything here is built from the existing tokens (--panel, --border, --text,
+   --muted, --accent, --mono, --sans) rather than literal colours, so it inherits
+   both the dark and the light palette without a second rule set — and stays
+   consistent if the palette moves again. */
+
+/* ---------- shared primitives ---------- */
+.pocket,
+.route,
+.support,
+.fb,
+.dest {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  margin-top: 10px;
+}
+
+.pocket-title,
+.route-head,
+.support-lbl,
+.fb-head,
+.dest-head,
+.dest-kind,
+.pocket-svc-label,
+.route-tag,
+.fb-item-kind,
+.dest-scope {
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+}
+
+/* ---------- emergency call pocket ---------- */
+.pocket-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  background: none;
+  border: 0;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+.pocket-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+}
+.pocket-title svg { width: 15px; height: 15px; }
+.pocket-where {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pocket-stale {
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--faint);
+  border: 1px solid var(--border);
+  padding: 1px 4px;
+}
+.pocket-chevron { color: var(--muted); font-size: 16px; width: 12px; text-align: center; }
+
+/* An active alert makes this the loudest thing on the screen that isn't the
+   alert itself — that is the entire point of the module. */
+.pocket-urgent { border-color: var(--accent); }
+.pocket-urgent-note {
+  margin: 0;
+  padding: 0 14px 10px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.pocket-list { list-style: none; margin: 0; padding: 0 14px 12px; }
+.pocket-svc {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 9px 0;
+  border-top: 1px solid var(--border);
+}
+.pocket-svc-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  min-width: 132px;
+}
+.pocket-svc-label svg { width: 14px; height: 14px; }
+.pocket-svc-first .pocket-svc-label { color: var(--accent); }
+.pocket-numbers { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+
+.pocket-call {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  min-height: 40px; /* thumb-sized: this gets pressed under stress */
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  border-radius: 2px;
+}
+.pocket-call svg { width: 14px; height: 14px; }
+.pocket-call:active { opacity: 0.85; }
+.pocket-num {
+  padding: 8px 12px;
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+}
+.pocket-foot {
+  margin: 0;
+  padding: 0 14px 12px;
+  font-size: 12px;
+  color: var(--faint);
+  line-height: 1.5;
+}
+
+/* ---------- safe route ---------- */
+.route { border-color: var(--accent); }
+.route-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+.route-head svg { width: 15px; height: 15px; }
+.route-tag {
+  margin-left: auto;
+  color: var(--faint);
+  border: 1px solid var(--border);
+  padding: 2px 6px;
+  font-size: 9px;
+}
+.route-tag-public { color: var(--muted); }
+.route-muted { margin: 0; padding: 12px 14px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+.route-dest { display: flex; flex-direction: column; gap: 3px; padding: 12px 14px 10px; }
+.route-name { font-size: 18px; line-height: 1.25; }
+.route-addr { font-size: 12px; color: var(--muted); }
+.route-travel { font-family: var(--mono); font-size: 13px; color: var(--text); margin-top: 3px; }
+.route-warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--cmd-warn);
+}
+.route-warn svg { width: 14px; height: 14px; flex: none; }
+
+.route-actions { display: flex; gap: 8px; padding: 0 14px 12px; }
+.route-go,
+.route-call {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex: 1;
+  min-height: 44px;
+  font-family: var(--mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  border-radius: 2px;
+}
+.route-go { background: var(--accent); color: #fff; }
+.route-call { border: 1px solid var(--border); color: var(--text); }
+.route-go svg, .route-call svg { width: 15px; height: 15px; }
+
+.route-alts { list-style: none; margin: 0; padding: 0 14px 12px; }
+.route-alts li { border-top: 1px solid var(--border); }
+.route-alts a {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 0;
+  text-decoration: none;
+  color: var(--muted);
+  font-size: 13px;
+}
+.route-alt-dist { font-family: var(--mono); font-size: 12px; color: var(--faint); }
+
+/* ---------- contact & support ---------- */
+.support { padding: 16px; }
+.support-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0 0 12px;
+}
+.support-back svg { width: 15px; height: 15px; }
+.support-head h2 { margin: 0 0 6px; font-size: 20px; }
+.support-head p { margin: 0 0 16px; font-size: 13px; color: var(--muted); line-height: 1.55; }
+
+.support-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.support-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+}
+.support-lbl { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); }
+.support-lbl svg { width: 14px; height: 14px; }
+.support-value {
+  font-family: var(--mono);
+  font-size: 16px;
+  color: var(--text);
+  text-decoration: none;
+  word-break: break-all;
+}
+a.support-value { color: var(--accent); }
+
+.support-topics { list-style: none; margin: 18px 0 0; padding: 0; }
+.support-topics li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.support-topics b { display: block; font-size: 14px; margin-bottom: 3px; }
+.support-topics span { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.support-topic-link {
+  margin-left: auto;
+  flex: none;
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  border-radius: 2px;
+}
+
+/* ---------- feedback centre ---------- */
+.fb-head,
+.dest-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+.fb-head svg, .dest-head svg { width: 15px; height: 15px; }
+
+.fb-form { display: flex; flex-direction: column; gap: 10px; padding: 14px; }
+.fb-kinds { display: flex; flex-wrap: wrap; gap: 6px; }
+.fb-kind {
+  padding: 7px 11px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  cursor: pointer;
+}
+.fb-kind.on { border-color: var(--accent); color: var(--text); }
+
+.fb-input,
+.fb-text,
+.dest-form input,
+.dest-form select {
+  width: 100%;
+  padding: 10px;
+  background: var(--panel-2, var(--bg));
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+.fb-text { resize: vertical; min-height: 90px; line-height: 1.5; }
+.fb-input:focus, .fb-text:focus, .dest-form input:focus, .dest-form select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.fb-submit,
+.dest-add {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 11px 18px;
+  min-height: 42px;
+  background: var(--accent);
+  border: 0;
+  border-radius: 2px;
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+.fb-submit:disabled, .dest-add:disabled { opacity: 0.45; cursor: not-allowed; }
+.fb-submit svg, .dest-add svg { width: 14px; height: 14px; }
+
+.fb-error, .dest-error { margin: 0; font-size: 13px; color: var(--cmd-crit); }
+.fb-ok { margin: 0; font-size: 13px; color: var(--cmd-safe); line-height: 1.5; }
+.fb-ok a { color: var(--accent); }
+.fb-note, .dest-hint, .dest-intro {
+  margin: 0;
+  font-size: 12px;
+  color: var(--faint);
+  line-height: 1.5;
+}
+.dest-intro { padding: 12px 14px 0; }
+
+.fb-list { list-style: none; margin: 0; padding: 0 14px 14px; }
+.fb-list li { padding: 11px 0; border-top: 1px solid var(--border); }
+.fb-item-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.fb-item-kind { color: var(--faint); border: 1px solid var(--border); padding: 2px 6px; font-size: 9px; }
+.fb-item-head b { font-size: 14px; }
+.fb-item-state {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--faint);
+}
+.fb-item-state.sent { color: var(--cmd-safe); }
+.fb-item-msg { margin: 6px 0 4px; font-size: 13px; color: var(--muted); line-height: 1.5; white-space: pre-wrap; }
+.fb-item-meta { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+
+/* ---------- safe destinations ---------- */
+.dest-list { list-style: none; margin: 0; padding: 12px 14px 0; }
+.dest-list > li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.dest-list > li:first-child { border-top: 0; }
+.dest-empty { color: var(--faint); font-size: 13px; border-top: 0 !important; }
+.dest-item { display: flex; flex-direction: column; gap: 3px; }
+.dest-kind { color: var(--faint); }
+.dest-item b { font-size: 15px; }
+.dest-coords, .dest-addr { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.dest-scope { color: var(--faint); }
+.dest-scope.personal { color: var(--accent); }
+.dest-del {
+  margin-left: auto;
+  flex: none;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 8px;
+  min-height: 36px;
+}
+.dest-del svg { width: 14px; height: 14px; display: block; }
+.dest-del:hover { border-color: var(--cmd-crit); color: var(--cmd-crit); }
+
+.dest-form { display: flex; flex-direction: column; gap: 10px; padding: 14px; }
+.dest-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.dest-row label { display: flex; flex-direction: column; gap: 5px; flex: 1 1 150px; }
+.dest-row label > span {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.dest-row label > span small { text-transform: none; letter-spacing: 0; color: var(--faint); }
+.dest-here {
+  flex: none;
+  padding: 10px 13px;
+  min-height: 40px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  cursor: pointer;
+}
+
+/* ---------- org bar additions ---------- */
+.org-tools,
+.org-support {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 6px 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+.org-tools svg, .org-support svg { width: 13px; height: 13px; }
+.org-tools:hover, .org-support:hover { color: var(--text); border-color: var(--text); }
+
+@media (max-width: 560px) {
+  .pocket-svc { gap: 6px; }
+  .pocket-svc-label { min-width: 0; flex: 1 1 100%; }
+  .pocket-numbers { margin-left: 0; }
+  .support-topics li { flex-wrap: wrap; }
+  .support-topic-link { margin-left: 0; }
+}
+
+/* The alert overlay owns the screen during an alarm; nothing here should ever
+   animate underneath it. */
+@media (prefers-reduced-motion: reduce) {
+  .pocket-call, .route-go, .fb-submit, .dest-add { transition: none; }
+}

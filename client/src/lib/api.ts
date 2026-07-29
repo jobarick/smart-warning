@@ -25,12 +25,26 @@ export interface Stats {
   avgResolveSeconds: number | null;
 }
 
+export interface OrgProfile {
+  id: string;
+  name: string;
+  joinCode: string;
+  publicCode: string | null;
+  adminName: string | null;
+  contactEmail: string | null;
+  phone: string | null;
+  industry: string | null;
+  address: string | null;
+  country: string | null;
+}
+
 export interface AuthUser {
   id: string;
   email: string;
   name: string;
   role: string;
-  org: { id: string; name: string; joinCode: string; publicCode: string | null };
+  phone?: string | null;
+  org: OrgProfile;
 }
 
 export interface AuthResult {
@@ -113,6 +127,12 @@ export async function signup(input: {
   name: string;
   email: string;
   password: string;
+  phone: string;
+  industry?: string;
+  address?: string;
+  country?: string;
+  adminName?: string;
+  contactEmail?: string;
 }): Promise<AuthResult> {
   const res = await fetch(`${API_BASE}/api/auth/signup`, {
     method: 'POST',
@@ -233,4 +253,204 @@ export async function deletePushSubscription(endpoint: string): Promise<void> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ endpoint }),
   });
+}
+
+// --- Organization profile ---
+
+export async function updateOrg(
+  patch: Partial<Pick<OrgProfile, 'name' | 'adminName' | 'contactEmail' | 'phone' | 'industry' | 'address' | 'country'>>,
+  token?: string,
+): Promise<AuthUser> {
+  const res = await fetch(`${API_BASE}/api/org`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not save the organization profile'));
+  const body = await res.json();
+  return body.user as AuthUser;
+}
+
+// --- Safe destinations ---
+
+/** Where an emergency should send someone. `assembly` is the site muster point. */
+export type DestinationKind = 'assembly' | 'clinic' | 'safe' | 'muster' | 'shelter';
+
+export interface Destination {
+  id: string;
+  kind: DestinationKind;
+  label: string;
+  lat: number;
+  lng: number;
+  address: string | null;
+  phone: string | null;
+  /** null = applies to the whole organization; otherwise an operator id. */
+  assignedTo: string | null;
+  createdBy: string | null;
+}
+
+/** Either credential works: a supervisor token, or a worker's join code. */
+export interface OrgCreds {
+  token?: string;
+  orgCode?: string;
+}
+
+function credQuery(creds: OrgCreds, extra: Record<string, string> = {}): string {
+  const params = new URLSearchParams(extra);
+  if (!creds.token && creds.orgCode) params.set('orgCode', creds.orgCode);
+  const q = params.toString();
+  return q ? `?${q}` : '';
+}
+
+export async function fetchDestinations(creds: OrgCreds, operatorId?: string): Promise<Destination[]> {
+  const extra: Record<string, string> = operatorId ? { operatorId } : {};
+  const res = await fetch(`${API_BASE}/api/destinations${credQuery(creds, extra)}`, {
+    headers: authHeaders(creds.token),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not load destinations'));
+  const body = await res.json();
+  return body.destinations ?? [];
+}
+
+export async function createDestination(
+  input: { kind: DestinationKind; label: string; lat: number; lng: number; address?: string; phone?: string; assignedTo?: string },
+  token?: string,
+): Promise<Destination> {
+  const res = await fetch(`${API_BASE}/api/destinations`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not save the destination'));
+  const body = await res.json();
+  return body.destination;
+}
+
+export async function deleteDestination(id: string, token?: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/destinations/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not remove the destination'));
+}
+
+// --- Safe route ---
+
+export interface SafePlace {
+  name: string;
+  lat: number;
+  lng: number;
+  kind: string;
+  address: string | null;
+  phone: string | null;
+  distanceM: number | null;
+  walkMinutes: number | null;
+  driveMinutes: number | null;
+  configured?: boolean;
+  throughDanger?: boolean;
+}
+
+export interface SafeRoute {
+  destination: SafePlace | null;
+  alternatives: SafePlace[];
+  /** 'configured' = the site's own plan, 'discovered' = a public facility. */
+  source: 'configured' | 'discovered' | 'none';
+  label: string;
+}
+
+export async function fetchSafeRoute(
+  input: { type: string; lat: number | null; lng: number | null; operatorId?: string },
+  creds: OrgCreds,
+): Promise<SafeRoute> {
+  const extra: Record<string, string> = { type: input.type };
+  if (input.lat != null && input.lng != null) {
+    extra.lat = String(input.lat);
+    extra.lng = String(input.lng);
+  }
+  if (input.operatorId) extra.operatorId = input.operatorId;
+  const res = await fetch(`${API_BASE}/api/safe-route${credQuery(creds, extra)}`, {
+    headers: authHeaders(creds.token),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not work out where to go'));
+  return res.json();
+}
+
+// --- Emergency call directory ---
+
+export interface EmergencyService {
+  id: string;
+  label: string;
+  numbers: string[];
+}
+
+export interface EmergencyDirectory {
+  country: { code: string | null; name: string; dial: string };
+  services: EmergencyService[];
+}
+
+/** Published emergency numbers for a position. Unauthenticated by design. */
+export async function fetchDirectory(lat: number | null, lng: number | null, country?: string): Promise<EmergencyDirectory> {
+  const params = new URLSearchParams();
+  if (country) params.set('country', country);
+  else if (lat != null && lng != null) {
+    params.set('lat', String(lat));
+    params.set('lng', String(lng));
+  }
+  const res = await fetch(`${API_BASE}/api/emergency/directory?${params.toString()}`);
+  if (!res.ok) throw new Error(`directory request failed (${res.status})`);
+  return res.json();
+}
+
+// --- Feedback ---
+
+export type FeedbackKind = 'suggestion' | 'recommendation' | 'feature' | 'bug' | 'general';
+
+export interface FeedbackItem {
+  id: string;
+  kind: FeedbackKind;
+  subject: string;
+  message: string;
+  status: string;
+  delivered: boolean;
+  authorName: string | null;
+  createdAt: number;
+}
+
+export async function submitFeedback(
+  input: { kind: FeedbackKind; subject: string; message: string },
+  token?: string,
+): Promise<{ feedback: FeedbackItem; mailTo: string | null }> {
+  const res = await fetch(`${API_BASE}/api/feedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not send your feedback'));
+  return res.json();
+}
+
+export async function fetchFeedback(token?: string): Promise<{ feedback: FeedbackItem[]; mailEnabled: boolean; mailTo: string }> {
+  const res = await fetch(`${API_BASE}/api/feedback`, { headers: authHeaders(token) });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not load feedback'));
+  return res.json();
+}
+
+// --- Incident movement history ---
+
+export interface TrackPoint {
+  workerId: string;
+  workerName: string | null;
+  lat: number;
+  lng: number;
+  accuracy: number | null;
+  at: number;
+}
+
+export async function fetchTrack(incidentId: string, token?: string): Promise<TrackPoint[]> {
+  const res = await fetch(`${API_BASE}/api/incidents/${encodeURIComponent(incidentId)}/track`, {
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not load the movement history'));
+  const body = await res.json();
+  return body.track ?? [];
 }

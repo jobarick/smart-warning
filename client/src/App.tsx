@@ -33,6 +33,11 @@ import { getProfile, alertLabel } from './lib/profiles';
 import { useIncidentHistory } from './hooks/useIncidentHistory';
 import { AuthGate } from './components/AuthGate';
 import { PushToggle } from './components/PushToggle';
+import { EmergencyCallPocket } from './components/EmergencyCallPocket';
+import { SafeRoutePanel } from './components/SafeRoutePanel';
+import { ContactSupport } from './components/ContactSupport';
+import { FeedbackCenter } from './components/FeedbackCenter';
+import { DestinationsManager } from './components/DestinationsManager';
 import { unsubscribe as unsubscribePush } from './lib/push';
 import { fetchHealth, fetchMe, fetchReports, escalateReport, dismissReport, type Report } from './lib/api';
 import {
@@ -65,6 +70,11 @@ export default function App() {
   const [view, setView] = useState<AppView>(() => (localStorage.getItem(VIEW_KEY) === 'command' ? 'command' : 'worker'));
   const [showSettings, setShowSettings] = useState(false);
   const [showMore, setShowMore] = useState(false);
+  const [showSupport, setShowSupport] = useState(false);
+  // Supervisor configuration (destinations, feedback). Rendered instead of the
+  // dashboard rather than beside it — the command centre is viewport-locked and
+  // a sibling section would break its no-scroll layout.
+  const [showTools, setShowTools] = useState(false);
   // Multi-tenant auth. orgsMode: null = still checking the backend, true =
   // accounts required, false = legacy single-room (no login).
   const [orgsMode, setOrgsMode] = useState<boolean | null>(null);
@@ -483,13 +493,33 @@ export default function App() {
             <span className="org-info"><b>Team {workerCode}</b><span className="org-code">{settings.deviceName}</span></span>
           )}
           {joinCreds && <PushToggle creds={joinCreds} />}
+          {org && !showTools && !showSupport && (
+            <button className="org-tools" onClick={() => setShowTools(true)} title="Safe destinations and feedback">
+              <Icon name="map-pin" /> Setup
+            </button>
+          )}
+          <button className="org-support" onClick={() => setShowSupport((v) => !v)}>
+            <Icon name="help" /> {showSupport ? 'Close' : 'Support'}
+          </button>
           <button className="org-signout" onClick={signOut}>
             <Icon name="exit" /> {org ? 'Sign out' : 'Leave'}
           </button>
         </div>
       )}
 
-      {view === 'command' ? (
+      {showSupport ? (
+        <main className="worker">
+          <ContactSupport onBack={() => setShowSupport(false)} />
+        </main>
+      ) : view === 'command' && showTools ? (
+        <main className="worker">
+          <button className="btn back-btn" onClick={() => setShowTools(false)}>
+            <Icon name="arrow-left" /> Back to command centre
+          </button>
+          <DestinationsManager token={token} roster={roster} />
+          <FeedbackCenter token={token} />
+        </main>
+      ) : view === 'command' ? (
         <CommandDashboard
           roster={roster}
           alarm={alarm}
@@ -526,6 +556,21 @@ export default function App() {
       ) : (
         <main className="worker">
           <SosPanel profile={profile} disabled={alarmActive} onTrigger={trigger} />
+          {/* Both of these are quiet until they matter: the route panel renders
+              nothing without a live alert, and the call pocket sits collapsed
+              until one opens it. */}
+          <SafeRoutePanel
+            alertType={alarm.alert?.type ?? null}
+            lat={settings.shareLocation ? telemetry.lat : null}
+            lng={settings.shareLocation ? telemetry.lng : null}
+            creds={joinCreds ?? {}}
+            operatorId={sessionId.current}
+          />
+          <EmergencyCallPocket
+            lat={telemetry.lat}
+            lng={telemetry.lng}
+            alertType={alarm.alert?.type ?? null}
+          />
           <OperatorStatus
             name={settings.deviceName}
             operatorId={settings.operatorId}
@@ -556,6 +601,9 @@ export default function App() {
             </button>
             <button className="btn settings-link" onClick={() => setShowSettings(true)}>
               <Icon name="settings" /> Settings
+            </button>
+            <button className="btn settings-link" onClick={() => setShowSupport(true)}>
+              <Icon name="help" /> Support
             </button>
           </div>
         </main>

@@ -102,6 +102,69 @@ async function init() {
     -- poster must not be that one.
     ALTER TABLE organizations ADD COLUMN IF NOT EXISTS public_code TEXT;
     CREATE UNIQUE INDEX IF NOT EXISTS organizations_public_code_idx ON organizations (public_code);
+
+    -- Organization profile. Registration used to capture only a name; a real
+    -- account needs an owner of record and a way to reach them.
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS admin_name    TEXT;
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS contact_email TEXT;
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS phone         TEXT;
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS industry      TEXT;
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS address       TEXT;
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS country       TEXT;
+    ALTER TABLE users         ADD COLUMN IF NOT EXISTS phone         TEXT;
+
+    -- Safe destinations. A row with assigned_to IS NULL applies to the whole
+    -- organization; a row naming an operator overrides it for that person.
+    -- 'kind' is the alert category the destination serves, so an alert can be
+    -- routed to the right place instead of always to one static assembly point.
+    CREATE TABLE IF NOT EXISTS destinations (
+      id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id      UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      kind        TEXT NOT NULL DEFAULT 'assembly',
+      label       TEXT NOT NULL,
+      lat         DOUBLE PRECISION NOT NULL,
+      lng         DOUBLE PRECISION NOT NULL,
+      address     TEXT,
+      phone       TEXT,
+      assigned_to TEXT,
+      created_by  TEXT,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS destinations_org_idx ON destinations (org_id, kind);
+
+    -- Movement history while an alert is live. Written only between the alert
+    -- and its all-clear, so this never becomes routine location surveillance.
+    CREATE TABLE IF NOT EXISTS location_pings (
+      id          BIGSERIAL PRIMARY KEY,
+      org_id      UUID,
+      incident_id TEXT,
+      worker_id   TEXT NOT NULL,
+      worker_name TEXT,
+      lat         DOUBLE PRECISION NOT NULL,
+      lng         DOUBLE PRECISION NOT NULL,
+      accuracy    DOUBLE PRECISION,
+      at          TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS location_pings_incident_idx ON location_pings (incident_id, at);
+    CREATE INDEX IF NOT EXISTS location_pings_org_at_idx   ON location_pings (org_id, at DESC);
+
+    -- Supervisor feedback. Stored first and delivered second, so a submission is
+    -- never lost because mail was misconfigured.
+    CREATE TABLE IF NOT EXISTS feedback (
+      id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id       UUID,
+      user_id      UUID,
+      author_name  TEXT,
+      author_email TEXT,
+      kind         TEXT NOT NULL DEFAULT 'suggestion',
+      subject      TEXT NOT NULL,
+      message      TEXT NOT NULL,
+      status       TEXT NOT NULL DEFAULT 'new',
+      delivered    BOOLEAN NOT NULL DEFAULT false,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS feedback_org_idx     ON feedback (org_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS feedback_created_idx ON feedback (created_at DESC);
   `);
   await backfillPublicCodes();
   return true;
@@ -138,15 +201,27 @@ function randomCode(len = 6) {
   return s;
 }
 
-async function createOrg(name) {
+async function createOrg(name, profile = {}) {
   if (!pool) throw new Error('persistence disabled');
   // Retry on the (very unlikely) join_code collision.
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = randomCode();
     try {
       const { rows } = await pool.query(
-        `INSERT INTO organizations (name, join_code, public_code) VALUES ($1, $2, $3) RETURNING *`,
-        [name, code, randomCode(8)],
+        `INSERT INTO organizations
+           (name, join_code, public_code, admin_name, contact_email, phone, industry, address, country)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+        [
+          name,
+          code,
+          randomCode(8),
+          profile.adminName || null,
+          profile.contactEmail || null,
+          profile.phone || null,
+          profile.industry || null,
+          profile.address || null,
+          profile.country || null,
+        ],
       );
       return rows[0];
     } catch (e) {
@@ -155,6 +230,28 @@ async function createOrg(name) {
     }
   }
   throw new Error('could not allocate a unique join code');
+}
+
+// Update the editable parts of an org profile. Never touches join_code /
+// public_code — rotating those would silently lock out every joined device.
+async function updateOrgProfile(id, profile = {}) {
+  if (!pool) return null;
+  const fields = { name: profile.name, admin_name: profile.adminName, contact_email: profile.contactEmail,
+    phone: profile.phone, industry: profile.industry, address: profile.address, country: profile.country };
+  const sets = [];
+  const params = [];
+  for (const [col, val] of Object.entries(fields)) {
+    if (val === undefined) continue;
+    params.push(val === '' ? null : val);
+    sets.push(`${col} = $${params.length}`);
+  }
+  if (!sets.length) return getOrgById(id);
+  params.push(id);
+  const { rows } = await pool.query(
+    `UPDATE organizations SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`,
+    params,
+  );
+  return rows[0] || null;
 }
 
 async function getOrgByCode(code) {
@@ -225,12 +322,12 @@ async function getOrgById(id) {
   return rows[0] || null;
 }
 
-async function createUser({ orgId, email, passwordHash, name, role = 'supervisor' }) {
+async function createUser({ orgId, email, passwordHash, name, role = 'supervisor', phone = null }) {
   if (!pool) throw new Error('persistence disabled');
   const { rows } = await pool.query(
-    `INSERT INTO users (org_id, email, password_hash, name, role)
-     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [orgId, email.toLowerCase(), passwordHash, name, role],
+    `INSERT INTO users (org_id, email, password_hash, name, role, phone)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [orgId, email.toLowerCase(), passwordHash, name, role, phone],
   );
   return rows[0];
 }
@@ -359,6 +456,114 @@ async function deletePushSubscription(endpoint) {
   await pool.query(`DELETE FROM push_subscriptions WHERE endpoint = $1`, [endpoint]);
 }
 
+// --- Safe destinations -----------------------------------------------------
+
+// Destinations visible to one operator: the org-wide rows plus any assigned
+// specifically to them. Personal rows sort first so a caller taking the first
+// match of a kind gets the assigned override rather than the org default.
+async function listDestinations({ orgId, operatorId = null, kind = null } = {}) {
+  if (!pool) return [];
+  const params = [orgId];
+  let sql = `SELECT * FROM destinations WHERE org_id = $1`;
+  if (operatorId) {
+    params.push(operatorId);
+    sql += ` AND (assigned_to IS NULL OR assigned_to = $${params.length})`;
+  } else {
+    sql += ` AND assigned_to IS NULL`;
+  }
+  if (kind) { params.push(kind); sql += ` AND kind = $${params.length}`; }
+  sql += ` ORDER BY (assigned_to IS NULL), kind, created_at`;
+  const { rows } = await pool.query(sql, params);
+  return rows;
+}
+
+// Every destination in the org, including per-operator ones — the supervisor's
+// management view, as opposed to what a single device should follow.
+async function listAllDestinations(orgId, limit = 500) {
+  if (!pool) return [];
+  const { rows } = await pool.query(
+    `SELECT * FROM destinations WHERE org_id = $1 ORDER BY kind, assigned_to NULLS FIRST, created_at LIMIT $2`,
+    [orgId, Math.min(Math.max(1, limit), 1000)],
+  );
+  return rows;
+}
+
+async function createDestination({ orgId, kind = 'assembly', label, lat, lng, address = null, phone = null, assignedTo = null, createdBy = null }) {
+  if (!pool) throw new Error('persistence disabled');
+  const { rows } = await pool.query(
+    `INSERT INTO destinations (org_id, kind, label, lat, lng, address, phone, assigned_to, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    [orgId, kind, label, lat, lng, address, phone, assignedTo, createdBy],
+  );
+  return rows[0];
+}
+
+// Scoped by org so a guessed id can never delete another site's destination.
+async function deleteDestination(id, orgId) {
+  if (!pool) return null;
+  const { rows } = await pool.query(
+    `DELETE FROM destinations WHERE id = $1 AND org_id = $2 RETURNING *`,
+    [id, orgId],
+  );
+  return rows[0] || null;
+}
+
+// --- Live location tracking ------------------------------------------------
+
+// One position sample for a worker during a live incident. Cheap and additive:
+// the roster already carries these coordinates, this just makes them durable so
+// movement can be replayed afterwards.
+async function recordPing({ orgId, incidentId, workerId, workerName, lat, lng, accuracy }) {
+  if (!pool) return;
+  await pool.query(
+    `INSERT INTO location_pings (org_id, incident_id, worker_id, worker_name, lat, lng, accuracy)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [orgId || null, incidentId || null, String(workerId), workerName || null, lat, lng, numOrNull(accuracy)],
+  );
+}
+
+async function listPings({ incidentId, orgId, workerId = null, limit = 1000 } = {}) {
+  if (!pool) return [];
+  const params = [];
+  const where = [];
+  if (incidentId) { params.push(incidentId); where.push(`incident_id = $${params.length}`); }
+  if (orgId) { params.push(orgId); where.push(`org_id = $${params.length}`); }
+  if (workerId) { params.push(workerId); where.push(`worker_id = $${params.length}`); }
+  if (!where.length) return [];
+  params.push(Math.min(Math.max(1, limit), 5000));
+  const { rows } = await pool.query(
+    `SELECT * FROM location_pings WHERE ${where.join(' AND ')} ORDER BY at ASC LIMIT $${params.length}`,
+    params,
+  );
+  return rows;
+}
+
+// --- Feedback --------------------------------------------------------------
+
+async function createFeedback({ orgId, userId, authorName, authorEmail, kind = 'suggestion', subject, message }) {
+  if (!pool) throw new Error('persistence disabled');
+  const { rows } = await pool.query(
+    `INSERT INTO feedback (org_id, user_id, author_name, author_email, kind, subject, message)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [orgId || null, userId || null, authorName || null, authorEmail || null, kind, subject, message],
+  );
+  return rows[0];
+}
+
+async function listFeedback({ orgId, limit = 50 } = {}) {
+  if (!pool) return [];
+  const { rows } = await pool.query(
+    `SELECT * FROM feedback WHERE org_id IS NOT DISTINCT FROM $1 ORDER BY created_at DESC LIMIT $2`,
+    [orgId || null, Math.min(Math.max(1, limit), 200)],
+  );
+  return rows;
+}
+
+async function markFeedbackDelivered(id) {
+  if (!pool) return;
+  await pool.query(`UPDATE feedback SET delivered = true WHERE id = $1`, [id]);
+}
+
 // --- Key/value config ------------------------------------------------------
 
 async function getKv(key) {
@@ -384,9 +589,19 @@ module.exports = {
   enabled,
   init,
   createOrg,
+  updateOrgProfile,
   getOrgByCode,
   getOrgByPublicCode,
   getOrgById,
+  listDestinations,
+  listAllDestinations,
+  createDestination,
+  deleteDestination,
+  recordPing,
+  listPings,
+  createFeedback,
+  listFeedback,
+  markFeedbackDelivered,
   createReport,
   listReports,
   countPendingReports,

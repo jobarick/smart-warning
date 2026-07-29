@@ -22,6 +22,11 @@ export function AuthGate({ onAuthed, notice }: Props) {
   const [orgName, setOrgName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  // Organization registration details — this is the account of record for a
+  // site, so it captures an owner and a way to reach them.
+  const [phone, setPhone] = useState('');
+  const [industry, setIndustry] = useState('');
+  const [address, setAddress] = useState('');
 
   const go = (s: Step) => { setError(null); setStep(s); };
 
@@ -49,7 +54,15 @@ export function AuthGate({ onAuthed, notice }: Props) {
     e.preventDefault();
     setBusy(true); setError(null);
     try {
-      const res = await signup({ orgName: orgName.trim(), name: name.trim(), email: email.trim(), password });
+      const res = await signup({
+        orgName: orgName.trim(),
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        phone: phone.trim(),
+        industry: industry || undefined,
+        address: address.trim() || undefined,
+      });
       onAuthed({ kind: 'supervisor', token: res.token, user: res.user });
     } catch (err) {
       setError((err as Error).message);
@@ -131,8 +144,34 @@ export function AuthGate({ onAuthed, notice }: Props) {
               <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sam Ops" autoComplete="name" />
             </label>
             <label className="auth-field">
-              <span>Email</span>
+              <span>Contact email</span>
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
+            </label>
+            <label className="auth-field">
+              <span>Phone number</span>
+              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+255 713 455 454" autoComplete="tel" />
+            </label>
+            <label className="auth-field">
+              <span>Sector <small>optional</small></span>
+              <select value={industry} onChange={(e) => setIndustry(e.target.value)}>
+                <option value="">Not specified</option>
+                <option value="manufacturing">Manufacturing</option>
+                <option value="construction">Construction</option>
+                <option value="healthcare">Healthcare</option>
+                <option value="education">Education</option>
+                <option value="transport">Transport &amp; logistics</option>
+                <option value="security">Security</option>
+                <option value="office">Offices</option>
+                <option value="warehouse">Warehousing</option>
+                <option value="retail">Retail</option>
+                <option value="hospitality">Hospitality</option>
+                <option value="public">Public institution</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+            <label className="auth-field">
+              <span>Site address <small>optional</small></span>
+              <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street, city" autoComplete="street-address" />
             </label>
             <label className="auth-field">
               <span>Password</span>

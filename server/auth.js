@@ -35,25 +35,81 @@ function publicUser(user, org) {
     email: user.email,
     name: user.name,
     role: user.role,
+    phone: user.phone || null,
     org: org
-      ? { id: org.id, name: org.name, joinCode: org.join_code, publicCode: org.public_code || null }
+      ? {
+          id: org.id,
+          name: org.name,
+          joinCode: org.join_code,
+          publicCode: org.public_code || null,
+          adminName: org.admin_name || null,
+          contactEmail: org.contact_email || null,
+          phone: org.phone || null,
+          industry: org.industry || null,
+          address: org.address || null,
+          country: org.country || null,
+        }
       : undefined,
   };
 }
 
-// Create an organization and its first supervisor in one step.
-async function signup({ orgName, name, email, password }) {
+// A phone number is stored as typed apart from obvious separators — numbering
+// plans vary too much to validate beyond "plausible length, digits and +".
+const PHONE_RE = /^\+?[0-9]{6,15}$/;
+
+function normalizePhone(raw, { required = false, field = 'phone number' } = {}) {
+  const cleaned = String(raw || '').replace(/[\s()\-.]/g, '');
+  if (!cleaned) {
+    if (required) throw httpError(400, `a ${field} is required`);
+    return null;
+  }
+  if (!PHONE_RE.test(cleaned)) throw httpError(400, `that ${field} does not look valid`);
+  return cleaned;
+}
+
+/**
+ * Register an organization and its first supervisor.
+ *
+ * This is the account of record for a site: it captures who owns it and how to
+ * reach them, so an organization is a durable customer rather than whatever
+ * identity a third-party sign-in happened to return. Any social sign-in added
+ * later should attach to an org created here, not replace this step.
+ */
+async function signup({ orgName, name, email, password, phone, adminName, contactEmail, industry, address, country }) {
   if (!orgName || !orgName.trim()) throw httpError(400, 'organization name is required');
   if (!name || !name.trim()) throw httpError(400, 'your name is required');
   if (!EMAIL_RE.test(email || '')) throw httpError(400, 'a valid email is required');
   if (!password || password.length < 8) throw httpError(400, 'password must be at least 8 characters');
+  const orgPhone = normalizePhone(phone, { required: true, field: 'contact phone number' });
+  if (contactEmail && !EMAIL_RE.test(contactEmail)) throw httpError(400, 'the organization contact email is not valid');
 
   if (await db.getUserByEmail(email)) throw httpError(409, 'an account with that email already exists');
 
-  const org = await db.createOrg(orgName.trim());
+  const org = await db.createOrg(orgName.trim(), {
+    // The administrator defaults to the person registering, which is who they
+    // are in practice — but it stays editable, because the ops owner and the
+    // named administrator are not always the same person.
+    adminName: (adminName || name).trim(),
+    contactEmail: (contactEmail || email).toLowerCase(),
+    phone: orgPhone,
+    industry: industry || null,
+    address: address || null,
+    country: country || null,
+  });
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
-  const user = await db.createUser({ orgId: org.id, email, passwordHash, name: name.trim() });
+  const user = await db.createUser({ orgId: org.id, email, passwordHash, name: name.trim(), phone: orgPhone });
   return { token: signToken(user), user: publicUser(user, org) };
+}
+
+// Edit the organization profile. Supervisors only — enforced by the route.
+async function updateOrg(orgId, body = {}) {
+  if (body.contactEmail && !EMAIL_RE.test(body.contactEmail)) throw httpError(400, 'the organization contact email is not valid');
+  const patch = { ...body };
+  if (body.phone !== undefined) patch.phone = normalizePhone(body.phone) || '';
+  if (body.name !== undefined && !String(body.name).trim()) throw httpError(400, 'organization name is required');
+  const org = await db.updateOrgProfile(orgId, patch);
+  if (!org) throw httpError(404, 'organization not found');
+  return org;
 }
 
 async function login({ email, password }) {
@@ -81,4 +137,4 @@ function httpError(status, message) {
   return e;
 }
 
-module.exports = { signup, login, userFromToken, verifyToken, publicUser, httpError };
+module.exports = { signup, login, updateOrg, userFromToken, verifyToken, publicUser, httpError, normalizePhone };

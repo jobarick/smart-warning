@@ -65,6 +65,10 @@ already joined keep relaying.
 | `CLIENT_DIST` | Override the built-client directory. Defaults to `../client/dist`. |
 | `RELAY_TOKEN` | Legacy shared secret, only when there is **no** database. |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | Web push keys. Optional — a pair is generated once and stored in the database if unset. |
+| `SMTP_URL` | `smtp://user:pass@host:587`. Optional. **Unset by default**, which means feedback is stored but never emailed. |
+| `FEEDBACK_TO` | Where feedback is mailed. Defaults to `jobarick@gmail.com`. |
+| `SMTP_FROM` | From address for feedback mail. |
+| `OVERPASS_URL` / `OVERPASS_TIMEOUT_MS` | Nearby-facility lookups. Defaults to the public Overpass API with a 7s timeout. |
 
 ## REST API
 
@@ -78,12 +82,24 @@ the app when the client is bundled.
 |---|---|---|
 | `GET` | `/api/health` | `{service, clients, persistence, orgs, client, uptime}`. Render's health check. |
 | `GET` | `/` | The app when `client/dist` exists, otherwise the health payload. |
-| `POST` | `/api/auth/signup` | `{orgName, name, email, password}` → creates the org and its first supervisor. |
+| `POST` | `/api/auth/signup` | `{orgName, name, email, password, phone, industry?, address?, country?, adminName?, contactEmail?}` → creates the org and its first supervisor. **`phone` is required** — an organization is an account of record, not a throwaway login. |
 | `POST` | `/api/auth/login` | `{email, password}` → `{token, user}`. |
 | `GET` | `/api/auth/me` | Validates a token; returns the user and org. |
 | `GET` | `/api/push/vapid` | Public key for subscribing. |
 | `POST` | `/api/push/subscribe` | Supervisor bearer token, or a worker's `orgCode` in the body. |
 | `POST` | `/api/push/unsubscribe` | `{endpoint}`. |
+| `GET` | `/api/emergency/directory?lat=&lng=` or `?country=` | Published emergency numbers for that place. **Unauthenticated on purpose** — these are public numbers, and someone who cannot sign in still needs them. Never returns an empty list: unknown coordinates fall back to 112/911. |
+| `GET` | `/api/emergency/nearby?lat=&lng=&kind=` | Nearest hospital/police/fire/shelter/pharmacy from OpenStreetMap. Best effort: returns `[]` rather than failing. |
+
+### Worker or supervisor
+
+These accept **either** credential: a supervisor's bearer token, or a worker's
+join code as `?orgCode=`. Workers legitimately need these and never hold a JWT.
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET` | `/api/destinations` | Configured safe destinations. A supervisor with no `operatorId` sees all of them; anyone else sees the org-wide rows plus their own. |
+| `GET` | `/api/safe-route?type=&lat=&lng=&operatorId=` | Where this emergency should send this person: the site's own destination if one is configured, else the nearest suitable public facility, with distance and travel estimates. `cyber` deliberately returns no destination. |
 
 ### Public reporting
 
@@ -109,6 +125,12 @@ A report reaches no device. It is queued until a supervisor escalates it.
 | `GET` | `/api/incidents/:id` | One incident. |
 | `GET` | `/api/stats` | `{total, active, last24h, avgResolveSeconds}`. |
 | `GET` | `/api/roster` | Live check-in list, from memory. |
+| `GET` | `/api/incidents/:id/track` | Movement history for one incident — the positions recorded between the alert and its all-clear. |
+| `PATCH` | `/api/org` | Update the organization profile. Never touches the join or public code. |
+| `POST` | `/api/destinations` | `{kind, label, lat, lng, address?, phone?, assignedTo?}`. Writing is supervisors only: an assembly point is a site-wide safety decision. Omit `assignedTo` for the whole org, or name an operator to override it for them. |
+| `DELETE` | `/api/destinations/:id` | Org-scoped, so a guessed id cannot reach another site. |
+| `POST` | `/api/feedback` | `{kind, subject, message}`. **Stored first, mailed second** — a mail outage never loses a submission. The response reports `delivered` honestly and offers a `mailTo` fallback when SMTP is unconfigured. |
+| `GET` | `/api/feedback` | This org's submissions, plus whether mail delivery is configured. |
 
 Escalation asks for the type and severity rather than taking anything the
 reporter typed: an anonymous stranger should not choose how loudly a site
@@ -157,15 +179,22 @@ Created and migrated by `db.init()` at boot.
 
 | Table | Holds |
 |---|---|
-| `organizations` | Name, `join_code` (admits devices), `public_code` (public reporting only). |
-| `users` | Supervisors — email, bcrypt hash, role, org. |
+| `organizations` | Name, `join_code` (admits devices), `public_code` (public reporting only), plus the registration profile: administrator, contact email, phone, industry, address, country. |
+| `users` | Supervisors — email, bcrypt hash, role, phone, org. |
 | `incidents` | Every alert raised, with who, where, and when it resolved. |
 | `reports` | Public reports and their outcome, linked to the incident if escalated. |
+| `destinations` | Where each kind of emergency sends people. `assigned_to IS NULL` applies to the whole org; naming an operator overrides it for them. |
+| `location_pings` | Movement during a live incident. **Written only between an alert and its all-clear** — this is incident tracking, not routine location logging. |
+| `feedback` | Supervisor submissions, with a `delivered` flag so a mail failure is visible rather than silent. |
 | `push_subscriptions` | Per-org web push endpoints. |
 | `app_kv` | Server-managed config, currently the generated VAPID keypair. |
 
-Everything is scoped by `org_id`. Reports and subscriptions cascade when an
-organization is deleted.
+Everything is scoped by `org_id`. Reports, destinations and subscriptions cascade
+when an organization is deleted.
+
+Every addition is an `ADD COLUMN IF NOT EXISTS` / `CREATE TABLE IF NOT EXISTS`,
+so `init()` migrates a live database in place — verified against real Postgres
+starting from the pre-migration schema.
 
 ## Deploying
 

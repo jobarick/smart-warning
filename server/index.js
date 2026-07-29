@@ -16,6 +16,9 @@ const db = require('./db');
 const auth = require('./auth');
 const push = require('./push');
 const staticFiles = require('./static');
+const emergencyNumbers = require('./emergency-numbers');
+const places = require('./places');
+const mailer = require('./mailer');
 
 const PORT = process.env.PORT || 3001;
 // Legacy shared token (only used when orgs are disabled — i.e. no database).
@@ -28,7 +31,7 @@ const ORGS = db.enabled();
 // ---------------------------------------------------------------------------
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
@@ -263,6 +266,171 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { workers: rosterList(ctx?.orgId ?? null), count: orgCount(ctx?.orgId ?? null) });
     }
 
+    // --- Organization profile (supervisor) ---
+    if (path === '/api/org' && (req.method === 'PATCH' || req.method === 'POST')) {
+      const ctx = await guardOrg(req, res);
+      if (ctx === false) return;
+      if (!ctx) return sendJson(res, 501, { error: 'organizations require a database' });
+      const org = await auth.updateOrg(ctx.orgId, await readJson(req));
+      return sendJson(res, 200, { user: auth.publicUser(ctx.user, org) });
+    }
+
+    // --- Safe destinations ---
+    // Readable by a worker too (join code in the query), because the device that
+    // has to walk to the assembly point is the one that needs to know where it is.
+    if (path === '/api/destinations' && req.method === 'GET') {
+      const ctx = await orgContext(req, url);
+      if (!ctx) return sendJson(res, 401, { error: 'org credentials required' });
+      const operatorId = url.searchParams.get('operatorId') || null;
+      const rows = ctx.supervisor && !operatorId
+        ? await db.listAllDestinations(ctx.orgId)
+        : await db.listDestinations({ orgId: ctx.orgId, operatorId });
+      return sendJson(res, 200, { destinations: rows.map(publicDestination) });
+    }
+
+    // Writing is supervisors only: an assembly point is a site-wide safety
+    // decision, not something a device should be able to move for everyone.
+    if (path === '/api/destinations' && req.method === 'POST') {
+      const ctx = await guardOrg(req, res);
+      if (ctx === false) return;
+      if (!ctx) return sendJson(res, 501, { error: 'destinations require a database' });
+      const body = await readJson(req);
+      const lat = Number(body.lat);
+      const lng = Number(body.lng);
+      const label = String(body.label || '').trim().slice(0, 120);
+      const kind = DESTINATION_KINDS.has(body.kind) ? body.kind : 'assembly';
+      if (!label) return sendJson(res, 400, { error: 'a name is required' });
+      if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lng) || lng < -180 || lng > 180) {
+        return sendJson(res, 400, { error: 'valid coordinates are required' });
+      }
+      const row = await db.createDestination({
+        orgId: ctx.orgId, kind, label, lat, lng,
+        address: String(body.address || '').trim().slice(0, 200) || null,
+        phone: body.phone ? auth.normalizePhone(body.phone) : null,
+        // null assigns it to the whole organization; an operator id overrides
+        // the org default for that one person.
+        assignedTo: String(body.assignedTo || '').trim().slice(0, 80) || null,
+        createdBy: ctx.user?.name || 'Supervisor',
+      });
+      return sendJson(res, 201, { destination: publicDestination(row) });
+    }
+
+    const destMatch = path.match(/^\/api\/destinations\/([^/]+)$/);
+    if (destMatch && req.method === 'DELETE') {
+      const ctx = await guardOrg(req, res);
+      if (ctx === false) return;
+      if (!ctx) return sendJson(res, 501, { error: 'destinations require a database' });
+      if (!UUID_RE.test(destMatch[1])) return sendJson(res, 404, { error: 'no such destination' });
+      const row = await db.deleteDestination(destMatch[1], ctx.orgId);
+      if (!row) return sendJson(res, 404, { error: 'no such destination' });
+      return sendJson(res, 200, { ok: true });
+    }
+
+    // --- Emergency call directory ---
+    // Deliberately unauthenticated: published emergency numbers are public
+    // information, and a person who cannot sign in still needs to reach help.
+    if (path === '/api/emergency/directory' && req.method === 'GET') {
+      const lat = Number(url.searchParams.get('lat'));
+      const lng = Number(url.searchParams.get('lng'));
+      const code = url.searchParams.get('country');
+      const country = code
+        ? emergencyNumbers.countryByCode(code)
+        : emergencyNumbers.countryAt(lat, lng);
+      return sendJson(res, 200, emergencyNumbers.directoryFor(country));
+    }
+
+    // Physical facilities near a point (best effort — see places.js).
+    if (path === '/api/emergency/nearby' && req.method === 'GET') {
+      const lat = Number(url.searchParams.get('lat'));
+      const lng = Number(url.searchParams.get('lng'));
+      const kind = url.searchParams.get('kind') || 'hospital';
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return sendJson(res, 400, { error: 'lat and lng are required' });
+      }
+      return sendJson(res, 200, { places: await places.nearby(kind, lat, lng) });
+    }
+
+    // --- Where to go for this emergency ---
+    if (path === '/api/safe-route' && req.method === 'GET') {
+      const ctx = await orgContext(req, url);
+      const type = url.searchParams.get('type') || 'evacuation';
+      const lat = Number(url.searchParams.get('lat'));
+      const lng = Number(url.searchParams.get('lng'));
+      if (!ALERT_TYPES.has(type)) return sendJson(res, 400, { error: 'unknown alert type' });
+
+      const configured = ctx
+        ? await db.listDestinations({ orgId: ctx.orgId, operatorId: url.searchParams.get('operatorId') || null })
+        : [];
+      // Live incidents double as danger points to route around.
+      const dangers = ctx
+        ? (await db.listIncidents({ orgId: ctx.orgId, status: 'active', limit: 20 }))
+            .filter((i) => i.lat != null && i.lng != null)
+            .map((i) => ({ lat: Number(i.lat), lng: Number(i.lng) }))
+        : [];
+      const out = await places.safeDestination({ type, lat, lng, configured, dangers });
+      return sendJson(res, 200, out);
+    }
+
+    // --- Feedback & recommendations (supervisor) ---
+    if (path === '/api/feedback' && req.method === 'POST') {
+      const ctx = await guardOrg(req, res);
+      if (ctx === false) return;
+      if (!ctx) return sendJson(res, 501, { error: 'feedback requires a database' });
+      const body = await readJson(req);
+      const subject = String(body.subject || '').trim().slice(0, 160);
+      const message = String(body.message || '').trim().slice(0, 4000);
+      const kind = FEEDBACK_KINDS.has(body.kind) ? body.kind : 'suggestion';
+      if (!subject) return sendJson(res, 400, { error: 'a subject is required' });
+      if (!message) return sendJson(res, 400, { error: 'a message is required' });
+
+      // Stored first, mailed second — a mail outage must not lose the feedback.
+      const row = await db.createFeedback({
+        orgId: ctx.orgId, userId: ctx.user?.id, authorName: ctx.user?.name,
+        authorEmail: ctx.user?.email, kind, subject, message,
+      });
+      const delivered = await mailer.sendFeedback({ ...row, org_name: ctx.org?.name });
+      if (delivered) await db.markFeedbackDelivered(row.id);
+      console.log(`[*] feedback ${kind} from ${ctx.user?.email || 'supervisor'} (delivered: ${delivered})`);
+      return sendJson(res, 201, {
+        ok: true,
+        feedback: { ...publicFeedback(row), delivered },
+        // The client offers a mailto: fallback when the server cannot mail.
+        mailTo: mailer.enabled() ? null : mailer.destination(),
+      });
+    }
+
+    if (path === '/api/feedback' && req.method === 'GET') {
+      const ctx = await guardOrg(req, res);
+      if (ctx === false) return;
+      if (!ctx) return sendJson(res, 501, { error: 'feedback requires a database' });
+      const rows = await db.listFeedback({ orgId: ctx.orgId });
+      return sendJson(res, 200, {
+        feedback: rows.map(publicFeedback),
+        mailEnabled: mailer.enabled(),
+        mailTo: mailer.destination(),
+      });
+    }
+
+    // --- Movement history for one incident ---
+    const trackMatch = path.match(/^\/api\/incidents\/([^/]+)\/track$/);
+    if (trackMatch && req.method === 'GET') {
+      const ctx = await guardOrg(req, res);
+      if (ctx === false) return;
+      const incidentId = decodeURIComponent(trackMatch[1]);
+      const incident = await db.getIncident(incidentId, ctx?.orgId);
+      if (!incident) return sendJson(res, 404, { error: 'not found' });
+      const pings = await db.listPings({ incidentId, orgId: ctx?.orgId });
+      return sendJson(res, 200, {
+        incident,
+        track: pings.map((p) => ({
+          workerId: p.worker_id, workerName: p.worker_name,
+          lat: Number(p.lat), lng: Number(p.lng),
+          accuracy: p.accuracy == null ? null : Number(p.accuracy),
+          at: new Date(p.at).getTime(),
+        })),
+      });
+    }
+
     // Anything left that is not an API route may be the built client: an asset,
     // or a deep link that should return the app shell.
     if (!path.startsWith('/api/') && staticFiles.serve(req, res, url.pathname)) return;
@@ -283,6 +451,53 @@ async function guardOrg(req, res) {
   const ctx = await requireAuth(req);
   if (!ctx) { sendJson(res, 401, { error: 'not authenticated' }); return false; }
   return ctx;
+}
+
+// Resolve the caller's org from either credential a client may hold: a
+// supervisor's bearer token, or a worker's join code as a query parameter.
+// Workers legitimately need read access to destinations and safe-route
+// guidance, and they never have a JWT.
+async function orgContext(req, url) {
+  const ctx = await requireAuth(req);
+  if (ctx) return { orgId: ctx.orgId, supervisor: true, user: ctx.user, org: ctx.org };
+  const code = url.searchParams.get('orgCode');
+  if (code) {
+    const org = await db.getOrgByCode(code);
+    if (org) return { orgId: org.id, supervisor: false, user: null, org };
+  }
+  return null;
+}
+
+const DESTINATION_KINDS = new Set(['assembly', 'clinic', 'safe', 'muster', 'shelter']);
+const FEEDBACK_KINDS = new Set(['suggestion', 'recommendation', 'feature', 'bug', 'general']);
+
+function publicDestination(d) {
+  if (!d) return null;
+  return {
+    id: d.id,
+    kind: d.kind,
+    label: d.label,
+    lat: Number(d.lat),
+    lng: Number(d.lng),
+    address: d.address || null,
+    phone: d.phone || null,
+    assignedTo: d.assigned_to || null,
+    createdBy: d.created_by || null,
+  };
+}
+
+function publicFeedback(f) {
+  if (!f) return null;
+  return {
+    id: f.id,
+    kind: f.kind,
+    subject: f.subject,
+    message: f.message,
+    status: f.status,
+    delivered: f.delivered === true,
+    authorName: f.author_name || null,
+    createdAt: f.created_at ? new Date(f.created_at).getTime() : Date.now(),
+  };
 }
 
 // Resolve an org for a push subscription: a supervisor's bearer token, or a
@@ -317,6 +532,18 @@ async function raiseAlert(orgId, alert, worker = null, origin = 'unknown') {
   // however it was raised — an escalated public report most of all.
   console.log(`[!] ALERT ${alert.type}/${alert.severity} from ${origin} "${alert.sender}" (org ${orgId ?? 'global'}): ${alert.message || '(no message)'}`);
   db.recordAlert(alert, worker, orgId).catch((e) => console.error('[db] recordAlert:', e.message));
+
+  // Open the tracking window. Until the all-clear, every position a device
+  // reports is written to the incident's movement history.
+  activeIncident.set(orgId ?? null, alert.id);
+  if (worker && worker.lat != null && worker.lng != null) {
+    // The raiser's position at the moment of the alert — the first and most
+    // important point on the track.
+    db.recordPing({
+      orgId, incidentId: alert.id, workerId: worker.id, workerName: worker.name,
+      lat: worker.lat, lng: worker.lng, accuracy: worker.accuracy,
+    }).catch((e) => console.error('[db] recordPing:', e.message));
+  }
   push.notifyOrg(orgId, {
     title: `🚨 ${titleCase(alert.type)} alert`,
     body: alert.message || `${titleCase(alert.severity)} severity — raised by ${alert.sender || 'a worker'}`,
@@ -427,6 +654,34 @@ async function resolveJoin(msg) {
 // advisory nobody is watching any more.
 const orgStatus = new Map(); // orgId (or null) → SystemStatusMessage
 
+// ---------------------------------------------------------------------------
+// Live location tracking during an incident
+// ---------------------------------------------------------------------------
+// Which incident (if any) each org is currently running. Its only job is to
+// answer "should this position be written down?" — so that movement history is
+// captured for the minutes that matter and at no other time. Devices already
+// report position continuously for the roster; this makes it durable, bounded
+// to a live emergency, and nothing more.
+const activeIncident = new Map(); // orgId (or null) → incident id
+
+// Heartbeats arrive every ~5s per device. Match that, and no faster, so a
+// chatty client cannot turn itself into a write amplifier.
+const PING_MIN_INTERVAL_MS = 5000;
+
+function trackPosition(ws) {
+  const w = ws.worker;
+  if (!w || w.lat == null || w.lng == null) return;
+  const incidentId = activeIncident.get(ws.orgId ?? null);
+  if (!incidentId) return; // no live incident — nothing is recorded
+  const now = Date.now();
+  if (ws.lastPingAt && now - ws.lastPingAt < PING_MIN_INTERVAL_MS) return;
+  ws.lastPingAt = now;
+  db.recordPing({
+    orgId: ws.orgId, incidentId, workerId: w.id, workerName: w.name,
+    lat: w.lat, lng: w.lng, accuracy: w.accuracy,
+  }).catch((e) => console.error('[db] recordPing:', e.message));
+}
+
 const STATUS_LEVELS = new Set(['clear', 'watch', 'emergency']);
 
 function statusFor(orgId) {
@@ -523,6 +778,8 @@ wss.on('connection', (ws, req) => {
         return; // raiseAlert already broadcast it
       } else {
         console.log(`[.] all-clear from #${ws.connId} "${msg.sender}" (org ${ws.orgId ?? 'global'})`);
+        // Close the tracking window: position recording stops here.
+        activeIncident.delete(ws.orgId ?? null);
         db.resolveActive(msg, ws.orgId).catch((e) => console.error('[db] resolveActive:', e.message));
         push.notifyOrg(ws.orgId, {
           title: '✓ All clear',
@@ -563,6 +820,7 @@ wss.on('connection', (ws, req) => {
     if (msg.kind === 'hello' || msg.kind === 'heartbeat') {
       ws.worker = sanitizeWorker(msg, ws.connId);
       if (msg.kind === 'hello') broadcastRoster(ws.orgId); // announce joins promptly
+      trackPosition(ws); // no-op unless an incident is live
       return;
     }
   });
