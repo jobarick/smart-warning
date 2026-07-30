@@ -40,3 +40,17 @@ services:
       # relay). Ignored once orgs are enabled. Leave unset.
       - key: RELAY_TOKEN
         sync: false
+      # Firebase Cloud Messaging service account (Android native push, closed-app
+      # delivery). Optional: without it, web push still works but Android users
+      # get no alerts while the app is closed. See docs/FIREBASE_SETUP.md.
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false
+      # SMTP connection string (nodemailer URL syntax). Optional: without it,
+      # mail queues safely in outbound_mail and delivers the backlog once this
+      # is set. See docs/SMTP_SETUP.md.
+      - key: SMTP_URL
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: FEEDBACK_TO
+        sync: false
