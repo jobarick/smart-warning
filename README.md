@@ -4,6 +4,8 @@ A web app (PWA) for instant emergency alerts across all connected devices — de
 
 📋 **[Product vision & technical roadmap](docs/VISION.md)** — where this is going, and what is shipped, partial or planned against each goal.
 
+**Setup guides** — [Firebase / Android push](docs/FIREBASE_SETUP.md) · [Email](docs/SMTP_SETUP.md). Both channels are built and inert; supplying credentials turns them on with no code change.
+
 ## Structure
 
 - `server/` — Node.js **backend** (port **3001**): a WebSocket relay *and* a REST history API. Broadcasts every alert / all-clear to all connected clients, tracks the live device roster, and — when a `DATABASE_URL` is configured — persists every alert as a durable **incident** (with resolution, location, and stats) in Postgres. With no `DATABASE_URL` it runs in-memory only, exactly like before.
@@ -90,7 +92,7 @@ In orgs mode the history/roster endpoints require a supervisor bearer token
 
 | Method & path | Description |
 | --- | --- |
-| `GET /` | Health: `{ service, clients, persistence, orgs, uptime }` (Render health check). |
+| `GET /api/health` | Health: `{ service, clients, persistence, orgs, client, channels, uptime }` — `channels` reports which of web push, native push and mail are actually configured. |
 | `POST /api/auth/signup` | Create an org + first supervisor `{ orgName, name, email, password }` → `{ token, user }`. |
 | `POST /api/auth/login` | `{ email, password }` → `{ token, user }`. |
 | `GET /api/auth/me` | The current supervisor + org (bearer token). |
@@ -101,6 +103,9 @@ In orgs mode the history/roster endpoints require a supervisor bearer token
 | `GET /api/push/vapid` | `{ enabled, publicKey }` — the VAPID key a device needs to subscribe. |
 | `POST /api/push/subscribe` | Register a Web Push subscription (bearer token or `{ orgCode }`). |
 | `POST /api/push/unsubscribe` | Remove a subscription by `{ endpoint }`. |
+| `GET /api/push/device` | Native push status: `{ enabled, project, reason }`. |
+| `POST /api/push/device` | Register an Android FCM token (bearer token or `{ orgCode }`). Accepted before Firebase is configured; replies `{ delivery: 'pending-credentials' }`. |
+| `POST /api/push/device/unregister` | Remove a device token. |
 
 An **incident** is created when an alert is raised (enriched with the sender's
 last-known zone + coordinates from the roster) and marked `resolved` when an

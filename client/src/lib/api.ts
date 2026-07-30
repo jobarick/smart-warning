@@ -247,6 +247,36 @@ export async function savePushSubscription(
   if (!res.ok) throw new Error(await errorMessage(res, 'could not enable notifications'));
 }
 
+/**
+ * Register this device's native push token with its org.
+ *
+ * Accepted even while the server has no Firebase credentials: the tokens
+ * gathered now are exactly the ones that must receive the first alert after
+ * credentials are added, and dropping them would mean every device had to
+ * reopen the app before push started working.
+ */
+export async function registerDeviceToken(
+  token: string,
+  creds: { token?: string; orgCode?: string },
+  meta: { platform?: string; workerId?: string; label?: string } = {},
+): Promise<{ delivery: 'active' | 'pending-credentials' }> {
+  const res = await fetch(`${API_BASE}/api/push/device`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(creds.token) },
+    body: JSON.stringify({ token, orgCode: creds.orgCode, ...meta }),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not register this device for alerts'));
+  return res.json();
+}
+
+export async function unregisterDeviceToken(token: string): Promise<void> {
+  await fetch(`${API_BASE}/api/push/device/unregister`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+  }).catch(() => {});
+}
+
 export async function deletePushSubscription(endpoint: string): Promise<void> {
   await fetch(`${API_BASE}/api/push/unsubscribe`, {
     method: 'POST',

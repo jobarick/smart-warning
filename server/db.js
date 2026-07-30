@@ -165,6 +165,49 @@ async function init() {
     );
     CREATE INDEX IF NOT EXISTS feedback_org_idx     ON feedback (org_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS feedback_created_idx ON feedback (created_at DESC);
+
+    -- Outbound mail, queued before it is attempted.
+    --
+    -- Mail is the one delivery channel whose configuration lives entirely
+    -- outside the code, so it is also the one most likely to be absent. Rows
+    -- accumulate as 'pending' while no provider is configured and drain by
+    -- themselves the first time one is, which is what makes "no user action is
+    -- ever lost" a property of the database rather than a promise about ops.
+    CREATE TABLE IF NOT EXISTS outbound_mail (
+      id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id       UUID,
+      kind         TEXT NOT NULL DEFAULT 'generic',
+      ref_id       TEXT,
+      to_addr      TEXT NOT NULL,
+      reply_to     TEXT,
+      subject      TEXT NOT NULL,
+      body         TEXT NOT NULL,
+      status       TEXT NOT NULL DEFAULT 'pending',
+      attempts     INT  NOT NULL DEFAULT 0,
+      last_error   TEXT,
+      next_attempt TIMESTAMPTZ NOT NULL DEFAULT now(),
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      sent_at      TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS outbound_mail_due_idx ON outbound_mail (status, next_attempt);
+    -- One row per (kind, ref_id) so a retried submission cannot mail twice.
+    CREATE UNIQUE INDEX IF NOT EXISTS outbound_mail_ref_idx
+      ON outbound_mail (kind, ref_id) WHERE ref_id IS NOT NULL;
+
+    -- Native push registrations. Separate from push_subscriptions, which holds
+    -- browser Web Push endpoints: an FCM token is a different credential with a
+    -- different lifecycle, and conflating them would mean one prune killing the
+    -- other channel.
+    CREATE TABLE IF NOT EXISTS device_tokens (
+      token      TEXT PRIMARY KEY,
+      org_id     UUID,
+      platform   TEXT NOT NULL DEFAULT 'android',
+      worker_id  TEXT,
+      label      TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      seen_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS device_tokens_org_idx ON device_tokens (org_id);
   `);
   await backfillPublicCodes();
   return true;
@@ -518,6 +561,132 @@ async function deleteDestination(id, orgId) {
   return rows[0] || null;
 }
 
+// --- Outbound mail queue ---------------------------------------------------
+
+/**
+ * Queue one message. `refId` makes the write idempotent: a resubmitted feedback
+ * row or a retried request cannot produce two emails about the same thing.
+ * Returns the row, or null when persistence is off (the caller then decides
+ * whether a direct, unqueued attempt is worth making).
+ */
+async function queueMail({ orgId = null, kind = 'generic', refId = null, to, replyTo = null, subject, body }) {
+  if (!pool) return null;
+  const { rows } = await pool.query(
+    `INSERT INTO outbound_mail (org_id, kind, ref_id, to_addr, reply_to, subject, body)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     ON CONFLICT (kind, ref_id) WHERE ref_id IS NOT NULL DO NOTHING
+     RETURNING *`,
+    [orgId, kind, refId, to, replyTo, subject, body],
+  );
+  return rows[0] || null;
+}
+
+/**
+ * Claim messages that are due for an attempt.
+ *
+ * The UPDATE … RETURNING is the claim: it moves the row's next attempt forward
+ * before handing it out, so two server instances draining concurrently cannot
+ * both send the same email.
+ */
+async function claimDueMail(limit = 20, leaseMs = 60_000) {
+  if (!pool) return [];
+  const { rows } = await pool.query(
+    `UPDATE outbound_mail SET next_attempt = now() + ($2 || ' milliseconds')::interval
+      WHERE id IN (
+        SELECT id FROM outbound_mail
+         WHERE status = 'pending' AND next_attempt <= now()
+         ORDER BY created_at
+         LIMIT $1
+         FOR UPDATE SKIP LOCKED
+      )
+      RETURNING *`,
+    [Math.min(Math.max(1, limit), 200), String(leaseMs)],
+  );
+  return rows;
+}
+
+async function markMailSent(id) {
+  if (!pool) return;
+  await pool.query(
+    `UPDATE outbound_mail SET status = 'sent', sent_at = now(), attempts = attempts + 1, last_error = NULL
+      WHERE id = $1`,
+    [id],
+  );
+}
+
+/**
+ * Record a failed attempt and schedule the next one.
+ *
+ * Backoff is capped rather than unbounded, and the row stays 'pending' however
+ * many times it fails: a message that cannot be delivered today because nobody
+ * has configured SMTP must still go out the day somebody does. `giveUpAfter`
+ * exists only for permanent rejections, which the caller identifies.
+ */
+async function markMailFailed(id, error, { backoffMs = 60_000, permanent = false } = {}) {
+  if (!pool) return;
+  await pool.query(
+    `UPDATE outbound_mail
+        SET attempts = attempts + 1,
+            last_error = $2,
+            status = CASE WHEN $4 THEN 'failed' ELSE 'pending' END,
+            next_attempt = now() + ($3 || ' milliseconds')::interval
+      WHERE id = $1`,
+    [id, String(error || '').slice(0, 500), String(backoffMs), permanent],
+  );
+}
+
+async function mailQueueStats() {
+  if (!pool) return { pending: 0, sent: 0, failed: 0 };
+  const { rows } = await pool.query(
+    `SELECT status, COUNT(*)::int AS n FROM outbound_mail GROUP BY status`,
+  );
+  const out = { pending: 0, sent: 0, failed: 0 };
+  for (const r of rows) if (r.status in out) out[r.status] = r.n;
+  return out;
+}
+
+// --- Native push tokens ----------------------------------------------------
+
+async function saveDeviceToken({ token, orgId = null, platform = 'android', workerId = null, label = null }) {
+  if (!pool) return null;
+  const { rows } = await pool.query(
+    `INSERT INTO device_tokens (token, org_id, platform, worker_id, label)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (token) DO UPDATE
+       SET org_id = EXCLUDED.org_id, platform = EXCLUDED.platform,
+           worker_id = EXCLUDED.worker_id, label = EXCLUDED.label, seen_at = now()
+     RETURNING *`,
+    [token, orgId, platform, workerId, label],
+  );
+  return rows[0] || null;
+}
+
+async function listDeviceTokens(orgId) {
+  if (!pool) return [];
+  const { rows } = await pool.query(
+    `SELECT token, platform FROM device_tokens WHERE org_id IS NOT DISTINCT FROM $1`,
+    [orgId],
+  );
+  return rows;
+}
+
+async function deleteDeviceToken(token) {
+  if (!pool) return;
+  await pool.query(`DELETE FROM device_tokens WHERE token = $1`, [token]);
+}
+
+/** Drop tokens the push service has told us are dead, in one round trip. */
+async function deleteDeviceTokens(tokens) {
+  if (!pool || !tokens.length) return;
+  await pool.query(`DELETE FROM device_tokens WHERE token = ANY($1::text[])`, [tokens]);
+}
+
+async function countDeviceTokens() {
+  if (!pool) return 0;
+  const { rows } = await pool.query(`SELECT COUNT(*)::int AS n FROM device_tokens`);
+  return rows[0]?.n || 0;
+}
+
 // --- Live location tracking ------------------------------------------------
 
 // One position sample for a worker during a live incident. Cheap and additive:
@@ -603,6 +772,16 @@ async function close() {
 module.exports = {
   enabled,
   init,
+  queueMail,
+  claimDueMail,
+  markMailSent,
+  markMailFailed,
+  mailQueueStats,
+  saveDeviceToken,
+  listDeviceTokens,
+  deleteDeviceToken,
+  deleteDeviceTokens,
+  countDeviceTokens,
   createOrg,
   updateOrgProfile,
   getOrgByCode,

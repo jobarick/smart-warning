@@ -15,6 +15,7 @@ const { WebSocketServer } = require('ws');
 const db = require('./db');
 const auth = require('./auth');
 const push = require('./push');
+const fcm = require('./fcm');
 const staticFiles = require('./static');
 const emergencyNumbers = require('./emergency-numbers');
 const places = require('./places');
@@ -80,12 +81,21 @@ const server = http.createServer(async (req, res) => {
   }
   const path = url.pathname.replace(/\/+$/, '') || '/';
 
+  // Which optional channels are actually live is an operational question that
+  // currently needs log access to answer. Reporting it here means "is push
+  // configured on this deployment" is one request, not a support conversation.
   const health = () => ({
     service: 'alert-backend',
     clients: wss.clients.size,
     persistence: db.enabled(),
     orgs: ORGS,
     client: staticFiles.enabled(),
+    channels: {
+      webPush: push.enabled(),
+      nativePush: fcm.enabled(),
+      mail: mailer.enabled(),
+      mailProvider: mailer.providerName(),
+    },
     uptime: process.uptime(),
   });
 
@@ -141,6 +151,39 @@ const server = http.createServer(async (req, res) => {
     if (path === '/api/push/unsubscribe' && req.method === 'POST') {
       const body = await readJson(req);
       if (body.endpoint) await db.deletePushSubscription(body.endpoint);
+      return sendJson(res, 200, { ok: true });
+    }
+
+    // --- Native push (Android / FCM) ---
+    // Separate from the Web Push routes above: an FCM registration token is a
+    // different credential with its own lifecycle, and a browser subscription
+    // being pruned must never take an app registration with it.
+    if (path === '/api/push/device' && req.method === 'GET') {
+      return sendJson(res, 200, fcm.status());
+    }
+    if (path === '/api/push/device' && req.method === 'POST') {
+      const body = await readJson(req);
+      const token = String(body.token || '').trim();
+      if (!token || token.length > 4096) return sendJson(res, 400, { error: 'a device token is required' });
+      // Registration is accepted even while FCM is unconfigured. Tokens gathered
+      // now are exactly the tokens that must receive the first alert after
+      // credentials are added — dropping them would mean every device had to
+      // reopen the app before push started working.
+      if (!db.enabled()) return sendJson(res, 501, { error: 'device registration requires a database' });
+      const orgId = await orgIdFromRequest(req, body);
+      if (!orgId) return sendJson(res, 401, { error: 'org credentials required' });
+      await db.saveDeviceToken({
+        token,
+        orgId,
+        platform: String(body.platform || 'android').slice(0, 16),
+        workerId: body.workerId ? String(body.workerId).slice(0, 64) : null,
+        label: body.label ? String(body.label).slice(0, 80) : null,
+      });
+      return sendJson(res, 201, { ok: true, delivery: fcm.enabled() ? 'active' : 'pending-credentials' });
+    }
+    if (path === '/api/push/device/unregister' && req.method === 'POST') {
+      const body = await readJson(req);
+      if (body.token) await db.deleteDeviceToken(String(body.token));
       return sendJson(res, 200, { ok: true });
     }
 
@@ -567,13 +610,18 @@ async function raiseAlert(orgId, alert, worker = null, origin = 'unknown') {
     return;
   }
 
-  push.notifyOrg(orgId, {
+  // Two independent channels, deliberately not chained: browsers get Web Push,
+  // the Android app gets FCM, and one being unconfigured or failing must never
+  // stop the other. Both are fire-and-forget beside the broadcast above.
+  const notification = {
     title: `🚨 ${titleCase(alert.type)} alert`,
     body: alert.message || `${titleCase(alert.severity)} severity — raised by ${alert.sender || 'a worker'}`,
     type: alert.type,
     severity: alert.severity,
     tag: 'sw-alert',
-  }).catch((e) => console.error('[push] notifyOrg:', e.message));
+  };
+  push.notifyOrg(orgId, notification).catch((e) => console.error('[push] notifyOrg:', e.message));
+  fcm.notifyOrg(orgId, notification).catch((e) => console.error('[fcm] notifyOrg:', e.message));
 }
 
 /**
@@ -870,11 +918,13 @@ wss.on('connection', (ws, req) => {
         // Close the tracking window: position recording stops here.
         activeIncident.delete(ws.orgId ?? null);
         db.resolveActive(msg, ws.orgId).catch((e) => console.error('[db] resolveActive:', e.message));
-        push.notifyOrg(ws.orgId, {
+        const standDown = {
           title: '✓ All clear',
           body: `Stood down by ${msg.sender || 'a supervisor'}`,
           tag: 'sw-alert',
-        }).catch((e) => console.error('[push] notifyOrg:', e.message));
+        };
+        push.notifyOrg(ws.orgId, standDown).catch((e) => console.error('[push] notifyOrg:', e.message));
+        fcm.notifyOrg(ws.orgId, standDown).catch((e) => console.error('[fcm] notifyOrg:', e.message));
       }
       broadcast(ws.orgId, msg);
 
@@ -984,6 +1034,20 @@ async function start() {
     await push.init();
   } catch (err) {
     console.error('[push] init failed, continuing without web push:', err.message);
+  }
+  // Both of the below are optional channels. Each logs what it is and why, and
+  // each is inert rather than fatal when its credentials are absent — a relay
+  // that refuses to boot because nobody configured email would be a worse
+  // failure than one that cannot send email.
+  try {
+    fcm.init();
+  } catch (err) {
+    console.error('[fcm] init failed, continuing without native push:', err.message);
+  }
+  try {
+    await mailer.init();
+  } catch (err) {
+    console.error('[mail] init failed, continuing without outbound mail:', err.message);
   }
   server.listen(PORT, '0.0.0.0', () => {
     const client = staticFiles.enabled() ? `client from ${staticFiles.distDir()}` : 'client not bundled (API only)';

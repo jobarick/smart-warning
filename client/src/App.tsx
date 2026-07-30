@@ -39,6 +39,7 @@ import { ContactSupport } from './components/ContactSupport';
 import { FeedbackCenter } from './components/FeedbackCenter';
 import { DestinationsManager } from './components/DestinationsManager';
 import { unsubscribe as unsubscribePush } from './lib/push';
+import { nativePushSupported, registerForPush, unregisterFromPush, attachHandlers } from './lib/nativePush';
 import { STALE_REPLAY_MS } from './lib/outbox';
 import * as trackBuffer from './lib/trackBuffer';
 import { fetchHealth, fetchMe, fetchReports, escalateReport, dismissReport, type Report } from './lib/api';
@@ -167,6 +168,7 @@ export default function App() {
 
   const signOut = useCallback(() => {
     void unsubscribePush(); // stop this device receiving the old org's alerts
+    void unregisterFromPush(); // and the same for the Android app's FCM token
     clearSession();
     setSession(null);
     setView('worker');
@@ -177,6 +179,30 @@ export default function App() {
     const nm = sessionName(session);
     if (nm && nm !== settings.deviceName) patchSettings({ deviceName: nm });
   }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Native push. The bell in the org bar covers browsers via Web Push; a
+  // Capacitor webview has no push service, so the Android app registers with
+  // FCM instead. Registration is accepted by the server even before Firebase
+  // credentials exist, so the devices already in the field are the ones that
+  // receive the first alert once they do.
+  useEffect(() => {
+    if (!nativePushSupported()) return;
+    const creds = joinCredentials(session);
+    if (!creds || (!creds.token && !creds.orgCode)) return;
+    let cancelled = false;
+    void (async () => {
+      const res = await registerForPush(creds, settings.deviceName);
+      if (cancelled) return;
+      if (res.status === 'error') console.warn('[push] native registration failed:', res.error);
+      else if (res.delivery === 'pending-credentials') {
+        console.info('[push] device registered; server is awaiting Firebase credentials');
+      }
+    })();
+    // Tapping a notification only needs to bring the app forward — the relay is
+    // the authority on state and the socket reconciles it on resume.
+    void attachHandlers({});
+    return () => { cancelled = true; };
+  }, [session, settings.deviceName]);
 
   // The app only runs its socket/dashboard once we're past the auth gate.
   const runApp = orgsMode === false || !!session;

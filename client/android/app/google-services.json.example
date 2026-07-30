@@ -1,0 +1,43 @@
+{
+  "_comment": [
+    "TEMPLATE ONLY — this file does nothing. Copy it to google-services.json in",
+    "this same directory and replace every value with the real one downloaded",
+    "from the Firebase console. See docs/FIREBASE_SETUP.md for where each value",
+    "comes from.",
+    "",
+    "A real google-services.json is deliberately NOT committed: it is per-project",
+    "configuration, it identifies your Firebase project publicly, and a committed",
+    "placeholder that happens to build is worse than no file at all — it makes a",
+    "dead push channel look configured. The gradle build already skips the",
+    "Firebase plugin when the file is absent, so the APK builds either way.",
+    "",
+    "The package_name below MUST stay com.smartwarning.app, or the build fails."
+  ],
+  "project_info": {
+    "project_number": "000000000000",
+    "project_id": "REPLACE-WITH-YOUR-FIREBASE-PROJECT-ID",
+    "storage_bucket": "REPLACE-WITH-YOUR-FIREBASE-PROJECT-ID.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
+        "android_client_info": {
+          "package_name": "com.smartwarning.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "REPLACE-WITH-YOUR-ANDROID-API-KEY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

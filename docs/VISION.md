@@ -189,12 +189,12 @@ Colour is never the only carrier of state: the roll call pairs its green with a
   restarts), in-app notifications, email for support and feedback.
 - **Planned:** SMS, WhatsApp, Telegram, Teams, Slack, voice calling, and a
   fastest-available-channel router.
-- ⚠️ **Known gap, highest priority:** web push does not work inside the Android
-  APK — a Capacitor webview has no push service. Until FCM lands, an Android
-  user who closes the app will not be alerted. See Phase 1.
-- ⚠️ Email needs `SMTP_URL` set on the Render service. The code path is built
-  and stores before it sends, so nothing is lost meanwhile — but nothing is
-  delivered either.
+- **FCM (Android):** infrastructure complete and inert pending credentials.
+  Tokens are collected now so no device has to reopen the app once Firebase
+  exists. See [FIREBASE_SETUP.md](FIREBASE_SETUP.md).
+- **Email:** queue-first delivery complete and inert pending `SMTP_URL`. Nothing
+  is lost meanwhile and nothing is falsely reported as sent. See
+  [SMTP_SETUP.md](SMTP_SETUP.md).
 
 ## 11. Emergency call pocket — **Shipped**
 
@@ -287,17 +287,28 @@ order. Everything below is sequenced against those three pillars.
 | | |
 |---|---|
 | Offline queue & replay | **Done** |
-| FCM push in the Android app | **Blocked** — needs a Firebase project and `google-services.json` |
-| SMTP delivery | **Blocked** — code reads `SMTP_URL`; needs credentials set on Render |
+| FCM push infrastructure | **Done in code** — awaiting credentials, see [FIREBASE_SETUP.md](FIREBASE_SETUP.md) |
+| Email infrastructure | **Done in code** — awaiting credentials, see [SMTP_SETUP.md](SMTP_SETUP.md) |
+| Deterministic deployment | **Open** — Vercel's Git integration is not triggering |
 
-Web push already works in the browser. The APK cannot receive it: a Capacitor
-webview has no push service. Until FCM lands, an Android user who closes the app
-will not be alerted — which makes this the single highest-value unblocked item
-once credentials exist.
+Both credential-dependent channels are now built end to end and inert rather
+than absent. Supplying the credentials turns them on at the next boot with **no
+code change**:
 
-Once SMTP is configured, the existing feedback path delivers immediately;
-incident summaries, weekly safety reports and password reset are then
-straightforward additions on top of it.
+- **Push.** Server-side FCM HTTP v1 sender, `device_tokens` table, registration
+  routes, Capacitor plugin, notification channels, Android 13 permission, and a
+  Gradle build that skips Firebase cleanly when the config file is missing.
+  Device tokens are **accepted and stored now**, replying
+  `pending-credentials` — the phones already in the field are the ones that must
+  receive the first alert once Firebase exists.
+- **Mail.** Provider abstraction (smtp / log / memory / none), an
+  `outbound_mail` queue written **before** each attempt, capped exponential
+  backoff, concurrency-safe claiming, and per-reference idempotency. With no
+  provider, messages queue and the API says so; the first boot with `SMTP_URL`
+  set drains the backlog.
+
+`GET /api/health` now reports which channels are live, so "is push configured on
+this deployment" is one request rather than a support conversation.
 
 ### Phase 2 — Intelligence
 

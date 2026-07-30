@@ -62,7 +62,11 @@ captures/
 .cxx/
 
 # Google Services (e.g. APIs or Firebase)
-# google-services.json
+# Per-project configuration, not source. Copy app/google-services.json.example
+# and fill it in from the Firebase console — see docs/FIREBASE_SETUP.md. The
+# build skips the Firebase plugin when this file is absent, so the APK still
+# builds without it; push simply stays inert.
+google-services.json
 
 # Freeline
 freeline.py

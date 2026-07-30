@@ -24,6 +24,16 @@
 
         </activity>
 
+        <!-- Where a notification lands when it arrives with the app killed and
+             FCM has no channel to put it on. Without this, Android drops such
+             messages onto a low-importance default channel that does not make a
+             sound — an emergency alert that arrives silently is not an alert.
+             The channels themselves are created at runtime (see nativePush.ts)
+             so their copy stays with the rest of the product's wording. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="sw_emergency" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -39,6 +49,15 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Android 13+ requires an explicit runtime grant before an app may post
+         notifications at all. Without this declaration the request cannot even
+         be shown, and every push would be delivered to a device that silently
+         discards it. Requested at registration time, not at first launch, so
+         the prompt arrives with a reason attached. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- The emergency channel vibrates; on older releases that needs a grant. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- The worker screen reads position for the map, the assembly-point
          distance and the roster it reports to supervisors. The webview's
