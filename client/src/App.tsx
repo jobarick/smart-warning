@@ -67,6 +67,9 @@ export default function App() {
   const [reportsError, setReportsError] = useState<string | null>(null);
   const [reportTick, setReportTick] = useState(0);
   const [sirenTesting, setSirenTesting] = useState(false);
+  // The incident this person has confirmed they are safe for. Held as an id, not
+  // a flag, so it can never carry over from one emergency into the next.
+  const [safeFor, setSafeFor] = useState<string | null>(null);
   const [view, setView] = useState<AppView>(() => (localStorage.getItem(VIEW_KEY) === 'command' ? 'command' : 'worker'));
   const [showSettings, setShowSettings] = useState(false);
   const [showMore, setShowMore] = useState(false);
@@ -241,9 +244,10 @@ export default function App() {
       lat: settings.shareLocation ? telemetry.lat : null,
       lng: settings.shareLocation ? telemetry.lng : null,
       accuracy: settings.shareLocation ? telemetry.accuracy : null,
+      safeFor,
       updatedAt: Date.now(),
     }),
-    [settings.deviceName, settings.zone, settings.shareLocation, view, selfStatus, telemetry],
+    [settings.deviceName, settings.zone, settings.shareLocation, view, selfStatus, telemetry, safeFor],
   );
 
   const { status, deviceCount, roster, joinRejected, send, sendHeartbeat } = useAlertSocket(
@@ -305,7 +309,16 @@ export default function App() {
   // command roster reflects SOS / location / battery without waiting for the tick.
   useEffect(() => {
     sendHeartbeat();
-  }, [selfStatus, telemetry.lat, telemetry.lng, telemetry.battery, settings.zone, settings.deviceName, view, sendHeartbeat]);
+  }, [selfStatus, safeFor, telemetry.lat, telemetry.lng, telemetry.battery, settings.zone, settings.deviceName, view, sendHeartbeat]);
+
+  // "I am safe" — the one piece of state only the person can supply. Stamped
+  // with the incident id so the supervisor's roll call counts answers to *this*
+  // emergency, and pushed straight out rather than waiting for the next tick.
+  const confirmSafe = useCallback(() => {
+    const id = alarm.alert?.id;
+    if (!id) return;
+    setSafeFor(id);
+  }, [alarm.alert]);
 
   const trigger = useCallback(
     (type: AlertType, severity: Severity, message: string) => {
@@ -539,6 +552,7 @@ export default function App() {
           reportsError={reportsError}
           onEscalateReport={onEscalateReport}
           onDismissReport={onDismissReport}
+          token={token}
         />
       ) : showSettings ? (
         <main className="worker">
@@ -615,6 +629,8 @@ export default function App() {
           acknowledged={alarm.acknowledged}
           settings={settings}
           label={alertLabel(profile, alarm.alert.type)}
+          safeConfirmed={safeFor === alarm.alert.id}
+          onConfirmSafe={confirmSafe}
           onAcknowledge={() => dispatch({ type: 'ACKNOWLEDGE' })}
           onAllClear={allClear}
         />

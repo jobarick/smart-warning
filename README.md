@@ -2,6 +2,8 @@
 
 A web app (PWA) for instant emergency alerts across all connected devices — desktop and mobile. When an alert fires, every device shows a bright warning border around the screen, optional high-intensity flashing, a synthesized siren, and vibration on phones.
 
+📋 **[Product vision & technical roadmap](docs/VISION.md)** — where this is going, and what is shipped, partial or planned against each goal.
+
 ## Structure
 
 - `server/` — Node.js **backend** (port **3001**): a WebSocket relay *and* a REST history API. Broadcasts every alert / all-clear to all connected clients, tracks the live device roster, and — when a `DATABASE_URL` is configured — persists every alert as a durable **incident** (with resolution, location, and stats) in Postgres. With no `DATABASE_URL` it runs in-memory only, exactly like before.

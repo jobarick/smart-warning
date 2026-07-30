@@ -302,6 +302,93 @@
 }
 .mc-tag.on { color: var(--cmd-crit); }
 
+/* ---------- roll call ----------
+   Two states, and the one that needs work is the one that gets the ink. A
+   silent device reads "no reply", never "unsafe" — we know what was not said,
+   not what is true. */
+.mc-muster {
+  font-family: var(--mono);
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--cmd-warn);
+  flex: none;
+}
+.mc-muster.on { color: var(--faint); }
+.mc-muster.on::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  background: var(--cmd-safe);
+}
+
+/* ---------- movement trail ----------
+   Deliberately faint: it is where someone has been, and the pin on top of it is
+   where they are. If the history ever reads louder than the present, the map is
+   answering the wrong question. */
+.mc-trail {
+  stroke: var(--cmd-info);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 3 4;
+  opacity: 0.55;
+}
+
+/* ---------- assessment ---------- */
+.mc-advisor { min-height: 0; }
+.mc-risk { display: flex; align-items: center; gap: 14px; }
+.mc-risk-n { font-size: 2rem; font-weight: 600; line-height: 1; color: var(--text); }
+.mc-risk-meta { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+.mc-risk-band {
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--faint);
+}
+.mc-risk-bar {
+  display: block;
+  height: 3px;
+  background: var(--panel-2);
+  border: 1px solid var(--panel-border);
+}
+.mc-risk-bar i { display: block; height: 100%; background: var(--faint); transition: width 0.4s ease; }
+.mc-risk[data-band='high'] .mc-risk-bar i { background: var(--cmd-warn); }
+.mc-risk[data-band='high'] .mc-risk-n { color: var(--cmd-warn); }
+.mc-risk[data-band='severe'] .mc-risk-bar i { background: var(--cmd-crit); }
+.mc-risk[data-band='severe'] .mc-risk-n { color: var(--cmd-crit); }
+.mc-risk-head { font-size: 0.82rem; color: var(--muted); }
+
+.mc-advice {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  /* Advice is the first thing allowed to scroll, so a long list compresses
+     itself before it starts pushing the controls below it off the screen. */
+  max-height: 152px;
+  overflow-y: auto;
+}
+.mc-advice li { display: flex; gap: 10px; font-size: 0.8rem; line-height: 1.4; color: var(--text); }
+.mc-urg {
+  font-family: var(--mono);
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--faint);
+  flex: none;
+  width: 34px;
+  padding-top: 3px;
+}
+.mc-advice li[data-urgency='now'] .mc-urg { color: var(--cmd-crit); }
+.mc-advice li[data-urgency='watch'] { color: var(--muted); }
+
 /* ---------- motion ----------
    One pulse on the live marker, one border transition when the state
    changes, and eased map pins. Anything more competes with the alarm. */
@@ -365,6 +452,17 @@
 @media (max-width: 780px) {
   /* Below the split breakpoint the page is allowed to scroll again. */
   .app:has(.mc) { height: auto; min-height: 100dvh; overflow: visible; }
+}
+
+/* The left column carries a variable number of blocks — the assessment appears
+   during an incident, pending reports only when the queue is non-empty — so on
+   a short screen it can genuinely need more room than it has. It scrolls itself
+   rather than clipping: `overflow: hidden` would silently cut the last
+   recommended action off the bottom, and advice you cannot see is worse than
+   advice you have to reach for. The page still never scrolls. */
+.mc-split > .mc-col:first-child {
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 /* The right column splits its height rather than letting the map take all of

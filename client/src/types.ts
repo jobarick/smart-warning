@@ -58,6 +58,16 @@ export interface WorkerInfo {
   lat: number | null;
   lng: number | null;
   accuracy: number | null; // metres
+  /**
+   * Id of the incident this person has personally confirmed they are safe for,
+   * or null. Keyed by incident rather than a boolean so it expires by itself: a
+   * new alert carries a new id, so yesterday's "I am safe" can never be mistaken
+   * for an answer to today's roll call.
+   *
+   * This is the only field in which a *person* asserts their own state. `status`
+   * is inferred by their device, and `acknowledge` only ever meant "I saw it".
+   */
+  safeFor: string | null;
   updatedAt: number;
 }
 

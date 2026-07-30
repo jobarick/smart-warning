@@ -48,6 +48,10 @@ function parseWorker(raw: unknown): WorkerInfo | null {
     lat: numOrNull(w.lat),
     lng: numOrNull(w.lng),
     accuracy: numOrNull(w.accuracy),
+    // Compared against the live alert id, never rendered — an unknown value can
+    // only ever fail to match, which reads as "not yet accounted for". That is
+    // the safe direction for a roll call to fail in.
+    safeFor: str(w.safeFor) || null,
     updatedAt: num(w.updatedAt, Date.now()),
   };
 }

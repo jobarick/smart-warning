@@ -613,6 +613,11 @@ function sanitizeWorker(msg, connId) {
     lat: numOrNull(msg.lat),
     lng: numOrNull(msg.lng),
     accuracy: numOrNull(msg.accuracy),
+    // A personal "I am safe", carrying the id of the incident it answers. The
+    // relay does not interpret it — it only has to survive the round trip
+    // intact, because a mismatch means "not accounted for" and that is the
+    // direction a roll call should fail in.
+    safeFor: typeof msg.safeFor === 'string' && msg.safeFor ? msg.safeFor.slice(0, 64) : null,
     updatedAt: Date.now(),
   };
 }

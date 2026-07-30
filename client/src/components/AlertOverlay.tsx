@@ -9,11 +9,14 @@ interface Props {
   acknowledged: boolean;
   settings: Settings;
   label?: string; // sector wording for the alert type (from the active profile)
+  /** Whether this person has already answered the roll call for THIS alert. */
+  safeConfirmed: boolean;
+  onConfirmSafe: () => void;
   onAcknowledge: () => void;
   onAllClear: () => void;
 }
 
-export function AlertOverlay({ alert, acknowledged, settings, label, onAcknowledge, onAllClear }: Props) {
+export function AlertOverlay({ alert, acknowledged, settings, label, safeConfirmed, onConfirmSafe, onAcknowledge, onAllClear }: Props) {
   // Ignore clicks for a moment after the overlay appears so a double-tap on a
   // trigger button can't accidentally acknowledge or all-clear the alert.
   const [armed, setArmed] = useState(false);
@@ -94,6 +97,18 @@ export function AlertOverlay({ alert, acknowledged, settings, label, onAcknowled
         ) : (
           <span className="acked-note">
             <Icon name="check-circle" /> Acknowledged — alert still active
+          </span>
+        )}
+        {/* Acknowledge means "I saw it". This means "I am not hurt" — the only
+            fact the supervisor cannot get from a device, and the one their
+            roll call is counting. */}
+        {!safeConfirmed ? (
+          <button className="btn btn-safe" disabled={!armed} onClick={onConfirmSafe}>
+            <Icon name="check-circle" /> I am safe
+          </button>
+        ) : (
+          <span className="safe-note">
+            <Icon name="check-circle" /> Reported safe — your supervisor can see this
           </span>
         )}
         <button

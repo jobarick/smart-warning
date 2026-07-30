@@ -774,6 +774,45 @@ body {
   background: #0e1a12;
 }
 
+/* The personal roll-call answer. Carried in weight rather than in a new hue:
+   acknowledge is already the green outline, all-clear is the red fill, and a
+   third colour on this screen would be one more thing to decode under stress.
+   White is the highest-emphasis surface the monochrome palette has. */
+.btn-safe {
+  border-color: #f5f5f5;
+  color: #0a0a0a;
+  background: #f5f5f5;
+}
+
+.btn-safe:hover:not(:disabled) {
+  background: #fff;
+  border-color: #fff;
+}
+
+/* The overlay has no ground of its own — it sits on the page, so on paper the
+   highest-emphasis surface is ink, not white. */
+:root[data-theme="light"] .btn-safe {
+  border-color: #111;
+  color: #f7f7f7;
+  background: #111;
+}
+
+:root[data-theme="light"] .btn-safe:hover:not(:disabled) {
+  background: #000;
+  border-color: #000;
+}
+
+.safe-note {
+  align-self: center;
+  color: #f5f5f5;
+  font-size: 0.88rem;
+  font-weight: 500;
+  background: #141414;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid #3a3a3a;
+}
+
 .btn-clear {
   border-color: #d70015;
   color: #fff;

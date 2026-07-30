@@ -4,8 +4,10 @@ import type { SocketStatus } from '../hooks/useAlertSocket';
 import type { AlertType, LogEntry, Severity, SystemStatusLevel, WorkerInfo } from '../types';
 import { ALERT_META, SEVERITY_META } from '../types';
 import { alertLabel, alertProtocol, type IndustryProfile } from '../lib/profiles';
-import type { Incident, Report, Stats } from '../lib/api';
+import type { Incident, Report, Stats, TrackPoint } from '../lib/api';
 import { PendingReports } from './PendingReports';
+import { useIncidentTrack } from '../hooks/useIncidentTrack';
+import { assess, accountedFor, unaccountedFor, musterPopulation } from '../lib/advisor';
 
 interface Props {
   roster: WorkerInfo[];
@@ -31,6 +33,8 @@ interface Props {
   reportsError: string | null;
   onEscalateReport: (id: string, type: AlertType, severity: Severity) => Promise<void>;
   onDismissReport: (id: string) => Promise<void>;
+  /** Supervisor bearer token — needed to read the incident movement history. */
+  token?: string;
 }
 
 /** Human duration between two ISO timestamps, e.g. "2m 5s". */
@@ -70,17 +74,26 @@ function lastSeen(updatedAt: number, now: number): string {
   return `${Math.floor(s / 60)}m`;
 }
 
-/** Places located workers inside the SVG by normalising their lat/lng bounds. */
-function useMapPoints(roster: WorkerInfo[]) {
+/**
+ * Places located workers — and, during an incident, the trail behind them —
+ * inside the SVG by normalising lat/lng bounds.
+ *
+ * Live pins and the recorded track are projected through the SAME bounds, which
+ * is the whole reason they are computed together: fit them separately and a
+ * person's trail would end somewhere other than the person.
+ */
+function useMapPoints(roster: WorkerInfo[], track: TrackPoint[]) {
   return useMemo(() => {
     const W = 760;
     const H = 380;
     const pad = 46;
     const located = roster.filter((w) => w.lat !== null && w.lng !== null) as (WorkerInfo & { lat: number; lng: number })[];
-    if (located.length === 0) return { points: [], unlocated: roster };
+    const unlocated = roster.filter((w) => w.lat === null || w.lng === null);
 
-    const lats = located.map((w) => w.lat);
-    const lngs = located.map((w) => w.lng);
+    const lats = [...located.map((w) => w.lat), ...track.map((p) => p.lat)];
+    const lngs = [...located.map((w) => w.lng), ...track.map((p) => p.lng)];
+    if (lats.length === 0) return { points: [], unlocated: roster, paths: [] };
+
     const minLat = Math.min(...lats);
     const maxLat = Math.max(...lats);
     const minLng = Math.min(...lngs);
@@ -88,15 +101,35 @@ function useMapPoints(roster: WorkerInfo[]) {
     const spanLat = maxLat - minLat || 1;
     const spanLng = maxLng - minLng || 1;
 
-    const points = located.map((w) => ({
-      worker: w,
-      // north (higher lat) is up, so invert y
-      x: pad + ((w.lng - minLng) / spanLng) * (W - pad * 2),
-      y: pad + (1 - (w.lat - minLat) / spanLat) * (H - pad * 2),
-    }));
-    const unlocated = roster.filter((w) => w.lat === null || w.lng === null);
-    return { points, unlocated };
-  }, [roster]);
+    // north (higher lat) is up, so invert y
+    const project = (lat: number, lng: number) => ({
+      x: pad + ((lng - minLng) / spanLng) * (W - pad * 2),
+      y: pad + (1 - (lat - minLat) / spanLat) * (H - pad * 2),
+    });
+
+    const points = located.map((w) => ({ worker: w, ...project(w.lat, w.lng) }));
+
+    // One path per device, in the order the positions were recorded.
+    const byWorker = new Map<string, TrackPoint[]>();
+    for (const p of [...track].sort((a, b) => a.at - b.at)) {
+      const seen = byWorker.get(p.workerId);
+      if (seen) seen.push(p);
+      else byWorker.set(p.workerId, [p]);
+    }
+    const paths = [...byWorker.entries()]
+      .filter(([, pts]) => pts.length > 1) // a single point is a pin, not a trail
+      .map(([workerId, pts]) => ({
+        workerId,
+        d: pts
+          .map((p, i) => {
+            const { x, y } = project(p.lat, p.lng);
+            return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+          })
+          .join(' '),
+      }));
+
+    return { points, unlocated, paths };
+  }, [roster, track]);
 }
 
 /**
@@ -108,7 +141,7 @@ function useMapPoints(roster: WorkerInfo[]) {
  * about the page scrolls; the three list panels scroll inside themselves, so
  * the state of the site is never below the fold.
  */
-export function CommandDashboard({ roster, alarm, log, history, stats, persistence, historyError, profile, selfName, status, onAcknowledge, onAllClear, standing, onSetStatus, reports, reportsError, onEscalateReport, onDismissReport }: Props) {
+export function CommandDashboard({ roster, alarm, log, history, stats, persistence, historyError, profile, selfName, status, onAcknowledge, onAllClear, standing, onSetStatus, reports, reportsError, onEscalateReport, onDismissReport, token }: Props) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -119,7 +152,32 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
   const sos = roster.filter((w) => w.status === 'sos');
   const lowBattery = roster.filter((w) => w.battery !== null && w.battery < 0.2);
   const located = roster.filter((w) => w.lat !== null && w.lng !== null);
-  const { points, unlocated } = useMapPoints(roster);
+
+  // Movement history only exists while an incident is open and only when the
+  // backend is storing anything.
+  const track = useIncidentTrack(alert?.id ?? null, !!persistence, token);
+  const { points, unlocated, paths } = useMapPoints(roster, track);
+
+  // The roll call. Only people who tapped "I am safe" for THIS alert count —
+  // a device reporting itself 'safe' is a device that has not fallen over, not
+  // a person who has said they are unhurt.
+  const muster = musterPopulation(roster);
+  const accounted = accountedFor(roster, alert);
+  const outstanding = unaccountedFor(roster, alert);
+  const assessment = useMemo(
+    () => assess({ alert, roster, elapsedMs: alert ? now - alert.timestamp : 0, standing, pendingReports: reports.length }),
+    [alert, roster, now, standing, reports.length],
+  );
+
+  // During a roll call the people who have NOT answered are the list; everyone
+  // else is reassurance. Sorted, not filtered — a supervisor still needs to see
+  // the whole team.
+  const responders = useMemo(() => {
+    if (!alert) return roster;
+    const rank = (w: WorkerInfo) =>
+      w.role === 'supervisor' ? 3 : w.status === 'sos' ? 0 : w.safeFor === alert.id ? 2 : 1;
+    return [...roster].sort((a, b) => rank(a) - rank(b));
+  }, [roster, alert]);
 
   const sender = alert ? roster.find((w) => w.name === alert.sender) : undefined;
   const meta = alert ? ALERT_META[alert.type] : null;
@@ -134,7 +192,9 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
       ? 'Advisory in effect — no alarm sounding'
       : `${roster.length} checked in · ${sos.length ? `${sos.length} needing help` : 'all report safe'}`;
 
-  const unaccounted = Math.max(0, roster.length - roster.filter((w) => w.status === 'safe').length);
+  // Without a live alert there is nothing to be accounted for, so the number
+  // falls back to devices that are not reporting themselves healthy.
+  const unaccounted = alert ? outstanding.length : roster.filter((w) => w.status !== 'safe').length;
 
   return (
     <div className={`mc${alert ? ' is-critical' : ''}`}>
@@ -193,6 +253,46 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
             )}
           </section>
 
+          {/* Sits directly under the incident it is reading, and disappears
+              entirely when there is nothing to say — a panel that always has an
+              opinion is a panel people stop reading. */}
+          {assessment && (
+            <section className="mc-block mc-advisor">
+              <h4 className="mc-h">
+                Assessment
+                <span className="mc-h-note" title="Deterministic rules, evaluated on this device. No network, no model.">
+                  rules · offline
+                </span>
+              </h4>
+
+              <div className="mc-risk" data-band={assessment.band}>
+                <b className="mc-mono mc-risk-n">{assessment.risk}</b>
+                <div className="mc-risk-meta">
+                  <span className="mc-risk-band">{assessment.band} escalation risk</span>
+                  <span className="mc-risk-bar"><i style={{ width: `${assessment.risk}%` }} /></span>
+                </div>
+              </div>
+
+              <p className="mc-risk-head">{assessment.headline}</p>
+
+              <ul className="mc-advice">
+                {assessment.actions.slice(0, 4).map((a, i) => (
+                  <li key={i} data-urgency={a.urgency}>
+                    <span className="mc-urg">{a.urgency}</span>
+                    <span>{a.text}</span>
+                  </li>
+                ))}
+              </ul>
+
+              {assessment.resources.length > 0 && (
+                <p className="mc-hint"><b>Likely resources:</b> {assessment.resources.join(' · ')}</p>
+              )}
+              {/* Shown, not hidden behind a tooltip: advice a supervisor cannot
+                  argue with is advice they cannot safely override. */}
+              <p className="mc-hint">Scored from {assessment.factors.join(', ')}.</p>
+            </section>
+          )}
+
           <section className="mc-block">
             <h4 className="mc-h">Controls</h4>
             <div className="mc-actions">
@@ -228,7 +328,14 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
             <h4 className="mc-h">Readout</h4>
             <div className="mc-grid">
               <div className="mc-metric"><i>Checked in</i><b>{roster.length}</b><em>{located.length} located</em></div>
-              <div className={`mc-metric${unaccounted ? ' warn' : ''}`}><i>Unaccounted</i><b>{unaccounted}</b><em>not reporting safe</em></div>
+              <div className={`mc-metric${unaccounted ? ' warn' : ''}`}>
+                <i>Unaccounted</i>
+                <b>{unaccounted}</b>
+                <em>{alert ? 'not confirmed safe' : 'not reporting safe'}</em>
+              </div>
+              {alert && (
+                <div className="mc-metric"><i>Reported safe</i><b>{accounted.length}</b><em>of {muster.length}</em></div>
+              )}
               <div className={`mc-metric${sos.length ? ' crit' : ''}`}><i>SOS</i><b>{sos.length}</b><em>need help</em></div>
               <div className={`mc-metric${lowBattery.length ? ' warn' : ''}`}><i>Low battery</i><b>{lowBattery.length}</b><em>under 20%</em></div>
               {persistence && stats && (
@@ -256,10 +363,17 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
           <section className="mc-block mc-map">
             <h4 className="mc-h">
               Live positions
-              <span className="mc-h-note">{located.length} of {roster.length} located</span>
+              <span className="mc-h-note">
+                {located.length} of {roster.length} located{paths.length > 0 ? ` · ${paths.length} tracked` : ''}
+              </span>
             </h4>
             <div className="mc-map-body">
-              <svg viewBox="0 0 760 380" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Map of worker locations">
+              <svg viewBox="0 0 760 380" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Map of worker locations and movement since the alert">
+                {/* Where people have been since the alert was raised, drawn
+                    under the pins so it never obscures where they are now. */}
+                {paths.map((p) => (
+                  <path key={p.workerId} className="mc-trail" d={p.d} fill="none" />
+                ))}
                 {points.length === 0 ? (
                   <text x="380" y="190" textAnchor="middle" className="cmd-map-empty">No devices are sharing location yet</text>
                 ) : (
@@ -285,17 +399,28 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
 
           <div className="mc-two">
             <section className="mc-block mc-scroll">
-              <h4 className="mc-h">Responders<span className="mc-h-note">{roster.length}</span></h4>
+              <h4 className="mc-h">
+                {alert ? 'Roll call' : 'Responders'}
+                <span className="mc-h-note">{alert ? `${accounted.length}/${muster.length} safe` : roster.length}</span>
+              </h4>
               <div className="mc-list">
                 {roster.length === 0 && <p className="mc-quiet">Waiting for devices to check in.</p>}
-                {roster.map((w) => (
+                {responders.map((w) => (
                   <div className="mc-row" key={w.id}>
                     <span className="mc-dot" style={{ background: STATUS_COLOR[w.status] }} />
                     <div className="mc-row-id">
                       <b>{w.name}{w.name === selfName ? ' (you)' : ''}</b>
                       <span>{w.zone || (w.lat !== null && w.lng !== null ? `${w.lat.toFixed(3)}, ${w.lng.toFixed(3)}` : 'no zone')}</span>
                     </div>
-                    <span className="mc-row-rt mc-mono">{batteryLabel(w.battery)}{w.charging ? '+' : ''} · {lastSeen(w.updatedAt, now)}</span>
+                    {/* Mid-incident the answer to the roll call outranks the
+                        battery reading, and the row has room for one of them. */}
+                    {alert && w.role !== 'supervisor' ? (
+                      <span className={`mc-muster${w.safeFor === alert.id ? ' on' : ''}`}>
+                        {w.safeFor === alert.id ? 'safe' : 'no reply'}
+                      </span>
+                    ) : (
+                      <span className="mc-row-rt mc-mono">{batteryLabel(w.battery)}{w.charging ? '+' : ''} · {lastSeen(w.updatedAt, now)}</span>
+                    )}
                   </div>
                 ))}
               </div>
