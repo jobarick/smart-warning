@@ -53,8 +53,36 @@ WebSocket-first, with REST confined to what can tolerate latency.
 - REST handles exactly what it should: authentication, configuration, history,
   administration.
 
-**Gap:** offline queue-and-replay. A device that loses connectivity mid-incident
-fires locally but does not re-send on reconnect.
+### Offline queue and replay
+
+Every life-safety message is written to a durable outbox *before* it is sent,
+and retired only when the relay echoes it back. A socket in `OPEN` state is not
+proof of delivery — the relay ignores traffic from a connection that has not
+finished joining its org room, which is a state every reconnect passes through —
+so "sent" and "accepted" are tracked as different things.
+
+Three decisions in that path are worth stating outright:
+
+- **Replay is idempotent.** A retry carries the original id, and the incident
+  insert is a no-op the second time. That no-op is what suppresses a second push
+  notification for the same emergency.
+- **A stale replay does not sound the alarm.** An alert delivered long after it
+  was raised goes to the supervisor's queue as a report to triage, not to every
+  siren on site. Ringing the building for something that may have resolved an
+  hour ago is how a workforce learns to ignore the alarm — but discarding it is
+  worse, because somebody pressed SOS and nobody ever saw it. A human decides.
+- **Only the flag can divert an alert, never the clock.** An old timestamp on a
+  message that was *not* replayed is treated as live, so a wrong device clock
+  can never silence a real emergency.
+
+Positions taken while disconnected are buffered and handed over on reconnect
+stamped with when they were actually taken, so a signal drop mid-evacuation does
+not leave a hole in exactly the stretch of trail that matters.
+
+**Gap:** images have no capture path anywhere in the product yet, so there is
+nothing to queue for them. Acknowledgements are device-local and never travel
+over the wire; the sync-critical equivalent is the roll-call answer, which is
+persisted and resynced.
 
 ## 2. Intelligent emergency response engine — **Partial**
 
@@ -161,8 +189,12 @@ Colour is never the only carrier of state: the roll call pairs its green with a
   restarts), in-app notifications, email for support and feedback.
 - **Planned:** SMS, WhatsApp, Telegram, Teams, Slack, voice calling, and a
   fastest-available-channel router.
-- **Known gap:** web push does not work inside the Android APK — a Capacitor
-  webview has no push service. That needs FCM.
+- ⚠️ **Known gap, highest priority:** web push does not work inside the Android
+  APK — a Capacitor webview has no push service. Until FCM lands, an Android
+  user who closes the app will not be alerted. See Phase 1.
+- ⚠️ Email needs `SMTP_URL` set on the Render service. The code path is built
+  and stores before it sends, so nothing is lost meanwhile — but nothing is
+  delivered either.
 
 ## 11. Emergency call pocket — **Shipped**
 
@@ -231,7 +263,9 @@ and appear as small squares rather than as text colour.
 Most of the market alerts. The distinct claims here are narrower and testable:
 
 1. **It works when the network does not.** Bundled emergency numbers, on-device
-   advice, LAN-mode relay, staged degradation.
+   advice, LAN-mode relay, staged degradation — and an SOS pressed with no
+   signal that is held, retried, and delivered when signal returns rather than
+   lost.
 2. **It knows who is *not* safe.** The roll call is an assertion by a person,
    scoped to one incident, and it fails toward "unaccounted".
 3. **Its advice can be argued with.** Every score shows its factors.
@@ -243,14 +277,84 @@ Most of the market alerts. The distinct claims here are narrower and testable:
 
 ## Delivery order
 
-**Next** — offline queue-and-replay · FCM push in the APK · incident media ·
-audit logging · supervisor invitations and roles.
+The organising principle: **stop adding features, start becoming dependable.**
+What separates a professional emergency platform from an alert app is
+reliability, operational intelligence and enterprise integration — in that
+order. Everything below is sequenced against those three pillars.
 
-**Then** — multi-language · geofencing and campus maps · SMS/WhatsApp channels ·
-analytics heatmaps · MFA and RBAC.
+### Phase 1 — Production readiness
 
-**Later** — computer vision modules · external intelligence plugins · predictive
-analytics · Redis, object storage and orchestration.
+| | |
+|---|---|
+| Offline queue & replay | **Done** |
+| FCM push in the Android app | **Blocked** — needs a Firebase project and `google-services.json` |
+| SMTP delivery | **Blocked** — code reads `SMTP_URL`; needs credentials set on Render |
+
+Web push already works in the browser. The APK cannot receive it: a Capacitor
+webview has no push service. Until FCM lands, an Android user who closes the app
+will not be alerted — which makes this the single highest-value unblocked item
+once credentials exist.
+
+Once SMTP is configured, the existing feedback path delivers immediately;
+incident summaries, weekly safety reports and password reset are then
+straightforward additions on top of it.
+
+### Phase 2 — Intelligence
+
+Largely built; the gaps are specific rather than structural.
+
+- **Incident advisor** — *done*. Produces accounted/unaccounted counts, missing
+  personnel by name, ranked actions and likely resources.
+- **Dynamic safe routes** — *partial*. Per-category destination resolution with
+  danger-avoidance ranking exists. Missing: continuous recalculation as
+  conditions change, and responder ETA ("fire department is 4 minutes away").
+- **Live resource discovery** — *partial*. Hospitals, police and fire stations
+  resolve from OpenStreetMap with no API key. Missing: AEDs, on-site security,
+  and assembly points as discoverable resources.
+- **Indoor guidance** — *not started*. "Use Exit B, avoid the east stairwell"
+  needs a floor-plan model the product does not have. This is the largest
+  genuinely new piece of Phase 2 and should be scoped on its own.
+
+### Phase 3 — Enterprise
+
+Visitor and contractor management (they belong in the roll call), emergency team
+roles with role-specific instructions — fire marshal, first aider, security
+officer, building manager, incident commander — and organization analytics:
+monthly incidents, response-time trends, risk heatmaps, per-department rates.
+
+### Phase 4 — Computer vision
+
+Fire, smoke, weapon, fall, PPE and crowd-density detection. Optional modules,
+never a hard dependency of the alerting path, feeding the classifier rather than
+the response engine.
+
+### Phase 5 — Android
+
+Background location, lock-screen emergency UI, SOS from the notification, Wear
+OS, Android Auto, offline maps.
+
+### Phase 6 — Command centre
+
+Resource allocation, team communication, and incident playback after resolution.
+Split-screen map and feed, the incident timeline and real-time movement are
+already built.
+
+### Phase 7 — Public API
+
+Integration with building management, IoT sensors, CCTV, HR, access control and
+attendance systems.
+
+---
+
+## Long-term
+
+Smart Warning should end up as an Emergency Intelligence Platform: it detects
+and classifies incidents, guides people to safety, coordinates supervisors and
+responders in real time, integrates with enterprise systems and public services,
+and learns from its own incident history to improve preparedness.
+
+The order above is what gets there without building a demo that cannot be
+trusted in a real emergency.
 
 ---
 

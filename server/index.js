@@ -530,12 +530,18 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 async function raiseAlert(orgId, alert, worker = null, origin = 'unknown') {
   // Logged here rather than at each call site so every alert is recorded once,
   // however it was raised — an escalated public report most of all.
-  console.log(`[!] ALERT ${alert.type}/${alert.severity} from ${origin} "${alert.sender}" (org ${orgId ?? 'global'}): ${alert.message || '(no message)'}`);
-  db.recordAlert(alert, worker, orgId).catch((e) => console.error('[db] recordAlert:', e.message));
+  console.log(`[!] ALERT ${alert.type}/${alert.severity} from ${origin} "${alert.sender}" (org ${orgId ?? 'global'})${alert.replayed ? ' [replayed]' : ''}: ${alert.message || '(no message)'}`);
 
   // Open the tracking window. Until the all-clear, every position a device
   // reports is written to the incident's movement history.
   activeIncident.set(orgId ?? null, alert.id);
+
+  // Broadcast BEFORE touching Postgres. The alarm reaching other devices must
+  // never queue behind a database round trip; storage is bookkeeping, and a
+  // slow or unreachable database is exactly the situation in which the siren
+  // still has to sound.
+  broadcast(orgId, alert);
+
   if (worker && worker.lat != null && worker.lng != null) {
     // The raiser's position at the moment of the alert — the first and most
     // important point on the track.
@@ -544,6 +550,23 @@ async function raiseAlert(orgId, alert, worker = null, origin = 'unknown') {
       lat: worker.lat, lng: worker.lng, accuracy: worker.accuracy,
     }).catch((e) => console.error('[db] recordPing:', e.message));
   }
+
+  // A device replaying its outbox re-sends the same alert id. The insert is a
+  // no-op the second time, and that is precisely what tells us not to push the
+  // same emergency to everyone's lock screen again.
+  let firstTime = true;
+  try {
+    const stored = await db.recordAlert(alert, worker, orgId);
+    if (db.enabled()) firstTime = stored;
+  } catch (e) {
+    console.error('[db] recordAlert:', e.message);
+  }
+
+  if (!firstTime) {
+    console.log(`[=] ${alert.id} is already on record — replay accepted, not re-notifying`);
+    return;
+  }
+
   push.notifyOrg(orgId, {
     title: `🚨 ${titleCase(alert.type)} alert`,
     body: alert.message || `${titleCase(alert.severity)} severity — raised by ${alert.sender || 'a worker'}`,
@@ -551,7 +574,55 @@ async function raiseAlert(orgId, alert, worker = null, origin = 'unknown') {
     severity: alert.severity,
     tag: 'sw-alert',
   }).catch((e) => console.error('[push] notifyOrg:', e.message));
-  broadcast(orgId, alert);
+}
+
+/**
+ * How old a replayed alert may be and still be treated as live. Mirrors
+ * STALE_REPLAY_MS in the client's outbox.
+ */
+const STALE_REPLAY_MS = 10 * 60 * 1000;
+
+/**
+ * A device has reconnected carrying an alert raised a long time ago.
+ *
+ * Sounding every siren on site for something that may have resolved an hour
+ * ago is its own harm — it is how a workforce learns to ignore the alarm. But
+ * discarding it is worse: somebody pressed SOS and nobody has ever seen it. So
+ * it goes to the supervisor's queue as a report to triage, which is the
+ * mechanism this system already has for "a human should decide whether this
+ * becomes an alarm".
+ *
+ * The alert is echoed back to the sender either way, so its outbox can retire
+ * the entry instead of retrying forever.
+ */
+async function fileStaleReplay(ws, alert, ageMs) {
+  const minutes = Math.round(ageMs / 60000);
+  console.log(`[~] stale replay of ${alert.type}/${alert.severity} from "${alert.sender}" raised ${minutes}m ago — filing for review (org ${ws.orgId ?? 'global'})`);
+
+  if (db.enabled() && ws.orgId) {
+    const where = ws.worker && ws.worker.lat != null && ws.worker.lng != null
+      ? `${ws.worker.lat.toFixed(5)}, ${ws.worker.lng.toFixed(5)}`
+      : ws.worker?.zone || null;
+    try {
+      await db.createReport({
+        orgId: ws.orgId,
+        message: `Offline SOS — ${alert.type}/${alert.severity} raised by ${alert.sender || 'a worker'} `
+          + `${minutes} minutes ago, delivered when their device regained signal.`
+          + (alert.message ? ` They said: "${String(alert.message).slice(0, 300)}"` : ''),
+        location: where,
+      });
+      broadcast(ws.orgId, { kind: 'reports', pending: await db.countPendingReports(ws.orgId) });
+    } catch (e) {
+      console.error('[db] createReport (stale replay):', e.message);
+    }
+  } else {
+    // No queue to file it in. Send it to the room carrying its real age and its
+    // replayed flag — clients log it and do not alarm on it.
+    broadcast(ws.orgId, alert);
+    return;
+  }
+
+  if (ws.readyState === 1) ws.send(JSON.stringify(alert));
 }
 
 // Rate limit for the one endpoint anyone on the internet can POST to. In memory
@@ -673,6 +744,11 @@ const activeIncident = new Map(); // orgId (or null) → incident id
 // chatty client cannot turn itself into a write amplifier.
 const PING_MIN_INTERVAL_MS = 5000;
 
+// Upper bound on one backfill payload. The client caps its own buffer well
+// below this; the limit is here so a hand-written client cannot turn a single
+// message into an unbounded run of inserts.
+const MAX_TRACK_POINTS = 500;
+
 function trackPosition(ws) {
   const w = ws.worker;
   if (!w || w.lat == null || w.lng == null) return;
@@ -779,6 +855,14 @@ wss.on('connection', (ws, req) => {
 
     if (msg.kind === 'alert' || msg.kind === 'all-clear') {
       if (msg.kind === 'alert') {
+        // An alert a device held while it had no signal. If it is recent the
+        // emergency is plausibly still running and it is raised for real;
+        // if it is old it goes to the supervisor instead of every siren.
+        const age = Date.now() - (Number(msg.timestamp) || Date.now());
+        if (msg.replayed === true && age > STALE_REPLAY_MS) {
+          await fileStaleReplay(ws, msg, age);
+          return;
+        }
         await raiseAlert(ws.orgId, msg, ws.worker, `#${ws.connId}`);
         return; // raiseAlert already broadcast it
       } else {
@@ -826,6 +910,30 @@ wss.on('connection', (ws, req) => {
       ws.worker = sanitizeWorker(msg, ws.connId);
       if (msg.kind === 'hello') broadcastRoster(ws.orgId); // announce joins promptly
       trackPosition(ws); // no-op unless an incident is live
+      return;
+    }
+
+    // Positions a device buffered while it had no signal. Filed with the times
+    // they were actually taken, so a backfilled trail sits in the right minutes
+    // rather than collapsing onto the moment the phone reconnected.
+    if (msg.kind === 'track') {
+      const w = ws.worker;
+      if (!w || typeof msg.incidentId !== 'string' || !msg.incidentId) return;
+      if (!Array.isArray(msg.points)) return;
+      const incidentId = msg.incidentId.slice(0, 64);
+      let filed = 0;
+      for (const p of msg.points.slice(0, MAX_TRACK_POINTS)) {
+        if (!p || typeof p !== 'object') continue;
+        const lat = numOrNull(p.lat);
+        const lng = numOrNull(p.lng);
+        if (lat === null || lng === null) continue;
+        filed++;
+        db.recordPing({
+          orgId: ws.orgId, incidentId, workerId: w.id, workerName: w.name,
+          lat, lng, accuracy: numOrNull(p.accuracy), at: numOrNull(p.at),
+        }).catch((e) => console.error('[db] recordPing (backfill):', e.message));
+      }
+      if (filed) console.log(`[.] backfilled ${filed} position(s) for ${incidentId} from #${ws.connId} "${w.name}"`);
       return;
     }
   });

@@ -82,6 +82,9 @@ export function parseWireMessage(raw: unknown): WireMessage | null {
         message: str(m.message),
         sender: str(m.sender, 'Unknown'),
         timestamp: num(m.timestamp, Date.now()),
+        // Strictly `=== true`: anything else must read as "this is happening
+        // now", which is the interpretation that still sounds the alarm.
+        replayed: m.replayed === true,
       };
     }
     case 'all-clear':
@@ -90,6 +93,7 @@ export function parseWireMessage(raw: unknown): WireMessage | null {
         id: str(m.id) || crypto.randomUUID(),
         sender: str(m.sender, 'Unknown'),
         timestamp: num(m.timestamp, Date.now()),
+        replayed: m.replayed === true,
       };
     case 'presence':
       return { kind: 'presence', count: Math.max(0, Math.trunc(num(m.count, 0))) };

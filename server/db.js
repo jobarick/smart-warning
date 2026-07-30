@@ -348,10 +348,19 @@ async function getUserById(id) {
 
 // Record a raised alert. `worker` is the triggering device's roster entry (if
 // known), the source of the alert's location — the wire alert carries none.
+/**
+ * Store an alert as an incident.
+ *
+ * Returns true only when a NEW row was written. A device replaying its outbox
+ * re-sends the same alert with the same id, so the ON CONFLICT below is the
+ * point at which a duplicate becomes harmless — and the return value is what
+ * lets the caller avoid pushing the same emergency to everyone's lock screen a
+ * second time.
+ */
 async function recordAlert(alert, worker, orgId) {
-  if (!pool) return;
+  if (!pool) return false;
   const ts = numOrNull(alert.timestamp) ?? Date.now();
-  await pool.query(
+  const res = await pool.query(
     `INSERT INTO incidents (id, org_id, type, severity, message, sender, zone, lat, lng, raised_at, status)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, to_timestamp($10 / 1000.0), 'active')
      ON CONFLICT (id) DO NOTHING`,
@@ -368,6 +377,7 @@ async function recordAlert(alert, worker, orgId) {
       ts,
     ],
   );
+  return res.rowCount > 0;
 }
 
 // Resolve the active incident(s) for one org only.
@@ -513,12 +523,17 @@ async function deleteDestination(id, orgId) {
 // One position sample for a worker during a live incident. Cheap and additive:
 // the roster already carries these coordinates, this just makes them durable so
 // movement can be replayed afterwards.
-async function recordPing({ orgId, incidentId, workerId, workerName, lat, lng, accuracy }) {
+// `at` is optional and defaults to now(). It is supplied only when a device
+// hands over positions it buffered while offline — those have to keep the time
+// they were actually taken, or a backfilled trail would collapse into a single
+// instant at the moment the phone found signal again.
+async function recordPing({ orgId, incidentId, workerId, workerName, lat, lng, accuracy, at = null }) {
   if (!pool) return;
+  const ts = numOrNull(at);
   await pool.query(
-    `INSERT INTO location_pings (org_id, incident_id, worker_id, worker_name, lat, lng, accuracy)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [orgId || null, incidentId || null, String(workerId), workerName || null, lat, lng, numOrNull(accuracy)],
+    `INSERT INTO location_pings (org_id, incident_id, worker_id, worker_name, lat, lng, accuracy, at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE(to_timestamp($8 / 1000.0), now()))`,
+    [orgId || null, incidentId || null, String(workerId), workerName || null, lat, lng, numOrNull(accuracy), ts],
   );
 }
 

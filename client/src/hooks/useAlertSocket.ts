@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { WireMessage, WorkerInfo } from '../types';
+import type { TrackMessage, WireMessage, WorkerInfo } from '../types';
 import { parseWireMessage } from '../lib/validate';
+import * as outbox from '../lib/outbox';
+import * as trackBuffer from '../lib/trackBuffer';
 
 export type SocketStatus = 'connecting' | 'open' | 'closed';
 
@@ -16,6 +18,13 @@ function relayUrl(): string {
   return `${proto}://${location.hostname}:${WS_PORT}`;
 }
 const HEARTBEAT_MS = 5000;
+
+/**
+ * How often to re-offer anything the relay has not yet echoed back. Slower than
+ * the heartbeat: a queued alert that missed the join handshake should go again
+ * promptly, but a relay that is refusing them should not be hammered.
+ */
+const FLUSH_MS = 3000;
 
 /** Credentials presented to join the org room: a supervisor JWT or a join code. */
 export interface JoinCredentials {
@@ -41,6 +50,12 @@ export function useAlertSocket(
   const [status, setStatus] = useState<SocketStatus>('connecting');
   const [deviceCount, setDeviceCount] = useState(0);
   const [roster, setRoster] = useState<WorkerInfo[]>([]);
+  // What is written down but not yet acknowledged by the relay. Surfaced so
+  // that "offline and holding your alert" never looks like "delivered".
+  // `queuedSince` is the oldest entry's age, which is what makes a real backlog
+  // distinguishable from the few milliseconds every normal send spends here.
+  const [queued, setQueued] = useState(() => outbox.size());
+  const [queuedSince, setQueuedSince] = useState<number | null>(null);
   // Set when the relay rejects our credentials (close code 4001) — the caller
   // uses this to send the user back to the entry screen.
   const [joinRejected, setJoinRejected] = useState(false);
@@ -53,6 +68,14 @@ export function useAlertSocket(
   joinRef.current = join;
   // Reconnect when credentials change (e.g. worker → supervisor login).
   const joinKey = JSON.stringify(join ?? null);
+
+  const syncQueue = useCallback(() => {
+    const entries = outbox.pending();
+    setQueued(entries.length);
+    setQueuedSince(entries.length === 0 ? null : Math.min(...entries.map((e) => e.queuedAt)));
+  }, []);
+  const syncQueueRef = useRef(syncQueue);
+  syncQueueRef.current = syncQueue;
 
   const sendHeartbeat = useCallback(() => {
     const ws = wsRef.current;
@@ -70,12 +93,41 @@ export function useAlertSocket(
     let retries = 0;
     let timer = 0;
     let beat = 0;
+    let flushTimer = 0;
     setJoinRejected(false);
 
     const connect = () => {
       setStatus('connecting');
       const ws = new WebSocket(relayUrl());
       wsRef.current = ws;
+
+      /**
+       * Re-offer everything the relay has not echoed back yet.
+       *
+       * Deliberately not a one-shot on open: the relay ignores traffic from a
+       * socket that has not finished joining its org room, and `join` is
+       * resolved asynchronously, so the first attempt after a reconnect can be
+       * dropped through no fault of the message. Entries survive until the echo
+       * arrives, so repeating costs nothing and eventually wins.
+       */
+      const flush = () => {
+        if (ws.readyState !== WebSocket.OPEN) return;
+        const entries = outbox.pending();
+        if (entries.length > 0) {
+          for (const e of entries) ws.send(JSON.stringify({ ...e.msg, replayed: true }));
+          outbox.markAttempted(entries.map((e) => e.key));
+        }
+
+        // Positions taken while disconnected. Best-effort and cleared on send:
+        // a duplicated point only thickens a trail, a lost alert does not.
+        const buf = trackBuffer.buffered();
+        if (buf && buf.points.length > 0) {
+          const msg: TrackMessage = { kind: 'track', incidentId: buf.incidentId, points: buf.points };
+          ws.send(JSON.stringify(msg));
+          trackBuffer.clear();
+        }
+        syncQueueRef.current();
+      };
 
       ws.onopen = () => {
         retries = 0;
@@ -95,6 +147,8 @@ export function useAlertSocket(
           const i = getSelfInfoRef.current?.();
           if (i && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ kind: 'heartbeat', ...i }));
         }, HEARTBEAT_MS);
+        flush();
+        flushTimer = window.setInterval(flush, FLUSH_MS);
       };
       ws.onmessage = (e) => {
         let raw: unknown;
@@ -109,10 +163,17 @@ export function useAlertSocket(
         if (!msg) return;
         if (msg.kind === 'presence') setDeviceCount(msg.count);
         else if (msg.kind === 'roster') setRoster(msg.workers);
+        // The relay echoes alerts, all-clears and statuses to the whole room,
+        // including whoever sent them. That echo is the only acknowledgement
+        // the protocol offers, so it is what retires an outbox entry.
+        else if (msg.kind === 'alert' || msg.kind === 'all-clear' || msg.kind === 'status') {
+          if (outbox.confirm(msg)) syncQueueRef.current();
+        }
         onMessageRef.current(msg);
       };
       ws.onclose = (e) => {
         clearInterval(beat);
+        clearInterval(flushTimer);
         if (disposed) return;
         setStatus('closed');
         setDeviceCount(0);
@@ -132,13 +193,27 @@ export function useAlertSocket(
       disposed = true;
       clearTimeout(timer);
       clearInterval(beat);
+      clearInterval(flushTimer);
       wsRef.current?.close();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [joinKey, enabled]);
 
-  /** Returns true if the message went out over the wire. */
+  /**
+   * Returns true if the message went out over the wire.
+   *
+   * Life-safety messages are written to the outbox BEFORE the attempt, not
+   * after it fails. A socket in OPEN state is not proof of delivery: the relay
+   * silently ignores anything from a connection that has not finished joining
+   * its org room, which is the state every reconnect passes through. Writing
+   * first and retiring on the echo makes that window survivable instead of
+   * merely unlikely. On the happy path the entry lives for a few milliseconds.
+   */
   const send = useCallback((m: WireMessage): boolean => {
+    if (m.kind === 'alert' || m.kind === 'all-clear' || m.kind === 'status') {
+      outbox.enqueue(m);
+      syncQueueRef.current();
+    }
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(m));
@@ -147,5 +222,5 @@ export function useAlertSocket(
     return false;
   }, []);
 
-  return { status, deviceCount, roster, joinRejected, send, sendHeartbeat };
+  return { status, deviceCount, roster, joinRejected, send, sendHeartbeat, queued, queuedSince };
 }

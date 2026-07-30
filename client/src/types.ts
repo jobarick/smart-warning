@@ -3,7 +3,19 @@ export type Severity = 'low' | 'medium' | 'high' | 'critical';
 export type SirenTone = 'wail' | 'yelp' | 'hilo' | 'pulse' | 'phaser';
 export type FlashMode = 'none' | 'pulse' | 'strobe';
 
-export interface AlertMessage {
+/**
+ * Set on any message delivered from a device's outbox rather than as it
+ * happened — the relay was unreachable when it was raised.
+ *
+ * It exists so nobody is told an old emergency is happening now. `timestamp` is
+ * always when the event actually occurred, so age is `Date.now() - timestamp`;
+ * this flag is what says that age is real rather than clock drift.
+ */
+export interface Replayable {
+  replayed?: boolean;
+}
+
+export interface AlertMessage extends Replayable {
   kind: 'alert';
   id: string;
   type: AlertType;
@@ -13,7 +25,7 @@ export interface AlertMessage {
   timestamp: number;
 }
 
-export interface AllClearMessage {
+export interface AllClearMessage extends Replayable {
   kind: 'all-clear';
   id: string;
   sender: string;
@@ -35,7 +47,7 @@ export interface PresenceMessage {
  */
 export type SystemStatusLevel = 'clear' | 'watch' | 'emergency';
 
-export interface SystemStatusMessage {
+export interface SystemStatusMessage extends Replayable {
   kind: 'status';
   status: SystemStatusLevel;
   note: string; // optional one-line reason shown beside the status
@@ -84,6 +96,17 @@ export interface RosterMessage {
   workers: WorkerInfo[];
 }
 
+/**
+ * Positions taken while the device was offline, handed over on reconnect so the
+ * movement trail has no hole. Client → server only; never rebroadcast, because
+ * it is history being filed rather than anything happening now.
+ */
+export interface TrackMessage {
+  kind: 'track';
+  incidentId: string;
+  points: { lat: number; lng: number; accuracy: number | null; at: number }[];
+}
+
 /** Pushed to an org when its public-report queue changes, so open dashboards refresh. */
 export interface ReportsMessage {
   kind: 'reports';
@@ -98,7 +121,8 @@ export type WireMessage =
   | ReportsMessage
   | HelloMessage
   | HeartbeatMessage
-  | RosterMessage;
+  | RosterMessage
+  | TrackMessage;
 
 export interface Settings {
   deviceName: string;

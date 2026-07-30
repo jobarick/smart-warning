@@ -39,6 +39,8 @@ import { ContactSupport } from './components/ContactSupport';
 import { FeedbackCenter } from './components/FeedbackCenter';
 import { DestinationsManager } from './components/DestinationsManager';
 import { unsubscribe as unsubscribePush } from './lib/push';
+import { STALE_REPLAY_MS } from './lib/outbox';
+import * as trackBuffer from './lib/trackBuffer';
 import { fetchHealth, fetchMe, fetchReports, escalateReport, dismissReport, type Report } from './lib/api';
 import {
   loadSession,
@@ -51,6 +53,7 @@ import {
 } from './lib/session';
 
 const VIEW_KEY = 'alert-system-view';
+const SAFE_FOR_KEY = 'sw-safe-for-v1';
 
 export default function App() {
   const [settings, setSettings] = useState(loadSettings);
@@ -68,8 +71,15 @@ export default function App() {
   const [reportTick, setReportTick] = useState(0);
   const [sirenTesting, setSirenTesting] = useState(false);
   // The incident this person has confirmed they are safe for. Held as an id, not
-  // a flag, so it can never carry over from one emergency into the next.
-  const [safeFor, setSafeFor] = useState<string | null>(null);
+  // a flag, so it can never carry over from one emergency into the next, and
+  // persisted so a reload during an evacuation does not silently retract an
+  // answer the supervisor has already counted.
+  const [safeFor, setSafeForState] = useState<string | null>(() => localStorage.getItem(SAFE_FOR_KEY));
+  const setSafeFor = useCallback((id: string | null) => {
+    setSafeForState(id);
+    if (id) localStorage.setItem(SAFE_FOR_KEY, id);
+    else localStorage.removeItem(SAFE_FOR_KEY);
+  }, []);
   const [view, setView] = useState<AppView>(() => (localStorage.getItem(VIEW_KEY) === 'command' ? 'command' : 'worker'));
   const [showSettings, setShowSettings] = useState(false);
   const [showMore, setShowMore] = useState(false);
@@ -91,6 +101,17 @@ export default function App() {
   const telemetryRef = useRef(telemetry);
   telemetryRef.current = telemetry;
   const activeAlertLogRef = useRef<{ id: string; startedAt: number } | null>(null);
+  // Wire ids already applied to app state. The outbox replays messages by their
+  // original id, so this is what makes delivery at-least-once safe to act on.
+  const handledIds = useRef<Set<string>>(new Set());
+  const remember = useCallback((id: string) => {
+    handledIds.current.add(id);
+    // Bounded: only recent ids can plausibly be replayed, and an unbounded set
+    // in a tab left open for weeks is a leak nobody would ever look for.
+    if (handledIds.current.size > 300) {
+      handledIds.current = new Set([...handledIds.current].slice(-150));
+    }
+  }, []);
 
   // One-second tick that drives the response-time lap timer.
   const [now, setNow] = useState(() => Date.now());
@@ -179,10 +200,23 @@ export default function App() {
       }
 
       if (m.kind === 'alert') {
+        // A device that raised this while offline already handled it locally,
+        // and the relay echoes it back on replay. Without this guard the same
+        // emergency would be logged twice and re-raised after its all-clear.
+        if (handledIds.current.has(m.id)) return;
+        remember(m.id);
+
         setSirenTesting(false);
         setLastAlert(m.timestamp);
         setIncidentTick((t) => t + 1);
-        dispatch({ type: 'RAISE', alert: m });
+
+        // An alert delivered long after it was raised is recorded but does not
+        // sound. The relay normally diverts these to the supervisor's queue
+        // before they ever reach a room; this is the same judgement applied on
+        // the client, for relays running without a database to divert them to.
+        const stale = m.replayed === true && Date.now() - m.timestamp > STALE_REPLAY_MS;
+        if (!stale) dispatch({ type: 'RAISE', alert: m });
+
         const id = crypto.randomUUID();
         activeAlertLogRef.current = { id, startedAt: m.timestamp };
         const tel = telemetryRef.current;
@@ -204,6 +238,8 @@ export default function App() {
           ].slice(0, 50),
         );
       } else if (m.kind === 'all-clear') {
+        if (handledIds.current.has(m.id)) return;
+        remember(m.id);
         setIncidentTick((t) => t + 1);
         dispatch({ type: 'CLEAR' });
         const active = activeAlertLogRef.current;
@@ -225,7 +261,7 @@ export default function App() {
         });
       }
     },
-    [dispatch, settings.deviceName],
+    [dispatch, remember, settings.deviceName],
   );
 
   // This device's own status for the shared roster: 'sos' while an alert it
@@ -250,7 +286,7 @@ export default function App() {
     [settings.deviceName, settings.zone, settings.shareLocation, view, selfStatus, telemetry, safeFor],
   );
 
-  const { status, deviceCount, roster, joinRejected, send, sendHeartbeat } = useAlertSocket(
+  const { status, deviceCount, roster, joinRejected, send, sendHeartbeat, queued, queuedSince } = useAlertSocket(
     handleWire,
     getSelfInfo,
     joinCreds,
@@ -310,6 +346,23 @@ export default function App() {
   useEffect(() => {
     sendHeartbeat();
   }, [selfStatus, safeFor, telemetry.lat, telemetry.lng, telemetry.battery, settings.zone, settings.deviceName, view, sendHeartbeat]);
+
+  // While the relay is unreachable during a live incident, keep the positions
+  // on the device. The relay records a movement track only between an alert and
+  // its all-clear, so a signal drop mid-evacuation would otherwise leave a hole
+  // in exactly the stretch of trail a supervisor most needs to see.
+  useEffect(() => {
+    if (status === 'open') return;
+    const id = alarm.alert?.id;
+    if (!id || !settings.shareLocation) return;
+    if (telemetry.lat === null || telemetry.lng === null) return;
+    trackBuffer.record(id, {
+      lat: telemetry.lat,
+      lng: telemetry.lng,
+      accuracy: telemetry.accuracy,
+      at: Date.now(),
+    });
+  }, [status, alarm.alert, settings.shareLocation, telemetry.lat, telemetry.lng, telemetry.accuracy]);
 
   // "I am safe" — the one piece of state only the person can supply. Stamped
   // with the incident id so the supervisor's roll call counts answers to *this*
@@ -636,7 +689,7 @@ export default function App() {
         />
       )}
 
-      <SystemFooter connected={status === 'open'} lastSync={lastSync} now={now} />
+      <SystemFooter connected={status === 'open'} lastSync={lastSync} now={now} queued={queued} queuedSince={queuedSince} />
     </div>
   );
 }
