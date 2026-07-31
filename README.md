@@ -4,7 +4,7 @@ A web app (PWA) for instant emergency alerts across all connected devices — de
 
 📋 **[Product vision & technical roadmap](docs/VISION.md)** — where this is going, and what is shipped, partial or planned against each goal.
 
-**Setup guides** — [Firebase / Android push](docs/FIREBASE_SETUP.md) · [Email](docs/SMTP_SETUP.md). Both channels are built and inert; supplying credentials turns them on with no code change.
+**Setup guides** — [Deployment](docs/DEPLOYMENT.md) · [Firebase / Android push](docs/FIREBASE_SETUP.md) · [Email](docs/SMTP_SETUP.md). Both channels are built and inert; supplying credentials turns them on with no code change.
 
 **Brand assets** — the mark lives at [`client/public/logo.svg`](client/public/logo.svg) and is the single source for every icon, launcher and splash in the product. Regenerate them with [`tools/`](tools/README.md).
 
