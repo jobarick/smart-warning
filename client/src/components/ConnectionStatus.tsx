@@ -1,5 +1,6 @@
 import type { SocketStatus } from '../hooks/useAlertSocket';
 import { Icon } from './Icon';
+import { Logo } from './Logo';
 
 export type AppView = 'worker' | 'command';
 
@@ -25,8 +26,8 @@ export function ConnectionStatus({ status, deviceCount, audioArmed, onArmAudio, 
   return (
     <div className="status-bar">
       <div className="brand">
-        <Icon name="siren" className="brand-icon" />
-        <span className="brand-name">Smart Emergency Warning</span>
+        <Logo size={20} className="brand-logo" decorative />
+        <span className="brand-name">Smart Warning</span>
       </div>
       <div className="view-toggle" role="tablist" aria-label="View">
         <button role="tab" aria-selected={view === 'worker'} className={view === 'worker' ? 'active' : ''} onClick={() => onViewChange('worker')}>

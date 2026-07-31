@@ -1,0 +1,12 @@
+{
+  "name": "smart-warning-tools",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Build-time asset tooling. Deliberately separate from client/ so its native dependencies never enter the deployed install.",
+  "scripts": {
+    "icons": "node generate-icons.js ../client"
+  },
+  "devDependencies": {
+    "sharp": "^0.34.4"
+  }
+}

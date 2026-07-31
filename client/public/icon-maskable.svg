@@ -1,14 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Smart Warning">
   <!--
-    App icon: the mark on the product's own ground colour.
-
-    Background is #080808 — the same value as the app's `--bg` — so the icon
-    reads as a continuation of the product rather than a separate asset. Corner
-    radius is for hosts that do not apply their own mask; Android adaptive and
-    iOS crop it themselves. See icon-maskable.svg for the safe-zone variant.
+    Maskable variant. A maskable icon may be cropped to any shape the platform
+    likes — circle, squircle, teardrop — and only the centre 80% is guaranteed
+    to survive. This one is full-bleed with the mark scaled down to sit inside
+    that safe zone, so no launcher can clip the exclamation off the bottom.
   -->
-  <rect width="512" height="512" rx="96" fill="#080808"/>
-  <g transform="translate(165.5 91) scale(0.2651)" fill="#e51c24">
+  <rect width="512" height="512" fill="#080808"/>
+  <g transform="translate(183 123) scale(0.2137)" fill="#e51c24">
     <path d="M8 495 L180 369.4 L180 651.4 L8 544.6 Z"/>
     <path d="M8 582.6 L180 689.4 L180 1119.4 L8 1245 Z"/>
     <path d="M245 142.4 L440 0 L440 812.8 L245 691.8 Z"/>

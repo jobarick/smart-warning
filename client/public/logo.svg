@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 683 1245" fill="none" role="img" aria-label="Smart Warning">
+  <!--
+    The Smart Warning mark.
+
+    Three sheared vertical slabs, one diagonal cut through all of them, and an
+    exclamation formed in the centre from the tapered slab below the cut plus a
+    detached dot. Every slanted edge shares one of two angles — the slabs are
+    sheared at -0.73, the cut descends at 0.621 — which is what holds the mark
+    together as one object rather than three shapes near each other.
+
+    Geometry is expressed in a 683x1245 space so the proportions stay exact at
+    any size; nothing here is rasterised until build time.
+  -->
+  <g fill="currentColor">
+    <!-- left slab, above and below the cut -->
+    <path d="M8 495 L180 369.4 L180 651.4 L8 544.6 Z"/>
+    <path d="M8 582.6 L180 689.4 L180 1119.4 L8 1245 Z"/>
+
+    <!-- centre slab: the tallest, cut short by the diagonal -->
+    <path d="M245 142.4 L440 0 L440 812.8 L245 691.8 Z"/>
+
+    <!-- the exclamation: tapered stem, then the detached dot -->
+    <path d="M255 736 L430 844.6 L405 1050 L280 1050 Z"/>
+    <path d="M275 1115 L410 1115 L410 1245 L275 1245 Z"/>
+
+    <!-- right slab, above and below the cut -->
+    <path d="M505 335 L675 210.9 L675 958.8 L505 853.2 Z"/>
+    <path d="M505 891.2 L675 996.8 L675 1120.9 L505 1245 Z"/>
+  </g>
+</svg>

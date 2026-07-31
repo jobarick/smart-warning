@@ -1441,7 +1441,7 @@ body {
   box-shadow: var(--shadow); padding: 28px 26px 30px;
 }
 .auth-brand { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.01em; }
-.auth-brand .auth-logo { width: 20px; height: 20px; color: var(--accent); }
+.auth-brand .auth-logo { width: auto; height: 22px; color: var(--accent); flex: none; }
 .auth-title { margin: 18px 0 6px; font-size: 1.5rem; font-weight: 700; color: var(--text); }
 .auth-sub { color: var(--muted); font-size: 0.9rem; line-height: 1.45; margin-bottom: 18px; }
 .auth-notice { margin-top: 14px; padding: 10px 12px; border-radius: 10px; font-size: 0.84rem;
@@ -2156,3 +2156,30 @@ body {
 }
 :root .cmd-status-btn.on.clear { border-color: var(--cmd-safe); }
 :root .cmd-status-btn.on.watch { border-color: var(--cmd-warn); }
+
+/* ---------------------------------------------------------------------------
+   Brand mark
+   ---------------------------------------------------------------------------
+   The logo is a tall rectangle (683:1245), not a square. Three places in this
+   file size their icons with a blanket `svg { width: N; height: N }`, which
+   would squash it — so each gets a rule that is deliberately one step more
+   specific and restores `width: auto`. Height is what should be set; width
+   follows from the mark's own proportions.
+
+   No glow. The siren icon it replaced carried a red drop-shadow from the
+   pre-mono design; the mark is meant to sit flat on the ground colour. */
+:root .brand .brand-logo {
+  width: auto;
+  height: 20px;
+  color: var(--accent);
+  flex: none;
+  filter: none;
+}
+.boot-splash .boot-logo {
+  width: auto;
+  height: 26px;
+  color: var(--accent);
+}
+@media (max-width: 560px) {
+  :root .brand .brand-logo { height: 17px; }
+}

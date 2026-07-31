@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { login, signup } from '../lib/api';
 import type { Session } from '../lib/session';
 import { Icon } from './Icon';
+import { Logo } from './Logo';
 
 type Step = 'choose' | 'worker' | 'login' | 'signup';
 
@@ -75,8 +76,8 @@ export function AuthGate({ onAuthed, notice }: Props) {
     <div className="auth">
       <div className="auth-card">
         <div className="auth-brand">
-          <Icon name="siren" className="auth-logo" />
-          <span>Smart Emergency Warning</span>
+          <Logo size={22} className="auth-logo" decorative />
+          <span>Smart Warning</span>
         </div>
 
         {notice && <p className="auth-notice">{notice}</p>}

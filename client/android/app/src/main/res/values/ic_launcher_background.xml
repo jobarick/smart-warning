@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <!--
+        The adaptive icon's background layer. Was the Capacitor template's
+        #FFFFFF, which put the red mark on white — the one combination the brand
+        never uses. #080808 is the app's own ground colour (the bg token in
+        styles.css), so the launcher icon, the splash and the first screen are
+        one continuous surface.
+    -->
+    <color name="ic_launcher_background">#080808</color>
 </resources>

@@ -29,6 +29,7 @@ import { CommandDashboard } from './components/CommandDashboard';
 import { SystemStatusBar } from './components/SystemStatusBar';
 import { SystemFooter } from './components/SystemFooter';
 import { Icon } from './components/Icon';
+import { Logo } from './components/Logo';
 import { getProfile, alertLabel } from './lib/profiles';
 import { useIncidentHistory } from './hooks/useIncidentHistory';
 import { AuthGate } from './components/AuthGate';
@@ -527,7 +528,7 @@ export default function App() {
   if (orgsMode === null) {
     return (
       <div className="app">
-        <div className="boot-splash"><Icon name="siren" /> <span>Connecting…</span></div>
+        <div className="boot-splash"><Logo size={26} className="boot-logo" decorative /> <span>Connecting…</span></div>
       </div>
     );
   }

@@ -6,6 +6,8 @@ A web app (PWA) for instant emergency alerts across all connected devices — de
 
 **Setup guides** — [Firebase / Android push](docs/FIREBASE_SETUP.md) · [Email](docs/SMTP_SETUP.md). Both channels are built and inert; supplying credentials turns them on with no code change.
 
+**Brand assets** — the mark lives at [`client/public/logo.svg`](client/public/logo.svg) and is the single source for every icon, launcher and splash in the product. Regenerate them with [`tools/`](tools/README.md).
+
 ## Structure
 
 - `server/` — Node.js **backend** (port **3001**): a WebSocket relay *and* a REST history API. Broadcasts every alert / all-clear to all connected clients, tracks the live device roster, and — when a `DATABASE_URL` is configured — persists every alert as a durable **incident** (with resolution, location, and stats) in Postgres. With no `DATABASE_URL` it runs in-memory only, exactly like before.
