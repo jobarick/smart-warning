@@ -39,6 +39,7 @@ import { SafeRoutePanel } from './components/SafeRoutePanel';
 import { ContactSupport } from './components/ContactSupport';
 import { FeedbackCenter } from './components/FeedbackCenter';
 import { DestinationsManager } from './components/DestinationsManager';
+import { BillingPanel } from './components/BillingPanel';
 import { unsubscribe as unsubscribePush } from './lib/push';
 import { nativePushSupported, registerForPush, unregisterFromPush, attachHandlers } from './lib/nativePush';
 import { STALE_REPLAY_MS } from './lib/outbox';
@@ -86,6 +87,9 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const [showSupport, setShowSupport] = useState(false);
+  // Plans & billing. Supervisors only — it needs an account token, and it is
+  // administrative by definition. Nothing here can reach the alert path.
+  const [showBilling, setShowBilling] = useState(false);
   // Supervisor configuration (destinations, feedback). Rendered instead of the
   // dashboard rather than beside it — the command centre is viewport-locked and
   // a sibling section would break its no-scroll layout.
@@ -591,6 +595,11 @@ export default function App() {
               <Icon name="map-pin" /> Setup
             </button>
           )}
+          {org && token && (
+            <button className="org-tools" onClick={() => setShowBilling((v) => !v)} title="Plans, payment and invoices">
+              <Icon name="check-circle" /> {showBilling ? 'Close' : 'Plans'}
+            </button>
+          )}
           <button className="org-support" onClick={() => setShowSupport((v) => !v)}>
             <Icon name="help" /> {showSupport ? 'Close' : 'Support'}
           </button>
@@ -603,6 +612,10 @@ export default function App() {
       {showSupport ? (
         <main className="worker">
           <ContactSupport onBack={() => setShowSupport(false)} />
+        </main>
+      ) : showBilling && token ? (
+        <main className="worker">
+          <BillingPanel token={token} onBack={() => setShowBilling(false)} />
         </main>
       ) : view === 'command' && showTools ? (
         <main className="worker">

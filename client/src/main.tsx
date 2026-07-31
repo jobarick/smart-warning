@@ -13,6 +13,7 @@ import '@fontsource-variable/jetbrains-mono';
 import './styles.css';
 import './command-center.css';
 import './platform.css';
+import './billing.css';
 
 registerSW({ immediate: true });
 

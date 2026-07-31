@@ -208,6 +208,95 @@ async function init() {
       seen_at    TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS device_tokens_org_idx ON device_tokens (org_id);
+
+    -- Billing ---------------------------------------------------------------
+    -- The tier is denormalised onto the organization so the common read — "what
+    -- is this site allowed to see" — costs no join, while subscriptions holds
+    -- the billing detail behind it.
+    -- organizations.tier is the tier the customer is SUBSCRIBED to. What they
+    -- are actually SERVED can differ — a payment in flight serves the previous
+    -- tier, a lapsed grace period serves free — and billing/entitlements.js is
+    -- the only authority on that. Do not use these columns to decide access.
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS tier                TEXT NOT NULL DEFAULT 'free';
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS subscription_status TEXT NOT NULL DEFAULT 'active';
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS active_seats        INT  NOT NULL DEFAULT 0;
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS billing_phone       TEXT;
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS billing_email       TEXT;
+
+    -- One live subscription per organization. A change of plan updates this row
+    -- rather than adding another, so there is never a question about which of
+    -- two rows is in force; the payment history lives in transactions.
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id               UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      tier                 TEXT NOT NULL DEFAULT 'free',
+      -- What to fall back to while a payment is still pending. Without it, an
+      -- upgrade attempt that is never authorised would have nothing to revert to.
+      previous_tier        TEXT NOT NULL DEFAULT 'free',
+      status               TEXT NOT NULL DEFAULT 'active',
+      payment_method       TEXT,
+      provider             TEXT,
+      billing_cycle        TEXT NOT NULL DEFAULT 'monthly',
+      currency             TEXT NOT NULL DEFAULT 'TZS',
+      amount               NUMERIC(14,2),
+      billing_phone        TEXT,
+      seats                INT,
+      reference_id         TEXT,
+      external_reference   TEXT,
+      current_period_start TIMESTAMPTZ,
+      current_period_end   TIMESTAMPTZ,
+      past_due_since       TIMESTAMPTZ,
+      canceled_at          TIMESTAMPTZ,
+      created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS subscriptions_org_idx ON subscriptions (org_id);
+    CREATE INDEX IF NOT EXISTS subscriptions_period_idx ON subscriptions (status, current_period_end);
+
+    -- Every collection attempt, successful or not.
+    --
+    -- order_reference is ours and is UNIQUE: it is what makes a webhook safe to
+    -- receive twice, which mobile money gateways do routinely. The applied flag
+    -- whether a paid transaction has already been turned into entitlement, so
+    -- provisioning happens exactly once however many callbacks arrive.
+    CREATE TABLE IF NOT EXISTS transactions (
+      id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id             UUID REFERENCES organizations(id) ON DELETE SET NULL,
+      subscription_id    UUID,
+      order_reference    TEXT NOT NULL UNIQUE,
+      external_reference TEXT,
+      provider           TEXT NOT NULL,
+      gateway            TEXT NOT NULL DEFAULT 'clickpesa',
+      method             TEXT NOT NULL DEFAULT 'mobile_money',
+      phone_number       TEXT,
+      amount             NUMERIC(14,2) NOT NULL,
+      currency           TEXT NOT NULL DEFAULT 'TZS',
+      plan_id            TEXT,
+      billing_cycle      TEXT NOT NULL DEFAULT 'monthly',
+      status             TEXT NOT NULL DEFAULT 'pending',
+      raw_status         TEXT,
+      message            TEXT,
+      applied            BOOLEAN NOT NULL DEFAULT false,
+      created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+      paid_at            TIMESTAMPTZ
+    );
+    -- At most ONE open mobile money attempt per organization.
+    --
+    -- The application checks for an existing attempt before pushing, but two
+    -- requests arriving together can both pass that check and both insert.
+    -- Only the database can settle a race, so this makes the second insert fail
+    -- with 23505 and the caller rejoins the first attempt instead. Without it a
+    -- double tap can put two USSD prompts on one handset, and a customer who
+    -- approves both is charged twice.
+    --
+    -- Scoped to mobile money on purpose: an abandoned Stripe checkout is
+    -- routine, and Stripe's own idempotency key already covers that path.
+    CREATE UNIQUE INDEX IF NOT EXISTS transactions_one_open_per_org
+      ON transactions (org_id) WHERE status = 'pending' AND method = 'mobile_money';
+    CREATE INDEX IF NOT EXISTS transactions_org_idx     ON transactions (org_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS transactions_status_idx  ON transactions (status, created_at DESC);
+    CREATE INDEX IF NOT EXISTS transactions_external_idx ON transactions (external_reference);
   `);
   await backfillPublicCodes();
   return true;
@@ -748,6 +837,304 @@ async function markFeedbackDelivered(id) {
   await pool.query(`UPDATE feedback SET delivered = true WHERE id = $1`, [id]);
 }
 
+// --- Billing: subscriptions & transactions ---------------------------------
+
+// Shape a subscriptions row for the billing code, which thinks in camelCase and
+// should never have to know this table's column names.
+function publicSubscription(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    tier: row.tier,
+    previousTier: row.previous_tier,
+    status: row.status,
+    paymentMethod: row.payment_method,
+    provider: row.provider,
+    billingCycle: row.billing_cycle,
+    currency: row.currency,
+    amount: row.amount == null ? null : Number(row.amount),
+    billingPhone: row.billing_phone,
+    seats: row.seats,
+    referenceId: row.reference_id,
+    externalReference: row.external_reference,
+    currentPeriodStart: row.current_period_start,
+    currentPeriodEnd: row.current_period_end,
+    pastDueSince: row.past_due_since,
+    canceledAt: row.canceled_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+async function getSubscription(orgId) {
+  if (!pool || !orgId) return null;
+  const { rows } = await pool.query(`SELECT * FROM subscriptions WHERE org_id = $1`, [orgId]);
+  return publicSubscription(rows[0]);
+}
+
+// Every org gets a row, including free ones. A missing row and a free plan
+// would otherwise be indistinguishable, and the billing code would have to
+// handle null everywhere it handles 'free'.
+async function ensureSubscription(orgId) {
+  if (!pool || !orgId) return null;
+  const { rows } = await pool.query(
+    `INSERT INTO subscriptions (org_id, tier, previous_tier, status)
+     VALUES ($1, 'free', 'free', 'active')
+     ON CONFLICT (org_id) DO UPDATE SET org_id = EXCLUDED.org_id
+     RETURNING *`,
+    [orgId],
+  );
+  return publicSubscription(rows[0]);
+}
+
+// Partial update by column allow-list. Written this way because the callers
+// legitimately change different subsets — a pending push sets one group of
+// fields, a successful payment another — and a fixed-arity update would force
+// every caller to restate values it has no opinion about.
+const SUBSCRIPTION_FIELDS = {
+  tier: 'tier',
+  previousTier: 'previous_tier',
+  status: 'status',
+  paymentMethod: 'payment_method',
+  provider: 'provider',
+  billingCycle: 'billing_cycle',
+  currency: 'currency',
+  amount: 'amount',
+  billingPhone: 'billing_phone',
+  seats: 'seats',
+  referenceId: 'reference_id',
+  externalReference: 'external_reference',
+  currentPeriodStart: 'current_period_start',
+  currentPeriodEnd: 'current_period_end',
+  pastDueSince: 'past_due_since',
+  canceledAt: 'canceled_at',
+};
+
+async function updateSubscription(orgId, patch = {}) {
+  if (!pool || !orgId) return null;
+  await ensureSubscription(orgId);
+
+  const sets = [];
+  const values = [];
+  for (const [key, column] of Object.entries(SUBSCRIPTION_FIELDS)) {
+    if (patch[key] === undefined) continue;
+    values.push(patch[key]);
+    sets.push(`${column} = $${values.length}`);
+  }
+  if (sets.length === 0) return getSubscription(orgId);
+
+  values.push(orgId);
+  const { rows } = await pool.query(
+    `UPDATE subscriptions SET ${sets.join(', ')}, updated_at = now()
+     WHERE org_id = $${values.length} RETURNING *`,
+    values,
+  );
+
+  // Keep the organizations mirror in step. This is the SUBSCRIBED tier and
+  // status — a reporting convenience, deliberately not an access decision.
+  if (patch.tier !== undefined || patch.status !== undefined) {
+    const row = rows[0];
+    await pool.query(
+      `UPDATE organizations SET tier = $1, subscription_status = $2 WHERE id = $3`,
+      [row.tier, row.status, orgId],
+    );
+  }
+  return publicSubscription(rows[0]);
+}
+
+function publicTransaction(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    orderReference: row.order_reference,
+    externalReference: row.external_reference,
+    provider: row.provider,
+    gateway: row.gateway,
+    method: row.method,
+    phoneNumber: row.phone_number,
+    amount: row.amount == null ? null : Number(row.amount),
+    currency: row.currency,
+    planId: row.plan_id,
+    billingCycle: row.billing_cycle,
+    status: row.status,
+    rawStatus: row.raw_status,
+    message: row.message,
+    applied: row.applied,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    paidAt: row.paid_at,
+  };
+}
+
+// Returns null when the org already has an open mobile money attempt — the
+// partial unique index above rejects the insert. The caller treats that as
+// "rejoin the attempt already in flight", not as an error.
+async function createTransaction(tx) {
+  if (!pool) throw new Error('persistence disabled');
+  try {
+    return await insertTransaction(tx);
+  } catch (e) {
+    if (e.code === '23505') return null;
+    throw e;
+  }
+}
+
+async function insertTransaction(tx) {
+  const { rows } = await pool.query(
+    `INSERT INTO transactions
+       (org_id, subscription_id, order_reference, external_reference, provider, gateway,
+        method, phone_number, amount, currency, plan_id, billing_cycle, status)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+     RETURNING *`,
+    [
+      tx.orgId ?? null,
+      tx.subscriptionId ?? null,
+      tx.orderReference,
+      tx.externalReference ?? null,
+      tx.provider,
+      tx.gateway ?? 'clickpesa',
+      tx.method ?? 'mobile_money',
+      tx.phoneNumber ?? null,
+      tx.amount,
+      tx.currency ?? 'TZS',
+      tx.planId ?? null,
+      tx.billingCycle ?? 'monthly',
+      tx.status ?? 'pending',
+    ],
+  );
+  return publicTransaction(rows[0]);
+}
+
+async function getTransactionByReference(orderReference) {
+  if (!pool || !orderReference) return null;
+  const { rows } = await pool.query(`SELECT * FROM transactions WHERE order_reference = $1`, [orderReference]);
+  return publicTransaction(rows[0]);
+}
+
+async function listTransactions({ orgId, limit = 50 } = {}) {
+  if (!pool) return [];
+  const capped = Math.min(Math.max(Number(limit) || 50, 1), 200);
+  const { rows } = await pool.query(
+    `SELECT * FROM transactions WHERE org_id IS NOT DISTINCT FROM $1
+     ORDER BY created_at DESC LIMIT $2`,
+    [orgId ?? null, capped],
+  );
+  return rows.map(publicTransaction);
+}
+
+// Record what the gateway now says about a transaction.
+//
+// paid_at is only ever set once (COALESCE), so a later SETTLED callback after
+// an earlier SUCCESS does not move the moment the customer actually paid.
+async function updateTransactionStatus({
+  orderReference, status, rawStatus = null, externalReference = null,
+  message = null, phoneNumber = null, provider = null,
+}) {
+  if (!pool || !orderReference) return null;
+  const { rows } = await pool.query(
+    `UPDATE transactions SET
+       status             = $2,
+       raw_status         = COALESCE($3, raw_status),
+       external_reference = COALESCE($4, external_reference),
+       message            = COALESCE($5, message),
+       phone_number       = COALESCE($6, phone_number),
+       provider           = COALESCE($7, provider),
+       paid_at            = CASE WHEN $2 = 'paid' THEN COALESCE(paid_at, now()) ELSE paid_at END,
+       updated_at         = now()
+     WHERE order_reference = $1
+     RETURNING *`,
+    [orderReference, status, rawStatus, externalReference, message, phoneNumber, provider],
+  );
+  return publicTransaction(rows[0]);
+}
+
+// Claim a paid transaction for provisioning.
+//
+// Returns true exactly once per transaction, however many webhook deliveries,
+// polls or manual retries race here — the WHERE clause is the lock. Everything
+// that grants entitlement hangs off this returning true.
+async function claimTransactionForProvisioning(orderReference) {
+  if (!pool || !orderReference) return false;
+  const { rowCount } = await pool.query(
+    `UPDATE transactions SET applied = true, updated_at = now()
+     WHERE order_reference = $1 AND status = 'paid' AND applied = false`,
+    [orderReference],
+  );
+  return rowCount > 0;
+}
+
+// Undo the claim, so a provisioning attempt that threw can be retried rather
+// than leaving a paid customer with nothing.
+async function releaseTransactionClaim(orderReference) {
+  if (!pool || !orderReference) return;
+  await pool.query(
+    `UPDATE transactions SET applied = false, updated_at = now() WHERE order_reference = $1`,
+    [orderReference],
+  );
+}
+
+// The org's most recent still-open payment attempt, if it is recent enough to
+// still be live on someone's handset. Used to make a second tap on "Pay" join
+// the attempt already in flight instead of raising another USSD push — two
+// prompts for one subscription is how a customer gets charged twice.
+async function findOpenTransactionForOrg(orgId, withinMs) {
+  if (!pool || !orgId) return null;
+  const { rows } = await pool.query(
+    `SELECT * FROM transactions
+     WHERE org_id = $1 AND status = 'pending'
+       AND created_at > now() - ($2 || ' milliseconds')::interval
+     ORDER BY created_at DESC LIMIT 1`,
+    [orgId, String(Math.max(0, Math.floor(withinMs)))],
+  );
+  return publicTransaction(rows[0]);
+}
+
+// Transactions still awaiting an answer, oldest first. The reconciler polls
+// these: a USSD push whose webhook never arrives must not strand a customer who
+// has already entered their PIN.
+async function listPendingTransactions({ olderThanMs = 60_000, limit = 50 } = {}) {
+  if (!pool) return [];
+  const { rows } = await pool.query(
+    `SELECT * FROM transactions
+     WHERE status = 'pending' AND created_at < now() - ($1 || ' milliseconds')::interval
+     ORDER BY created_at ASC LIMIT $2`,
+    [String(Math.max(0, Math.floor(olderThanMs))), Math.min(Math.max(Number(limit) || 50, 1), 200)],
+  );
+  return rows.map(publicTransaction);
+}
+
+// Cache the seat count worked out by the caller (registered accounts + devices
+// currently in the room). Reporting only — nothing reads it to refuse anyone;
+// see the seat comment in billing/entitlements.js.
+async function setActiveSeats(orgId, seats) {
+  if (!pool || !orgId) return;
+  await pool.query(`UPDATE organizations SET active_seats = $1 WHERE id = $2`, [Math.max(0, Math.floor(seats) || 0), orgId]);
+}
+
+// Registered accounts in an org. Combined with the live roster by the caller to
+// estimate seats in use — see the seat comment in billing/entitlements.js.
+async function countUsers(orgId) {
+  if (!pool || !orgId) return 0;
+  const { rows } = await pool.query(`SELECT COUNT(*)::int AS n FROM users WHERE org_id = $1`, [orgId]);
+  return rows[0] ? rows[0].n : 0;
+}
+
+// Subscriptions whose paid period has elapsed. Driven by the same sweep as the
+// reconciler; a period that ends is a billing event, not a login-time check,
+// or an org nobody signs into would stay active forever.
+async function listExpiredSubscriptions(limit = 100) {
+  if (!pool) return [];
+  const { rows } = await pool.query(
+    `SELECT * FROM subscriptions
+     WHERE status = 'active' AND tier <> 'free'
+       AND current_period_end IS NOT NULL AND current_period_end < now()
+     ORDER BY current_period_end ASC LIMIT $1`,
+    [Math.min(Math.max(Number(limit) || 100, 1), 500)],
+  );
+  return rows.map(publicSubscription);
+}
+
 // --- Key/value config ------------------------------------------------------
 
 async function getKv(key) {
@@ -800,6 +1187,20 @@ module.exports = {
   listReports,
   countPendingReports,
   handleReport,
+  getSubscription,
+  ensureSubscription,
+  updateSubscription,
+  createTransaction,
+  getTransactionByReference,
+  listTransactions,
+  updateTransactionStatus,
+  claimTransactionForProvisioning,
+  releaseTransactionClaim,
+  listPendingTransactions,
+  findOpenTransactionForOrg,
+  listExpiredSubscriptions,
+  countUsers,
+  setActiveSeats,
   createUser,
   getUserByEmail,
   getUserById,

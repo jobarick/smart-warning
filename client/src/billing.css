@@ -1,0 +1,398 @@
+/* Plans, checkout and the mobile money modal.
+ *
+ * Uses the shared tokens from styles.css only — no colour is written down here
+ * that the rest of the app does not already use, so both themes come out right
+ * without a second palette to maintain. Squared corners, mono labels and the
+ * single red accent follow the command centre. */
+
+/* --- Billing panel -------------------------------------------------------- */
+
+.bill {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px;
+  font-family: var(--sans);
+  color: var(--text);
+}
+
+.bill-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  padding: 4px 0;
+  margin-bottom: 8px;
+}
+.bill-back:hover { color: var(--text); }
+.bill-back svg { width: 14px; height: 14px; }
+
+.bill-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.bill-head h2 { margin: 0; font-size: 1.15rem; font-weight: 600; }
+
+.bill-cur { display: flex; gap: 0; }
+.bill-cur-btn {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  padding: 5px 12px;
+  background: var(--panel);
+  color: var(--faint);
+  border: 1px solid var(--panel-border);
+  cursor: pointer;
+}
+.bill-cur-btn + .bill-cur-btn { border-left: none; }
+.bill-cur-btn.on { color: var(--text); background: var(--panel-2); }
+
+/* The safety promise. Deliberately not styled as a warning — it is
+ * reassurance, so it reads as a quiet statement of fact rather than an alarm. */
+.bill-promise {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-left: 2px solid var(--cmd-safe);
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+.bill-promise svg { width: 15px; height: 15px; flex: none; margin-top: 1px; color: var(--cmd-safe); }
+
+.bill-lbl {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-bottom: 3px;
+}
+
+.bill-current {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  margin-bottom: 16px;
+}
+.bill-current.warn { border-left: 2px solid var(--cmd-warn); }
+.bill-current b { font-size: 0.95rem; display: block; }
+.bill-sub { font-size: 0.75rem; color: var(--muted); }
+.bill-sub.warn { color: var(--cmd-warn); }
+.bill-note {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.bill-error {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: 0.82rem;
+}
+
+.bill-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.bill-card {
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 2px;
+}
+.bill-card.current { border-color: var(--cmd-safe); }
+.bill-card h3 { margin: 0 0 2px; font-size: 0.95rem; font-weight: 600; }
+.bill-tag { margin: 0 0 10px; font-size: 0.75rem; color: var(--faint); line-height: 1.35; }
+
+.bill-amount { margin-bottom: 12px; }
+.bill-amount b { font-family: var(--mono); font-size: 1.25rem; display: block; }
+.bill-amount span { font-size: 0.72rem; color: var(--faint); }
+.bill-seat { display: block; margin-top: 2px; }
+
+.bill-includes { list-style: none; margin: 0 0 14px; padding: 0; flex: 1; }
+.bill-includes li {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 0.79rem;
+  color: var(--muted);
+  padding: 2px 0;
+  line-height: 1.4;
+}
+.bill-includes svg { width: 12px; height: 12px; flex: none; margin-top: 3px; color: var(--cmd-safe); }
+
+.bill-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 9px 12px;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid var(--accent);
+  cursor: pointer;
+}
+.bill-btn:hover:not(:disabled) { filter: brightness(1.1); }
+.bill-btn:disabled { opacity: 0.5; cursor: default; }
+.bill-btn.ghost { background: transparent; color: var(--text); border-color: var(--panel-border); }
+.bill-btn svg { width: 13px; height: 13px; }
+
+.bill-badge {
+  display: block;
+  text-align: center;
+  padding: 9px 12px;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+  border: 1px dashed var(--panel-border);
+}
+
+.bill-history { margin-top: 20px; }
+.bill-history ul { list-style: none; margin: 0; padding: 0; }
+.bill-history li {
+  display: grid;
+  grid-template-columns: 10px 100px 1fr 1fr 90px 80px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--panel-border);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.bill-history b { font-family: var(--mono); color: var(--text); }
+.bill-history em { font-family: var(--mono); font-style: normal; font-size: 0.68rem; text-transform: uppercase; }
+
+.bill-dot { width: 8px; height: 8px; background: var(--cmd-nosig); }
+.bill-dot.paid { background: var(--cmd-safe); }
+.bill-dot.pending { background: var(--cmd-warn); }
+.bill-dot.failed, .bill-dot.reversed { background: var(--accent); }
+
+.bill-cancel {
+  margin-top: 18px;
+  background: none;
+  border: 1px solid var(--panel-border);
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+.bill-cancel:hover { color: var(--accent); border-color: var(--accent); }
+
+/* --- Payment modal -------------------------------------------------------- */
+
+.pay-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.pay-modal {
+  width: min(420px, 100%);
+  max-height: 92vh;
+  overflow-y: auto;
+  background: var(--bg-2);
+  border: 1px solid var(--panel-border);
+  font-family: var(--sans);
+  color: var(--text);
+}
+
+.pay-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--panel-border);
+}
+.pay-head h3 { margin: 0; font-size: 1.05rem; font-weight: 600; }
+.pay-price { text-align: right; }
+.pay-price b { display: block; font-family: var(--mono); font-size: 1.05rem; }
+.pay-price span { font-size: 0.68rem; color: var(--faint); }
+
+.pay-lbl {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-bottom: 4px;
+}
+
+.pay-body { padding: 16px; }
+
+.pay-ops { border: none; margin: 0 0 14px; padding: 0; }
+.pay-ops legend { padding: 0; }
+.pay-op-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.pay-op {
+  padding: 9px 6px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  color: var(--muted);
+  cursor: pointer;
+  text-align: center;
+  font: inherit;
+}
+.pay-op b { display: block; font-size: 0.82rem; color: var(--text); }
+.pay-op span { display: block; font-size: 0.62rem; color: var(--faint); margin-top: 1px; }
+.pay-op.on { border-color: var(--accent); background: var(--panel-2); }
+
+.pay-field { display: block; margin-bottom: 12px; }
+.pay-field input {
+  width: 100%;
+  padding: 11px 12px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+}
+.pay-field input:focus { outline: none; border-color: var(--accent); }
+
+.pay-hint {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+  font-size: 0.73rem;
+  color: var(--faint);
+}
+.pay-hint svg { width: 12px; height: 12px; }
+.pay-hint.ok { color: var(--cmd-safe); }
+.pay-hint.warn { color: var(--cmd-warn); }
+
+.pay-note {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  background: var(--panel);
+  border-left: 2px solid var(--cmd-warn);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.pay-error {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: 0.8rem;
+}
+
+.pay-actions { display: flex; gap: 8px; }
+.pay-cancel, .pay-submit {
+  flex: 1;
+  padding: 11px 12px;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border: 1px solid var(--panel-border);
+}
+.pay-cancel { background: transparent; color: var(--muted); }
+.pay-cancel:hover:not(:disabled) { color: var(--text); }
+.pay-submit { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pay-submit:hover:not(:disabled) { filter: brightness(1.1); }
+.pay-submit:disabled, .pay-cancel:disabled { opacity: 0.5; cursor: default; }
+
+.pay-safety {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 14px 0 0;
+  font-size: 0.73rem;
+  color: var(--faint);
+  line-height: 1.45;
+}
+.pay-safety svg { width: 13px; height: 13px; flex: none; margin-top: 1px; color: var(--cmd-safe); }
+
+/* --- Waiting / result states --------------------------------------------- */
+
+.pay-waiting, .pay-done { text-align: center; }
+.pay-waiting h4, .pay-done h4 { margin: 14px 0 6px; font-size: 1rem; font-weight: 600; }
+.pay-waiting p, .pay-done p { margin: 0 0 8px; font-size: 0.85rem; color: var(--muted); line-height: 1.5; }
+.pay-waiting .pay-safety, .pay-done .pay-safety { justify-content: center; text-align: left; }
+.pay-waiting .pay-cancel { flex: none; width: 100%; margin-top: 6px; }
+
+.pay-spinner {
+  width: 38px;
+  height: 38px;
+  margin: 6px auto 0;
+  border: 2px solid var(--panel-border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: pay-spin 0.9s linear infinite;
+}
+@keyframes pay-spin { to { transform: rotate(360deg); } }
+
+.pay-countdown {
+  font-family: var(--mono);
+  font-size: 0.72rem !important;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint) !important;
+}
+
+.pay-tick, .pay-cross {
+  width: 42px;
+  height: 42px;
+  margin: 4px auto 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid currentColor;
+  font-family: var(--mono);
+  font-size: 1.3rem;
+}
+.pay-tick { color: var(--cmd-safe); }
+.pay-tick svg { width: 22px; height: 22px; }
+.pay-cross { color: var(--accent); }
+
+/* Motion is decoration here; the countdown text carries the same information. */
+@media (prefers-reduced-motion: reduce) {
+  .pay-spinner { animation: none; border-top-color: var(--panel-border); }
+}
+
+@media (max-width: 560px) {
+  .bill-history li { grid-template-columns: 10px 1fr 1fr; row-gap: 2px; }
+  .bill-current { gap: 14px; }
+}
