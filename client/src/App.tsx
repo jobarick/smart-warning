@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   AlertMessage,
   AlertType,
@@ -20,12 +20,10 @@ import { useSelfTelemetry } from './hooks/useSelfTelemetry';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
 import { AlertOverlay } from './components/AlertOverlay';
 import { OperatorStatus } from './components/OperatorStatus';
-import { MapPanel } from './components/MapPanel';
 import { SosPanel } from './components/SosPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 import { ConnectionStatus, type AppView } from './components/ConnectionStatus';
 import { AlertLog } from './components/AlertLog';
-import { CommandDashboard } from './components/CommandDashboard';
 import { SystemStatusBar } from './components/SystemStatusBar';
 import { SystemFooter } from './components/SystemFooter';
 import { Icon } from './components/Icon';
@@ -37,14 +35,39 @@ import { PushToggle } from './components/PushToggle';
 import { EmergencyCallPocket } from './components/EmergencyCallPocket';
 import { SafeRoutePanel } from './components/SafeRoutePanel';
 import { ContactSupport } from './components/ContactSupport';
-import { FeedbackCenter } from './components/FeedbackCenter';
-import { DestinationsManager } from './components/DestinationsManager';
-import { BillingPanel } from './components/BillingPanel';
 import { unsubscribe as unsubscribePush } from './lib/push';
 import { nativePushSupported, registerForPush, unregisterFromPush, attachHandlers } from './lib/nativePush';
 import { STALE_REPLAY_MS } from './lib/outbox';
 import * as trackBuffer from './lib/trackBuffer';
 import { fetchHealth, fetchMe, fetchReports, escalateReport, dismissReport, type Report } from './lib/api';
+
+// ---------------------------------------------------------------------------
+// Deferred surfaces
+// ---------------------------------------------------------------------------
+// Split out of the initial bundle so the emergency screen is interactive as
+// early as possible on a slow connection.
+//
+// THE RULE: nothing on the emergency path may be lazy. SosPanel, AlertOverlay,
+// SystemStatusBar, OperatorStatus, EmergencyCallPocket and SafeRoutePanel stay
+// eagerly imported above — an alarm must never wait on a network fetch, and a
+// chunk that fails to arrive must never be the reason someone cannot call for
+// help. Everything below is either administrative or reference material that a
+// person consults at a desk, not during an incident.
+//
+// These chunks are still precached by the service worker on first visit, so
+// after one load they open instantly and work offline like the rest of the app.
+const MapPanel = lazy(() => import('./components/MapPanel').then((m) => ({ default: m.MapPanel })));
+const CommandDashboard = lazy(() => import('./components/CommandDashboard').then((m) => ({ default: m.CommandDashboard })));
+const FeedbackCenter = lazy(() => import('./components/FeedbackCenter').then((m) => ({ default: m.FeedbackCenter })));
+const DestinationsManager = lazy(() => import('./components/DestinationsManager').then((m) => ({ default: m.DestinationsManager })));
+const BillingPanel = lazy(() => import('./components/BillingPanel').then((m) => ({ default: m.BillingPanel })));
+
+// Deliberately plain: a spinner that appears for one frame is noise, and these
+// panels are never on a critical path where a richer skeleton would earn its
+// keep.
+function PanelFallback({ label }: { label: string }) {
+  return <div className="panel-loading" role="status" aria-live="polite">Loading {label}…</div>;
+}
 import {
   loadSession,
   saveSession,
@@ -615,17 +638,22 @@ export default function App() {
         </main>
       ) : showBilling && token ? (
         <main className="worker">
-          <BillingPanel token={token} onBack={() => setShowBilling(false)} />
+          <Suspense fallback={<PanelFallback label="plans" />}>
+            <BillingPanel token={token} onBack={() => setShowBilling(false)} />
+          </Suspense>
         </main>
       ) : view === 'command' && showTools ? (
         <main className="worker">
           <button className="btn back-btn" onClick={() => setShowTools(false)}>
             <Icon name="arrow-left" /> Back to command centre
           </button>
-          <DestinationsManager token={token} roster={roster} />
-          <FeedbackCenter token={token} />
+          <Suspense fallback={<PanelFallback label="tools" />}>
+            <DestinationsManager token={token} roster={roster} />
+            <FeedbackCenter token={token} />
+          </Suspense>
         </main>
       ) : view === 'command' ? (
+        <Suspense fallback={<PanelFallback label="command centre" />}>
         <CommandDashboard
           roster={roster}
           alarm={alarm}
@@ -647,6 +675,7 @@ export default function App() {
           onDismissReport={onDismissReport}
           token={token}
         />
+        </Suspense>
       ) : showSettings ? (
         <main className="worker">
           <button className="btn back-btn" onClick={() => setShowSettings(false)}>
@@ -694,11 +723,13 @@ export default function App() {
               pressure is only the parts they act on. */}
           {showMore && (
             <>
-              <MapPanel
-                userLat={telemetry.lat}
-                userLng={telemetry.lng}
-                assembly={{ lat: settings.assemblyLat, lng: settings.assemblyLng, label: settings.assemblyLabel }}
-              />
+              <Suspense fallback={<PanelFallback label="map" />}>
+                <MapPanel
+                  userLat={telemetry.lat}
+                  userLng={telemetry.lng}
+                  assembly={{ lat: settings.assemblyLat, lng: settings.assemblyLng, label: settings.assemblyLabel }}
+                />
+              </Suspense>
               <AlertLog entries={log} />
             </>
           )}

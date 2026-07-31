@@ -2183,3 +2183,17 @@ body {
 @media (max-width: 560px) {
   :root .brand .brand-logo { height: 17px; }
 }
+
+/* Fallback while a deferred panel's chunk arrives. Deliberately quiet: these
+   surfaces are administrative, and after the first visit the service worker
+   has the chunk cached so this is rarely seen at all. Nothing on the emergency
+   path is deferred, so this never stands between someone and an alarm. */
+.panel-loading {
+  padding: 24px 16px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+}
