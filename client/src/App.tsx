@@ -32,6 +32,9 @@ import { Logo } from './components/Logo';
 import { getProfile, alertLabel } from './lib/profiles';
 import { useIncidentHistory } from './hooks/useIncidentHistory';
 import { AuthGate } from './components/AuthGate';
+import { ConsentGate } from './components/ConsentGate';
+import { hasAcceptedCurrentTerms, saveConsent } from './lib/consent';
+import { TERMS_VERSION } from './lib/terms';
 import { PushToggle } from './components/PushToggle';
 import { EmergencyCallPocket } from './components/EmergencyCallPocket';
 import { SafeRoutePanel } from './components/SafeRoutePanel';
@@ -40,7 +43,7 @@ import { unsubscribe as unsubscribePush } from './lib/push';
 import { nativePushSupported, registerForPush, unregisterFromPush, attachHandlers } from './lib/nativePush';
 import { STALE_REPLAY_MS } from './lib/outbox';
 import * as trackBuffer from './lib/trackBuffer';
-import { fetchHealth, fetchMe, fetchReports, escalateReport, dismissReport, type Report } from './lib/api';
+import { fetchHealth, fetchMe, fetchReports, escalateReport, dismissReport, recordConsent, type Report } from './lib/api';
 
 // ---------------------------------------------------------------------------
 // Deferred surfaces
@@ -91,6 +94,8 @@ export default function App() {
   // Standing status set by a supervisor, plus the liveness facts the status bar
   // and footer report. 'emergency' is derived from an active alert, not stored.
   const [standing, setStanding] = useState<{ level: SystemStatusLevel; note: string }>({ level: 'clear', note: '' });
+  // Read once at mount: this device has already accepted the current terms.
+  const [consented, setConsented] = useState(() => hasAcceptedCurrentTerms());
   const [responder, setResponder] = useState<RespondingMessage | null>(null);
   const [lastAlert, setLastAlert] = useState<number | null>(null);
   const [lastSync, setLastSync] = useState<number | null>(null);
@@ -195,6 +200,27 @@ export default function App() {
     if (nm) setSettings((prev) => ({ ...prev, deviceName: nm }));
     setView(s.kind === 'supervisor' ? 'command' : 'worker');
   }, []);
+
+  // Accepting the terms must never depend on the network.
+  //
+  // The local record is written first and the screen advances immediately; the
+  // durable server-side record is attempted afterwards and its failure is
+  // swallowed. Someone who has just agreed, on a bad connection, in a building
+  // where something is wrong, must not be held on a legal screen because a POST
+  // timed out.
+  const acceptTerms = useCallback(
+    (points: string[]) => {
+      saveConsent(points);
+      setConsented(true);
+      const creds = joinCredentials(session) ?? {};
+      if (creds.token || creds.orgCode) {
+        void recordConsent({ version: TERMS_VERSION, points }, creds).catch(() => {
+          /* the local record stands; the server copy can be re-sent later */
+        });
+      }
+    },
+    [session],
+  );
 
   const signOut = useCallback(() => {
     // Capture the credentials NOW. Both unregister calls are asynchronous and
@@ -591,6 +617,16 @@ export default function App() {
   // Accounts required but not signed in → the entry gate.
   if (orgsMode && !session) {
     return <AuthGate onAuthed={onAuthed} notice={authNotice} />;
+  }
+
+  // Terms & Conditions, once per device, after joining or signing in.
+  //
+  // Placed AFTER the auth gate on purpose: the confirmations are about how this
+  // person will use the service, so they belong once someone is actually
+  // entering it, not in front of a sign-in form. Raising TERMS_VERSION brings
+  // this screen back for everybody.
+  if (!consented) {
+    return <ConsentGate onAccept={acceptTerms} />;
   }
 
   const org = session?.kind === 'supervisor' ? session.user.org : undefined;

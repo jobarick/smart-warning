@@ -345,6 +345,24 @@ function credQuery(creds: OrgCreds, extra: Record<string, string> = {}): string 
   return q ? `?${q}` : '';
 }
 
+/**
+ * Record that this person accepted the terms.
+ *
+ * The durable record — a localStorage flag proves nothing and is under the
+ * user's own control, so it gates the UI but cannot serve as evidence of
+ * consent. Best-effort by design: the caller has already let the person in.
+ */
+export async function recordConsent(
+  body: { version: string; points: string[] },
+  creds: OrgCreds,
+): Promise<void> {
+  await fetch(`${API_BASE}/api/consent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(creds.token) },
+    body: JSON.stringify({ ...body, orgCode: creds.orgCode }),
+  });
+}
+
 /** A road route, or a straight-line estimate when routing was unavailable. */
 export interface RouteResult {
   ok: true;

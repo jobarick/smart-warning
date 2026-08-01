@@ -580,6 +580,54 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
+    // --- Terms & Conditions acceptance ---------------------------------------
+    //
+    // Best-effort by design. The client has already let the person through on
+    // its local record before calling this, so a failure here costs a row in an
+    // audit table — it must never be the reason somebody is held on a legal
+    // screen while something is happening around them.
+    if (path === '/api/consent' && req.method === 'POST') {
+      if (!db.enabled()) return sendJson(res, 200, { ok: true, recorded: false });
+      const body = await readJson(req);
+      const version = String(body.version || '').slice(0, 32);
+      if (!version) return sendJson(res, 400, { error: 'a terms version is required' });
+
+      const ctx = await requireAuth(req);
+      const orgId = ctx ? ctx.orgId : await orgIdFromRequest(req, body);
+      if (!orgId) return sendJson(res, 401, { error: 'org credentials required' });
+
+      const points = Array.isArray(body.points)
+        ? body.points.filter((p) => typeof p === 'string').slice(0, 20).map((p) => p.slice(0, 64))
+        : [];
+
+      await db.recordConsent({
+        orgId,
+        userId: ctx?.user?.id ?? null,
+        // For a worker there is no account, so record the name they joined
+        // under. Not an identity, but it is what the roster shows.
+        subject: ctx?.user?.email ?? (typeof body.subject === 'string' ? body.subject.slice(0, 120) : null),
+        version,
+        points,
+      });
+      return sendJson(res, 201, { ok: true, recorded: true });
+    }
+
+    // Who has accepted what, for an organisation's own records.
+    if (path === '/api/consent' && req.method === 'GET') {
+      const ctx = await guardOrg(req, res);
+      if (ctx === false) return;
+      if (!ctx) return sendJson(res, 501, { error: 'consent records require a database' });
+      const rows = await db.listConsents({ orgId: ctx.orgId });
+      return sendJson(res, 200, {
+        consents: rows.map((r) => ({
+          subject: r.subject,
+          version: r.version,
+          points: r.points,
+          acceptedAt: r.accepted_at,
+        })),
+      });
+    }
+
     // --- Billing & payments -------------------------------------------------
     //
     // Nothing in this section can affect whether an alert is raised or

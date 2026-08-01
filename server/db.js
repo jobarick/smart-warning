@@ -297,6 +297,27 @@ async function init() {
     CREATE INDEX IF NOT EXISTS transactions_org_idx     ON transactions (org_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS transactions_status_idx  ON transactions (status, created_at DESC);
     CREATE INDEX IF NOT EXISTS transactions_external_idx ON transactions (external_reference);
+
+    -- Record of who accepted which version of the Terms & Conditions.
+    --
+    -- The app also keeps a localStorage flag, but that only decides whether to
+    -- show the screen — it is under the user's own control and proves nothing.
+    -- This is the copy an organisation could actually rely on, which is the
+    -- entire point of asking somebody to tick four boxes.
+    --
+    -- Append-only: a later acceptance of a new version is a new row, so the
+    -- history of what each person agreed to, and when, stays intact.
+    CREATE TABLE IF NOT EXISTS consents (
+      id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id      UUID REFERENCES organizations(id) ON DELETE CASCADE,
+      user_id     UUID,
+      subject     TEXT,
+      version     TEXT NOT NULL,
+      points      TEXT[] NOT NULL DEFAULT '{}',
+      accepted_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS consents_org_idx  ON consents (org_id, accepted_at DESC);
+    CREATE INDEX IF NOT EXISTS consents_user_idx ON consents (user_id, accepted_at DESC);
   `);
   await backfillPublicCodes();
   await linkOrphanTables();
@@ -1221,6 +1242,28 @@ async function listExpiredSubscriptions(limit = 100) {
   return rows.map(publicSubscription);
 }
 
+// --- Terms & Conditions acceptance -----------------------------------------
+
+async function recordConsent({ orgId = null, userId = null, subject = null, version, points = [] }) {
+  if (!pool) return null;
+  const { rows } = await pool.query(
+    `INSERT INTO consents (org_id, user_id, subject, version, points)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [orgId, userId, subject, version, points],
+  );
+  return rows[0] || null;
+}
+
+async function listConsents({ orgId, limit = 100 } = {}) {
+  if (!pool) return [];
+  const { rows } = await pool.query(
+    `SELECT * FROM consents WHERE org_id IS NOT DISTINCT FROM $1
+     ORDER BY accepted_at DESC LIMIT $2`,
+    [orgId ?? null, Math.min(Math.max(Number(limit) || 100, 1), 500)],
+  );
+  return rows;
+}
+
 // --- Key/value config ------------------------------------------------------
 
 async function getKv(key) {
@@ -1285,6 +1328,8 @@ module.exports = {
   listPendingTransactions,
   findOpenTransactionForOrg,
   listExpiredSubscriptions,
+  recordConsent,
+  listConsents,
   countUsers,
   setActiveSeats,
   createUser,
