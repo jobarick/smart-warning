@@ -94,6 +94,10 @@ export function parseWireMessage(raw: unknown): WireMessage | null {
         sender: str(m.sender, 'Unknown'),
         timestamp: num(m.timestamp, Date.now()),
         replayed: m.replayed === true,
+        // Anything unrecognised reads as 'resolved'. Guessing 'false-alarm'
+        // from junk would let a malformed message quietly rewrite a real
+        // incident as an accident in the site's safety record.
+        reason: m.reason === 'false-alarm' ? 'false-alarm' : 'resolved',
       };
     case 'presence':
       return { kind: 'presence', count: Math.max(0, Math.trunc(num(m.count, 0))) };

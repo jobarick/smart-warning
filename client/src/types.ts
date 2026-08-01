@@ -30,6 +30,23 @@ export interface AllClearMessage extends Replayable {
   id: string;
   sender: string;
   timestamp: number;
+  /**
+   * Why the alarm stopped.
+   *
+   * 'resolved'    — the emergency is over.
+   * 'false-alarm' — it should never have been raised; a pocket press, a drill
+   *                 mistake, a misread situation.
+   *
+   * These are different events and conflating them is harmful in both
+   * directions. A site whose incident history counts accidents alongside real
+   * fires cannot see its own safety record. And a person who hits SOS by
+   * mistake needs a way to say so that is obviously a retraction — otherwise
+   * the honest move looks like declaring an emergency over, which is a thing
+   * only a supervisor should be doing.
+   *
+   * Absent means 'resolved', so older clients keep working unchanged.
+   */
+  reason?: 'resolved' | 'false-alarm';
 }
 
 export interface PresenceMessage {

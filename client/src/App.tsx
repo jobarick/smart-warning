@@ -488,15 +488,19 @@ export default function App() {
     [arm, send, handleWire, settings.deviceName],
   );
 
-  const allClear = useCallback(() => {
-    const msg: AllClearMessage = {
-      kind: 'all-clear',
-      id: crypto.randomUUID(),
-      sender: settings.deviceName,
-      timestamp: Date.now(),
-    };
-    if (!send(msg)) handleWire(msg);
-  }, [send, handleWire, settings.deviceName]);
+  const allClear = useCallback(
+    (reason: 'resolved' | 'false-alarm' = 'resolved') => {
+      const msg: AllClearMessage = {
+        kind: 'all-clear',
+        id: crypto.randomUUID(),
+        sender: settings.deviceName,
+        timestamp: Date.now(),
+        reason,
+      };
+      if (!send(msg)) handleWire(msg);
+    },
+    [send, handleWire, settings.deviceName],
+  );
 
   // Tell the site this supervisor is on their way.
   //
@@ -840,6 +844,11 @@ export default function App() {
           // Matched by incident id at the point of use, so a response to an
           // earlier emergency can never be shown against this one.
           responder={responder && responder.incidentId === alarm.alert.id ? responder : null}
+          // Only the device that raised it may retract it as a mistake.
+          // Anyone else calling it a false alarm is guessing about someone
+          // else's emergency.
+          canRetract={alarm.alert.sender === settings.deviceName}
+          onFalseAlarm={() => allClear('false-alarm')}
         />
       )}
 

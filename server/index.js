@@ -1320,16 +1320,30 @@ wss.on('connection', (ws, req) => {
         await raiseAlert(ws.orgId, msg, ws.worker, `#${ws.connId}`);
         return; // raiseAlert already broadcast it
       } else {
-        console.log(`[.] all-clear from #${ws.connId} "${msg.sender}" (org ${ws.orgId ?? 'global'})`);
+        // Normalised here rather than trusted: anything unrecognised is a
+        // plain resolution, so a malformed message cannot rewrite a real
+        // incident as an accident in the site's safety record.
+        msg.reason = msg.reason === 'false-alarm' ? 'false-alarm' : 'resolved';
+        const retracted = msg.reason === 'false-alarm';
+        console.log(`[.] ${retracted ? 'FALSE ALARM retracted' : 'all-clear'} from #${ws.connId} "${msg.sender}" (org ${ws.orgId ?? 'global'})`);
         // Close the tracking window: position recording stops here.
         activeIncident.delete(ws.orgId ?? null);
         clearResponding(ws.orgId);
         db.resolveActive(msg, ws.orgId).catch((e) => console.error('[db] resolveActive:', e.message));
-        const standDown = {
-          title: '✓ All clear',
-          body: `Stood down by ${msg.sender || 'a supervisor'}`,
-          tag: 'sw-alert',
-        };
+        // Phones that were woken by the alarm are told which of the two things
+        // happened, so nobody is left believing an emergency ran its course
+        // when it was withdrawn seconds later.
+        const standDown = retracted
+          ? {
+              title: 'False alarm',
+              body: `${msg.sender || 'The person who raised it'} withdrew the alert — there is no emergency`,
+              tag: 'sw-alert',
+            }
+          : {
+              title: '✓ All clear',
+              body: `Stood down by ${msg.sender || 'a supervisor'}`,
+              tag: 'sw-alert',
+            };
         push.notifyOrg(ws.orgId, standDown).catch((e) => console.error('[push] notifyOrg:', e.message));
         fcm.notifyOrg(ws.orgId, standDown).catch((e) => console.error('[fcm] notifyOrg:', e.message));
       }

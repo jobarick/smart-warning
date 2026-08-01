@@ -16,9 +16,21 @@ interface Props {
   onAllClear: () => void;
   /** A supervisor on their way to this incident, if one has said so. */
   responder?: RespondingMessage | null;
+  /** True when THIS device raised the alarm, so it may retract it. */
+  canRetract?: boolean;
+  onFalseAlarm?: () => void;
 }
 
-export function AlertOverlay({ alert, acknowledged, settings, label, safeConfirmed, onConfirmSafe, onAcknowledge, onAllClear, responder }: Props) {
+export function AlertOverlay({ alert, acknowledged, settings, label, safeConfirmed, onConfirmSafe, onAcknowledge, onAllClear, responder, canRetract, onFalseAlarm }: Props) {
+  // Retracting also stops every siren on site, so it takes a second tap the
+  // same way all-clear does — but it is worded as taking the alarm back, not
+  // as declaring an emergency over.
+  const [confirmRetract, setConfirmRetract] = useState(false);
+  useEffect(() => {
+    if (!confirmRetract) return;
+    const t = setTimeout(() => setConfirmRetract(false), 3500);
+    return () => clearTimeout(t);
+  }, [confirmRetract]);
   // Ignore clicks for a moment after the overlay appears so a double-tap on a
   // trigger button can't accidentally acknowledge or all-clear the alert.
   const [armed, setArmed] = useState(false);
@@ -112,6 +124,23 @@ export function AlertOverlay({ alert, acknowledged, settings, label, safeConfirm
           <span className="safe-note">
             <Icon name="check-circle" /> Reported safe — your supervisor can see this
           </span>
+        )}
+        {/* Raising an alarm by accident is common and the honest correction
+            must be easy. Without this the only way out is "All clear", which
+            says the emergency is over rather than that there never was one —
+            so accidents get recorded as real incidents and the site's safety
+            history stops meaning anything. */}
+        {canRetract && onFalseAlarm && (
+          <button
+            className="btn btn-retract"
+            disabled={!armed}
+            onClick={() => {
+              if (confirmRetract) onFalseAlarm();
+              else setConfirmRetract(true);
+            }}
+          >
+            {confirmRetract ? 'Tap again — this was a false alarm' : 'I raised this by mistake'}
+          </button>
         )}
 
         {/* The question the person having the emergency is actually asking.

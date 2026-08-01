@@ -2359,3 +2359,18 @@ body {
   font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
 }
 .consent-tabs button.on { color: var(--text); border-color: var(--text); }
+
+/* Retracting an accidental alarm. Deliberately not styled like the primary
+   actions: it is a correction, not an emergency control, and it must not
+   compete with "I am safe" for a frightened person's attention. */
+.btn-retract {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+}
+.btn-retract:hover:not(:disabled) { border-color: #fff; color: #fff; }
+:root[data-theme="light"] .btn-retract {
+  border-color: rgba(0, 0, 0, 0.4);
+  color: rgba(0, 0, 0, 0.8);
+}

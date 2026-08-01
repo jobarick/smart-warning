@@ -383,7 +383,12 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
           <section className="mc-block">
             <h4 className="mc-h">Controls</h4>
             <div className="mc-actions">
-              <button className="mc-btn mc-btn-crit" onClick={onAllClear} disabled={!alert}>Stand down</button>
+              {/* Wrapped, not passed directly: onAllClear now takes a reason,
+                  and handing it an onClick would make the React event the
+                  argument — a synthetic event has circular references, so
+                  serialising the message would throw and the stand-down would
+                  never leave the device. */}
+              <button className="mc-btn mc-btn-crit" onClick={() => onAllClear()} disabled={!alert}>Stand down</button>
               <button className="mc-btn" onClick={onAcknowledge} disabled={!alert || alarm.acknowledged}>
                 {alarm.acknowledged ? 'Acknowledged' : 'Acknowledge'}
               </button>

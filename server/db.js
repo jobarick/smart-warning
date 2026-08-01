@@ -76,6 +76,10 @@ async function init() {
       status       TEXT NOT NULL DEFAULT 'active'
     );
     ALTER TABLE incidents ADD COLUMN IF NOT EXISTS org_id UUID;
+    -- 'resolved' | 'false-alarm'. Nullable: rows that predate the distinction
+    -- genuinely do not know which they were, and inventing a value for them
+    -- would be worse than admitting it.
+    ALTER TABLE incidents ADD COLUMN IF NOT EXISTS resolution TEXT;
     CREATE INDEX IF NOT EXISTS incidents_raised_at_idx ON incidents (raised_at DESC);
     CREATE INDEX IF NOT EXISTS incidents_status_idx ON incidents (status);
     CREATE INDEX IF NOT EXISTS incidents_org_idx ON incidents (org_id);
@@ -608,11 +612,16 @@ async function recordAlert(alert, worker, orgId) {
 async function resolveActive(allClear, orgId) {
   if (!pool) return;
   const ts = numOrNull(allClear.timestamp) ?? Date.now();
+  // `resolution` separates a real incident that ended from one that was
+  // withdrawn as a mistake. Both leave status='resolved' so every existing
+  // query and stat keeps working; the distinction is additive.
+  const resolution = allClear.reason === 'false-alarm' ? 'false-alarm' : 'resolved';
   await pool.query(
     `UPDATE incidents
-        SET status = 'resolved', resolved_at = to_timestamp($1 / 1000.0), resolved_by = $2
+        SET status = 'resolved', resolved_at = to_timestamp($1 / 1000.0),
+            resolved_by = $2, resolution = $4
       WHERE status = 'active' AND org_id IS NOT DISTINCT FROM $3`,
-    [ts, allClear.sender || null, orgId || null],
+    [ts, allClear.sender || null, orgId || null, resolution],
   );
 }
 
