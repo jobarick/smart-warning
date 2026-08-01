@@ -151,9 +151,11 @@ export async function registerForPush(creds: { token?: string; orgCode?: string 
  * leaving a token attached to an org someone has left would keep delivering
  * that site's emergencies to a phone that is no longer part of it.
  */
-export async function unregisterFromPush(): Promise<void> {
+export async function unregisterFromPush(
+  creds: { token?: string; orgCode?: string } = {},
+): Promise<void> {
   const token = currentToken();
-  if (token) await unregisterDeviceToken(token);
+  if (token) await unregisterDeviceToken(token, creds);
   try {
     localStorage.removeItem(TOKEN_KEY);
   } catch {

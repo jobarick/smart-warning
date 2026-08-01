@@ -593,9 +593,18 @@ async function listPushSubscriptions(orgId) {
   return rows;
 }
 
-async function deletePushSubscription(endpoint) {
-  if (!pool) return;
-  await pool.query(`DELETE FROM push_subscriptions WHERE endpoint = $1`, [endpoint]);
+// Remove a subscription. When orgId is given the delete is scoped to that
+// organization, so possessing an endpoint string is not on its own enough to
+// switch off someone else's emergency notifications.
+//
+// orgId is omitted only by the push sender pruning an endpoint the push
+// service itself has reported as gone (404/410), which is authoritative.
+async function deletePushSubscription(endpoint, orgId = null) {
+  if (!pool) return 0;
+  const { rowCount } = orgId
+    ? await pool.query(`DELETE FROM push_subscriptions WHERE endpoint = $1 AND org_id = $2`, [endpoint, orgId])
+    : await pool.query(`DELETE FROM push_subscriptions WHERE endpoint = $1`, [endpoint]);
+  return rowCount;
 }
 
 // --- Safe destinations -----------------------------------------------------
@@ -759,9 +768,15 @@ async function listDeviceTokens(orgId) {
   return rows;
 }
 
-async function deleteDeviceToken(token) {
-  if (!pool) return;
-  await pool.query(`DELETE FROM device_tokens WHERE token = $1`, [token]);
+// Scoped the same way as deletePushSubscription: holding a registration token
+// must not be sufficient to unregister a device from its org's alerts. The
+// unscoped form is for FCM telling us a token is dead.
+async function deleteDeviceToken(token, orgId = null) {
+  if (!pool) return 0;
+  const { rowCount } = orgId
+    ? await pool.query(`DELETE FROM device_tokens WHERE token = $1 AND org_id = $2`, [token, orgId])
+    : await pool.query(`DELETE FROM device_tokens WHERE token = $1`, [token]);
+  return rowCount;
 }
 
 /** Drop tokens the push service has told us are dead, in one round trip. */

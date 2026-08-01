@@ -65,14 +65,21 @@ export async function subscribe(creds: { token?: string; orgCode?: string }): Pr
   await savePushSubscription(sub.toJSON(), creds);
 }
 
-/** Remove this device's subscription locally and on the backend. */
-export async function unsubscribe(): Promise<void> {
+/**
+ * Remove this device's subscription locally and on the backend.
+ *
+ * Takes the org credentials rather than reading them itself: this is called
+ * from sign-out, and it awaits the service worker before it does anything, by
+ * which point the session has already been cleared. The caller captures them
+ * synchronously and hands them over.
+ */
+export async function unsubscribe(creds: { token?: string; orgCode?: string } = {}): Promise<void> {
   if (!pushSupported()) return;
   try {
     const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.getSubscription();
     if (sub) {
-      await deletePushSubscription(sub.endpoint);
+      await deletePushSubscription(sub.endpoint, creds);
       await sub.unsubscribe();
     }
   } catch {

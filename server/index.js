@@ -203,9 +203,21 @@ const server = http.createServer(async (req, res) => {
       await db.createPushSubscription({ orgId, endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth });
       return sendJson(res, 201, { ok: true });
     }
+    // Unsubscribing requires the same org credentials subscribing did.
+    //
+    // It used to accept a bare endpoint from anyone. Possession of an endpoint
+    // string was therefore enough to switch off a specific device's emergency
+    // notifications — silently, and until its owner next opened the app. An
+    // endpoint is long and random, but "hard to guess" is not authorization,
+    // and these strings reach logs, crash reports and shared devices.
+    //
+    // Always answers 200 whether or not a row matched, so this cannot be used
+    // to probe which endpoints belong to which organization.
     if (path === '/api/push/unsubscribe' && req.method === 'POST') {
       const body = await readJson(req);
-      if (body.endpoint) await db.deletePushSubscription(body.endpoint);
+      const orgId = await orgIdFromRequest(req, body);
+      if (!orgId) return sendJson(res, 401, { error: 'org credentials required' });
+      if (body.endpoint) await db.deletePushSubscription(String(body.endpoint), orgId);
       return sendJson(res, 200, { ok: true });
     }
 
@@ -236,9 +248,12 @@ const server = http.createServer(async (req, res) => {
       });
       return sendJson(res, 201, { ok: true, delivery: fcm.enabled() ? 'active' : 'pending-credentials' });
     }
+    // Same reasoning as /api/push/unsubscribe above.
     if (path === '/api/push/device/unregister' && req.method === 'POST') {
       const body = await readJson(req);
-      if (body.token) await db.deleteDeviceToken(String(body.token));
+      const orgId = await orgIdFromRequest(req, body);
+      if (!orgId) return sendJson(res, 401, { error: 'org credentials required' });
+      if (body.token) await db.deleteDeviceToken(String(body.token), orgId);
       return sendJson(res, 200, { ok: true });
     }
 
@@ -450,6 +465,7 @@ const server = http.createServer(async (req, res) => {
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
         return sendJson(res, 400, { error: 'lat and lng are required' });
       }
+      if (!allowPlaces(req)) return sendJson(res, 429, { error: 'too many lookups — please wait a moment' });
       return sendJson(res, 200, { places: await places.nearby(kind, lat, lng) });
     }
 
@@ -599,6 +615,7 @@ const server = http.createServer(async (req, res) => {
     // gateway before it provisions anything.
     if (path === '/api/payments/mobile-money/webhook' && req.method === 'POST') {
       if (!db.enabled()) return sendJson(res, 200, { ok: true, ignored: 'no database' });
+      if (!allowWebhook(req)) return sendJson(res, 429, { error: 'slow down' });
       const body = await readJson(req);
       try {
         const out = await payments.handleClickPesaWebhook(body);
@@ -632,6 +649,7 @@ const server = http.createServer(async (req, res) => {
     // stops matching.
     if (path === '/api/payments/card/webhook' && req.method === 'POST') {
       if (!db.enabled()) return sendJson(res, 200, { ok: true, ignored: 'no database' });
+      if (!allowWebhook(req)) return sendJson(res, 429, { error: 'slow down' });
       const raw = await readText(req);
       try {
         const out = await payments.handleStripeWebhook(raw, req.headers['stripe-signature']);
@@ -864,25 +882,54 @@ async function fileStaleReplay(ws, alert, ageMs) {
   if (ws.readyState === 1) ws.send(JSON.stringify(alert));
 }
 
-// Rate limit for the one endpoint anyone on the internet can POST to. In memory
-// and per-IP: enough to stop a bored passer-by flooding a supervisor's queue,
-// and it costs nothing when idle.
-const REPORT_WINDOW_MS = 10 * 60 * 1000;
-const REPORT_MAX = 5;
-const reportHits = new Map(); // ip → timestamps
-
-function allowReport(req) {
-  const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
-  const now = Date.now();
-  const recent = (reportHits.get(ip) || []).filter((t) => now - t < REPORT_WINDOW_MS);
-  if (recent.length >= REPORT_MAX) { reportHits.set(ip, recent); return false; }
-  recent.push(now);
-  reportHits.set(ip, recent);
-  if (reportHits.size > 5000) { // bound the map; stale entries can only be old
-    for (const [k, v] of reportHits) if (v.every((t) => now - t >= REPORT_WINDOW_MS)) reportHits.delete(k);
-  }
-  return true;
+// Rate limiting for the endpoints anyone on the internet can reach. In memory
+// and per-IP: enough to stop a bored passer-by, and it costs nothing when idle.
+//
+// One bucket per limiter so a burst of one kind of request cannot exhaust the
+// allowance for another — a flood of place lookups must not stop somebody
+// filing a genuine report.
+function rateLimiter({ windowMs, max, name }) {
+  const hits = new Map(); // ip → timestamps
+  return function allow(req) {
+    const ip = clientIp(req);
+    const now = Date.now();
+    const recent = (hits.get(ip) || []).filter((t) => now - t < windowMs);
+    if (recent.length >= max) {
+      hits.set(ip, recent);
+      console.warn(`[rate-limit] ${name}: ${ip} blocked (${recent.length}/${max} in ${windowMs / 1000}s)`);
+      return false;
+    }
+    recent.push(now);
+    hits.set(ip, recent);
+    if (hits.size > 5000) { // bound the map; stale entries can only be old
+      for (const [k, v] of hits) if (v.every((t) => now - t >= windowMs)) hits.delete(k);
+    }
+    return true;
+  };
 }
+
+// Behind Render's proxy the socket address is the proxy, so prefer the
+// forwarded client address. Spoofable in general, but the proxy overwrites it,
+// and the fallback is still correct for a direct connection.
+function clientIp(req) {
+  return (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
+}
+
+const allowReport = rateLimiter({ windowMs: 10 * 60 * 1000, max: 5, name: 'public-report' });
+
+// /api/emergency/nearby forwards to OpenStreetMap's public Overpass service,
+// unauthenticated and free. Without a limit this server is an open proxy to it:
+// anyone could drive arbitrary query volume through us, and Overpass blocks by
+// IP — so the punishment would land on this deployment and take safe-route
+// discovery down for every real user. Generous enough for a device checking a
+// few categories while evacuating.
+const allowPlaces = rateLimiter({ windowMs: 60 * 1000, max: 30, name: 'places' });
+
+// Payment callbacks are unauthenticated by necessity. Each one costs a database
+// lookup and possibly a call out to the gateway, so it is worth a ceiling —
+// set high, because a real gateway retrying in earnest must never be turned
+// away from telling us a customer has paid.
+const allowWebhook = rateLimiter({ windowMs: 60 * 1000, max: 240, name: 'payment-webhook' });
 
 // ---------------------------------------------------------------------------
 // WebSocket relay (org-scoped rooms)

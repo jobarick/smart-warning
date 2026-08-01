@@ -269,20 +269,33 @@ export async function registerDeviceToken(
   return res.json();
 }
 
-export async function unregisterDeviceToken(token: string): Promise<void> {
+/**
+ * Both unregister calls carry the org credentials, because the backend now
+ * requires them: holding a token or endpoint is not by itself permission to
+ * switch off a device's emergency notifications.
+ *
+ * Capture the credentials before clearing the session — see signOut in App.
+ */
+export async function unregisterDeviceToken(
+  token: string,
+  creds: { token?: string; orgCode?: string } = {},
+): Promise<void> {
   await fetch(`${API_BASE}/api/push/device/unregister`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token }),
+    headers: { 'Content-Type': 'application/json', ...authHeaders(creds.token) },
+    body: JSON.stringify({ token, orgCode: creds.orgCode }),
   }).catch(() => {});
 }
 
-export async function deletePushSubscription(endpoint: string): Promise<void> {
+export async function deletePushSubscription(
+  endpoint: string,
+  creds: { token?: string; orgCode?: string } = {},
+): Promise<void> {
   await fetch(`${API_BASE}/api/push/unsubscribe`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ endpoint }),
-  });
+    headers: { 'Content-Type': 'application/json', ...authHeaders(creds.token) },
+    body: JSON.stringify({ endpoint, orgCode: creds.orgCode }),
+  }).catch(() => {});
 }
 
 // --- Organization profile ---

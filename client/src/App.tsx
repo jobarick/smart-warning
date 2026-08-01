@@ -195,12 +195,18 @@ export default function App() {
   }, []);
 
   const signOut = useCallback(() => {
-    void unsubscribePush(); // stop this device receiving the old org's alerts
-    void unregisterFromPush(); // and the same for the Android app's FCM token
+    // Capture the credentials NOW. Both unregister calls are asynchronous and
+    // await the service worker before they touch the network, so by the time
+    // they build their request the session below is already gone — and the
+    // backend requires org credentials to unregister a device, precisely so
+    // that holding a push token is not enough to silence someone's alerts.
+    const creds = joinCredentials(session) ?? {};
+    void unsubscribePush(creds); // stop this device receiving the old org's alerts
+    void unregisterFromPush(creds); // and the same for the Android app's FCM token
     clearSession();
     setSession(null);
     setView('worker');
-  }, []);
+  }, [session]);
 
   // Keep the device identity in sync with the active session.
   useEffect(() => {
