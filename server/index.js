@@ -580,6 +580,44 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
+    // --- Account deletion ----------------------------------------------------
+    //
+    // Required by Google Play for any app offering account creation, and the
+    // right thing regardless. Irreversible, so it is guarded three ways: a
+    // supervisor's bearer token, an explicit confirmation string that must
+    // match the organization's own name, and a response that states exactly
+    // what was destroyed rather than a bare "ok".
+    if (path === '/api/org' && req.method === 'DELETE') {
+      const ctx = await guardOrg(req, res);
+      if (ctx === false) return;
+      if (!ctx) return sendJson(res, 501, { error: 'account deletion requires a database' });
+
+      const body = await readJson(req);
+      const org = await db.getOrgById(ctx.orgId);
+      if (!org) return sendJson(res, 404, { error: 'no such organization' });
+
+      // Typing the name is the difference between deciding and mis-tapping.
+      if (String(body.confirm || '').trim() !== org.name) {
+        return sendJson(res, 400, {
+          error: 'to delete this organization, type its name exactly to confirm',
+          expected: org.name,
+        });
+      }
+
+      const removed = await db.deleteOrg(ctx.orgId);
+      if (!removed) return sendJson(res, 404, { error: 'no such organization' });
+
+      // Turn out anyone still connected: their org no longer exists, and the
+      // relay must not keep a room alive for a deleted account.
+      for (const client of wss.clients) {
+        if (client.orgId === ctx.orgId) {
+          try { client.close(4003, 'organization deleted'); } catch { /* already gone */ }
+        }
+      }
+      console.warn(`[!] organization ${ctx.orgId} ("${org.name}") deleted by ${ctx.user?.email || 'a supervisor'}: ${JSON.stringify(removed)}`);
+      return sendJson(res, 200, { ok: true, deleted: removed });
+    }
+
     // --- Terms & Conditions acceptance ---------------------------------------
     //
     // Best-effort by design. The client has already let the person through on

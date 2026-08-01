@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { CONSENT_POINTS, TERMS_EFFECTIVE_DATE, TERMS_SECTIONS, TERMS_VERSION } from '../lib/terms';
+import { CONSENT_POINTS, PRIVACY_SECTIONS, TERMS_EFFECTIVE_DATE, TERMS_SECTIONS, TERMS_VERSION } from '../lib/terms';
+import { LegalText } from './LegalText';
 import { Logo } from './Logo';
 
 interface Props {
@@ -21,6 +22,10 @@ interface Props {
  */
 export function ConsentGate({ onAccept }: Props) {
   const [ticked, setTicked] = useState<Record<string, boolean>>({});
+  // Both documents are here because the first confirmation says the person
+  // agrees to both. A checkbox referring to a document the screen does not show
+  // is not consent to it.
+  const [doc, setDoc] = useState<'terms' | 'privacy'>('terms');
 
   const allTicked = useMemo(
     () => CONSENT_POINTS.every((p) => ticked[p.id]),
@@ -50,22 +55,25 @@ export function ConsentGate({ onAccept }: Props) {
           This app assists with emergency communication — it does not replace them.
         </p>
 
+        <div className="consent-tabs" role="tablist">
+          <button
+            type="button" role="tab" aria-selected={doc === 'terms'}
+            className={doc === 'terms' ? 'on' : ''}
+            onClick={() => setDoc('terms')}
+          >
+            Terms &amp; Conditions
+          </button>
+          <button
+            type="button" role="tab" aria-selected={doc === 'privacy'}
+            className={doc === 'privacy' ? 'on' : ''}
+            onClick={() => setDoc('privacy')}
+          >
+            Privacy Policy
+          </button>
+        </div>
+
         <div className="consent-body" tabIndex={0}>
-          {TERMS_SECTIONS.map((section, i) => (
-            <section key={i}>
-              {section.heading && <h2>{section.heading}</h2>}
-              {section.body.map((para, j) => (
-                <p key={j}>{para}</p>
-              ))}
-              {section.bullets && (
-                <ul>
-                  {section.bullets.map((b, k) => (
-                    <li key={k}>{b}</li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          ))}
+          <LegalText sections={doc === 'terms' ? TERMS_SECTIONS : PRIVACY_SECTIONS} />
         </div>
 
         <ul className="consent-points">

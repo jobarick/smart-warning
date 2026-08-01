@@ -1242,6 +1242,43 @@ async function listExpiredSubscriptions(limit = 100) {
   return rows.map(publicSubscription);
 }
 
+// --- Account deletion ------------------------------------------------------
+
+/**
+ * Delete an organization and everything belonging to it.
+ *
+ * Google Play requires an app that offers account creation to offer account
+ * deletion, and a person who asks to be forgotten should actually be. One
+ * statement is enough because every table carrying org_id now has a foreign
+ * key with ON DELETE CASCADE behind it — users, push subscriptions, reports,
+ * destinations, subscriptions, consents, incidents, location_pings, feedback,
+ * outbound_mail and device_tokens all go with it.
+ *
+ * transactions are the deliberate exception: their org_id is ON DELETE SET
+ * NULL, so the financial record survives the account it belonged to, which
+ * accounting rules require and which holds no location or identity data.
+ *
+ * Returns what was removed, so the caller can tell the user plainly rather
+ * than saying "done".
+ */
+async function deleteOrg(orgId) {
+  if (!pool || !orgId) return null;
+
+  // Counted before the delete, because afterwards there is nothing to count.
+  const { rows: counts } = await pool.query(
+    `SELECT
+       (SELECT COUNT(*) FROM users          WHERE org_id = $1)::int AS users,
+       (SELECT COUNT(*) FROM incidents      WHERE org_id = $1)::int AS incidents,
+       (SELECT COUNT(*) FROM location_pings WHERE org_id = $1)::int AS location_points,
+       (SELECT COUNT(*) FROM reports        WHERE org_id = $1)::int AS reports`,
+    [orgId],
+  );
+
+  const { rowCount } = await pool.query(`DELETE FROM organizations WHERE id = $1`, [orgId]);
+  if (rowCount === 0) return null;
+  return counts[0];
+}
+
 // --- Terms & Conditions acceptance -----------------------------------------
 
 async function recordConsent({ orgId = null, userId = null, subject = null, version, points = [] }) {
@@ -1330,6 +1367,7 @@ module.exports = {
   listExpiredSubscriptions,
   recordConsent,
   listConsents,
+  deleteOrg,
   countUsers,
   setActiveSeats,
   createUser,

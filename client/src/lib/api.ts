@@ -346,6 +346,25 @@ function credQuery(creds: OrgCreds, extra: Record<string, string> = {}): string 
 }
 
 /**
+ * Delete an organization and everything belonging to it.
+ *
+ * `confirm` must equal the organization's own name; the backend rejects
+ * anything else. Irreversible.
+ */
+export async function deleteOrganization(
+  confirm: string,
+  token: string,
+): Promise<{ deleted: { users: number; incidents: number; location_points: number; reports: number } }> {
+  const res = await fetch(`${API_BASE}/api/org`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify({ confirm }),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not delete the organization'));
+  return res.json();
+}
+
+/**
  * Record that this person accepted the terms.
  *
  * The durable record — a localStorage flag proves nothing and is under the

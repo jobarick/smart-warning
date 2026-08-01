@@ -33,6 +33,7 @@ import { getProfile, alertLabel } from './lib/profiles';
 import { useIncidentHistory } from './hooks/useIncidentHistory';
 import { AuthGate } from './components/AuthGate';
 import { ConsentGate } from './components/ConsentGate';
+import { AboutPanel } from './components/AboutPanel';
 import { hasAcceptedCurrentTerms, saveConsent } from './lib/consent';
 import { TERMS_VERSION } from './lib/terms';
 import { PushToggle } from './components/PushToggle';
@@ -96,6 +97,7 @@ export default function App() {
   const [standing, setStanding] = useState<{ level: SystemStatusLevel; note: string }>({ level: 'clear', note: '' });
   // Read once at mount: this device has already accepted the current terms.
   const [consented, setConsented] = useState(() => hasAcceptedCurrentTerms());
+  const [showAbout, setShowAbout] = useState(false);
   const [responder, setResponder] = useState<RespondingMessage | null>(null);
   const [lastAlert, setLastAlert] = useState<number | null>(null);
   const [lastSync, setLastSync] = useState<number | null>(null);
@@ -700,6 +702,15 @@ export default function App() {
         <main className="worker">
           <ContactSupport onBack={() => setShowSupport(false)} />
         </main>
+      ) : showAbout ? (
+        <main className="worker">
+          <AboutPanel
+            token={token}
+            orgName={org?.name}
+            onBack={() => setShowAbout(false)}
+            onDeleted={() => { setShowAbout(false); signOut(); }}
+          />
+        </main>
       ) : showBilling && token ? (
         <main className="worker">
           <Suspense fallback={<PanelFallback label="plans" />}>
@@ -802,6 +813,9 @@ export default function App() {
           <div className="worker-tools">
             <button className="btn settings-link" onClick={() => setShowMore((v) => !v)}>
               {showMore ? 'Hide map & history' : 'Map & history'}
+            </button>
+            <button className="btn settings-link" onClick={() => setShowAbout(true)}>
+              About &amp; legal
             </button>
             <button className="btn settings-link" onClick={() => setShowSettings(true)}>
               <Icon name="settings" /> Settings

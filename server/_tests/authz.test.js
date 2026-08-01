@@ -28,6 +28,9 @@ const store = {
   tokens: new Map(),        // token → orgId
 };
 
+/** Org ids passed to deleteOrg, so a test can assert nothing was destroyed. */
+const deleted = [];
+
 let app;
 
 function stub(relPath, exports) {
@@ -47,7 +50,11 @@ before(() => {
       if (code === CODE_B) return { id: ORG_B, name: 'Site B' };
       return null;
     },
-    getOrgById: async (id) => ({ id, name: 'Site' }),
+    getOrgById: async (id) => ({ id, name: id === ORG_A ? 'Site A' : 'Site B' }),
+    deleteOrg: async (id) => {
+      deleted.push(id);
+      return { users: 1, incidents: 2, location_points: 7, reports: 0 };
+    },
     // The scoped deletes under test: a row is only removed when the caller's
     // org matches, mirroring the real WHERE ... AND org_id = $2.
     deletePushSubscription: async (endpoint, orgId = null) => {
@@ -78,7 +85,10 @@ before(() => {
   });
 
   stub('auth.js', {
-    userFromToken: async () => null,
+    // One valid supervisor, for the account-deletion tests below.
+    userFromToken: async (token) => (token === 'sup-token'
+      ? { orgId: ORG_A, user: { id: 'u1', name: 'Sup', email: 'sup@a.test' }, org: { id: ORG_A, name: 'Site A' } }
+      : null),
     httpError: (status, message) => Object.assign(new Error(message), { status }),
     publicUser: (u) => u,
   });
@@ -189,6 +199,64 @@ test('an invalid org code is not accepted as credentials', async () => {
 
   assert.strictEqual(res.status, 401);
   assert.ok(store.tokens.has('fcm-token-4'));
+});
+
+// --- Account deletion ------------------------------------------------------
+//
+// Irreversible and required by Google Play, so the guards around it are worth
+// as much test attention as the deletion itself.
+
+test('deleting an organization requires authentication', async () => {
+  deleted.length = 0;
+  const res = await fetch(`${BASE}/api/org`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ confirm: 'Site A' }),
+  });
+  assert.strictEqual(res.status, 401);
+  assert.deepStrictEqual(deleted, [], 'nothing may be deleted without a token');
+});
+
+test('deleting an organization requires the name, case-sensitively', async () => {
+  deleted.length = 0;
+  // Case and content must match. Surrounding whitespace is trimmed on purpose:
+  // a mobile keyboard appending a space should not stand between somebody and
+  // deleting their own data, and the intent is unambiguous either way. Getting
+  // the letters wrong is a different matter and is refused.
+  for (const confirm of ['', 'site a', 'SITE A', 'Site  A', 'Site B', 'yes', undefined]) {
+    const res = await fetch(`${BASE}/api/org`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer sup-token' },
+      body: JSON.stringify({ confirm }),
+    });
+    assert.strictEqual(res.status, 400, `accepted confirmation ${JSON.stringify(confirm)}`);
+  }
+  assert.deepStrictEqual(deleted, [], 'a near-miss confirmation must delete nothing');
+});
+
+test('surrounding whitespace on the confirmation is forgiven', async () => {
+  deleted.length = 0;
+  const res = await fetch(`${BASE}/api/org`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer sup-token' },
+    body: JSON.stringify({ confirm: '  Site A  ' }),
+  });
+  assert.strictEqual(res.status, 200);
+  assert.deepStrictEqual(deleted, [ORG_A]);
+});
+
+test('the exact name deletes the organization and reports what went', async () => {
+  deleted.length = 0;
+  const res = await fetch(`${BASE}/api/org`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer sup-token' },
+    body: JSON.stringify({ confirm: 'Site A' }),
+  });
+  assert.strictEqual(res.status, 200);
+  const body = await res.json();
+  assert.deepStrictEqual(deleted, [ORG_A]);
+  // Told plainly what was destroyed, rather than a bare ok.
+  assert.ok(body.deleted && typeof body.deleted.location_points === 'number');
 });
 
 // --- Rate limiting ---------------------------------------------------------
