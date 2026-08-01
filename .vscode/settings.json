@@ -33,5 +33,6 @@
   // .env.example files are env files, not plain text.
   "files.associations": {
     "*.env.example": "dotenv"
-  }
+  },
+  "java.configuration.updateBuildConfiguration": "interactive"
 }
