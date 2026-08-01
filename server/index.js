@@ -940,8 +940,37 @@ function rosterList(orgId) {
   return workers;
 }
 
+// The roster goes to supervisors only.
+//
+// Two reasons, found together while stress-testing the relay:
+//
+//  1. Scale. The roster carries one record per connected device, and it was
+//     sent to every connected device every three seconds — O(n²) bytes on a
+//     fixed timer. At 250 devices that is unnoticeable; at 600 it saturated
+//     the send buffers, alert fan-out went from 18 ms to 55 SECONDS, 40% of
+//     alerts were never delivered at all, and the dead-connection sweep began
+//     terminating clients that were merely backed up. Restricting it makes the
+//     cost O(n × supervisors), and supervisors are a handful.
+//
+//  2. Privacy. The payload is every colleague's live GPS, battery and status.
+//     Only the command centre renders it — no worker screen reads the roster —
+//     so every worker was receiving continuous location data about everyone
+//     else on site for no purpose. That is not something to ship in an app
+//     that declares precise-location collection on a store listing.
+//
+// Device COUNT still reaches everyone: that travels as the separate `presence`
+// message, which is a single integer, so the worker header is unaffected.
+//
+// In legacy LAN mode (no database) there are no roles at all, and the whole
+// point of that mode is zero configuration for a small site, so behaviour
+// there is unchanged — n is small and O(n²) costs nothing.
 function broadcastRoster(orgId) {
-  broadcast(orgId, { kind: 'roster', workers: rosterList(orgId) });
+  const payload = JSON.stringify({ kind: 'roster', workers: rosterList(orgId) });
+  for (const client of wss.clients) {
+    if (client.readyState !== 1 || !client.authed || client.orgId !== orgId) continue;
+    if (ORGS && !client.supervisor) continue;
+    client.send(payload);
+  }
 }
 
 // Resolve the org a joining client belongs to, from a supervisor JWT or a
