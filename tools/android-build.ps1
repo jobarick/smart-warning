@@ -14,6 +14,18 @@
 # Usage:
 #   pwsh tools/android-build.ps1                       # debug APK
 #   pwsh tools/android-build.ps1 -Task bundleRelease -VersionCode 5 -VersionName 1.0.5
+#
+# ⚠️ Do NOT pipe this (or gradlew, npm, node, git) through `2>&1` in Windows
+# PowerShell 5.1. Redirecting a native command's stderr into the pipeline wraps
+# each line in an ErrorRecord and sets $? to false, so the caller sees a
+# FAILURE and a non-zero exit even when the build succeeded — which has already
+# sent two investigations chasing a green build that reported red. Capture to a
+# file instead and read it back:
+#
+#   pwsh tools/android-build.ps1 -Task assembleDebug > out.txt 2> err.txt
+#   if ($LASTEXITCODE -ne 0) { Get-Content err.txt }
+#
+# $LASTEXITCODE is the truth here; $? is not.
 [CmdletBinding()]
 param(
     [string]$Task = 'assembleDebug',
