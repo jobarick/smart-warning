@@ -113,6 +113,36 @@ export interface ReportsMessage {
   pending: number;
 }
 
+/**
+ * A supervisor is on their way, and how far off they are.
+ *
+ * This is the answer to the question a frightened person actually has, and
+ * which the product could not previously answer: is anyone coming, and when.
+ * Sent by a supervisor's dashboard once it has a route to the incident, and
+ * relayed to everyone in the org so the person who raised the alarm sees it on
+ * their own screen.
+ *
+ * Supervisor-only, like `status` — a worker must not be able to fake a
+ * response and stop someone seeking help elsewhere. Held in memory per org
+ * rather than stored: it describes right now, and a stale "help is coming"
+ * surviving a restart would be worse than none at all.
+ */
+export interface RespondingMessage {
+  kind: 'responding';
+  /** Which incident this response is for; a new alert invalidates it. */
+  incidentId: string;
+  /** Display name of the responder. */
+  supervisor: string;
+  /** Seconds away, from the routing engine. Null when not yet known. */
+  etaS: number | null;
+  distanceM: number | null;
+  /** False when the ETA came from a straight line rather than a road route. */
+  routed: boolean;
+  timestamp: number;
+  /** Set when the supervisor stands down rather than arriving. */
+  cancelled?: boolean;
+}
+
 export type WireMessage =
   | AlertMessage
   | AllClearMessage
@@ -122,7 +152,8 @@ export type WireMessage =
   | HelloMessage
   | HeartbeatMessage
   | RosterMessage
-  | TrackMessage;
+  | TrackMessage
+  | RespondingMessage;
 
 export interface Settings {
   deviceName: string;

@@ -816,6 +816,9 @@ async function raiseAlert(orgId, alert, worker = null, origin = 'unknown') {
   // Open the tracking window. Until the all-clear, every position a device
   // reports is written to the incident's movement history.
   activeIncident.set(orgId ?? null, alert.id);
+  // A new emergency invalidates any response to the last one. Carrying it over
+  // would tell someone help was already on its way to them.
+  clearResponding(orgId);
 
   // Broadcast BEFORE touching Postgres. The alarm reaching other devices must
   // never queue behind a database round trip; storage is bookkeeping, and a
@@ -1123,6 +1126,27 @@ function setStatus(orgId, msg) {
 function sendStatus(ws) {
   const current = statusFor(ws.orgId);
   if (current && ws.readyState === 1) ws.send(JSON.stringify(current));
+
+  // Same treatment for a supervisor already en route: someone whose phone
+  // reconnects mid-incident must not lose the one piece of news that matters.
+  const responder = orgResponding.get(ws.orgId ?? null);
+  if (responder && ws.readyState === 1) ws.send(JSON.stringify(responder));
+}
+
+// Who is responding to the live incident, per org. In memory for the same
+// reason as the standing status: it describes right now, and a stale "help is
+// on the way" surviving a restart would be worse than saying nothing.
+const orgResponding = new Map(); // orgId (or null) → RespondingMessage
+
+function setResponding(orgId, msg) {
+  if (msg.cancelled) orgResponding.delete(orgId ?? null);
+  else orgResponding.set(orgId ?? null, msg);
+}
+
+// A response belongs to one emergency. Clearing on both ends of an incident
+// means it can never be carried into the next one.
+function clearResponding(orgId) {
+  orgResponding.delete(orgId ?? null);
 }
 
 let nextId = 1;
@@ -1213,6 +1237,7 @@ wss.on('connection', (ws, req) => {
         console.log(`[.] all-clear from #${ws.connId} "${msg.sender}" (org ${ws.orgId ?? 'global'})`);
         // Close the tracking window: position recording stops here.
         activeIncident.delete(ws.orgId ?? null);
+        clearResponding(ws.orgId);
         db.resolveActive(msg, ws.orgId).catch((e) => console.error('[db] resolveActive:', e.message));
         const standDown = {
           title: '✓ All clear',
@@ -1248,6 +1273,35 @@ wss.on('connection', (ws, req) => {
       };
       setStatus(ws.orgId, out);
       console.log(`[~] status ${out.status} from #${ws.connId} "${out.sender}" (org ${ws.orgId ?? 'global'})${out.note ? `: ${out.note}` : ''}`);
+      broadcast(ws.orgId, out);
+      return;
+    }
+
+    // "A supervisor is on the way, and this far off."
+    //
+    // Supervisors only, for the same reason as `status`: a worker holding the
+    // team code must not be able to tell a frightened colleague that help is
+    // coming when it is not — that could stop them seeking it elsewhere.
+    //
+    // Tied to an incident id so it cannot outlive the emergency it answers.
+    if (msg.kind === 'responding') {
+      if (ORGS && !ws.supervisor) return;
+      const incidentId = typeof msg.incidentId === 'string' ? msg.incidentId.slice(0, 64) : '';
+      if (!incidentId) return;
+      // Ignore a response aimed at anything other than the live incident.
+      if (activeIncident.get(ws.orgId ?? null) !== incidentId) return;
+
+      const out = {
+        kind: 'responding',
+        incidentId,
+        supervisor: typeof msg.supervisor === 'string' ? msg.supervisor.slice(0, 80) : 'A supervisor',
+        etaS: numOrNull(msg.etaS),
+        distanceM: numOrNull(msg.distanceM),
+        routed: msg.routed === true,
+        timestamp: Date.now(),
+        cancelled: msg.cancelled === true,
+      };
+      setResponding(ws.orgId, out);
       broadcast(ws.orgId, out);
       return;
     }

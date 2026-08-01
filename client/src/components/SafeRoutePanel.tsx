@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { AlertType } from '../types';
 import { fetchSafeRoute, type OrgCreds, type SafePlace, type SafeRoute } from '../lib/api';
 import { formatDistance } from '../lib/geo';
+import { useNavigationRoute, formatEta } from '../hooks/useNavigationRoute';
 import { Icon } from './Icon';
 
 interface Props {
@@ -38,6 +39,17 @@ export function SafeRoutePanel({ alertType, lat, lng, creds, operatorId }: Props
   const [route, setRoute] = useState<SafeRoute | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const dest = route?.destination ?? null;
+
+  // A walked road route to wherever the engine chose, refreshed as the person
+  // moves. Falls back to the straight-line estimate when routing is
+  // unavailable, so the panel always says something.
+  const { route: walkRoute } = useNavigationRoute(
+    lat != null && lng != null ? { lat, lng } : null,
+    dest ? { lat: dest.lat, lng: dest.lng } : null,
+    creds,
+    { profile: 'walking', active: Boolean(alertType && dest && lat != null && lng != null) },
+  );
 
   useEffect(() => {
     // Only ask when there is actually an emergency to route for.
@@ -65,8 +77,6 @@ export function SafeRoutePanel({ alertType, lat, lng, creds, operatorId }: Props
   // is correct; inventing somewhere to walk to would be worse.
   if (route && route.source === 'none' && !route.label) return null;
 
-  const dest = route?.destination ?? null;
-
   return (
     <section className="route">
       <header className="route-head">
@@ -92,7 +102,14 @@ export function SafeRoutePanel({ alertType, lat, lng, creds, operatorId }: Props
           <div className="route-dest">
             <b className="route-name">{dest.name}</b>
             {dest.address && <span className="route-addr">{dest.address}</span>}
-            <span className="route-travel">{travelLine(dest) || 'Distance unavailable'}</span>
+            {/* Prefer the walked road distance and time over the straight-line
+                estimate: "600 m, 8 min on foot" is a different instruction from
+                "400 m away" when a wall or a motorway sits between the two. */}
+            <span className="route-travel">
+              {walkRoute
+                ? `${formatDistance(walkRoute.distanceM)} · ${formatEta(walkRoute.durationS)} on foot${walkRoute.degraded ? ' (estimated)' : ''}`
+                : travelLine(dest) || 'Distance unavailable'}
+            </span>
             {dest.throughDanger && (
               <span className="route-warn">
                 <Icon name="hazard" /> This route passes near a reported incident — take care.

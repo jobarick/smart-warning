@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { AlertMessage, Settings } from '../types';
+import type { AlertMessage, RespondingMessage, Settings } from '../types';
 import { ALERT_META, SEVERITY_META, severityWants } from '../types';
 import { effectiveFlashRate, SAFE_FLASH_RATE } from '../lib/settings';
 import { Icon } from './Icon';
@@ -14,9 +14,11 @@ interface Props {
   onConfirmSafe: () => void;
   onAcknowledge: () => void;
   onAllClear: () => void;
+  /** A supervisor on their way to this incident, if one has said so. */
+  responder?: RespondingMessage | null;
 }
 
-export function AlertOverlay({ alert, acknowledged, settings, label, safeConfirmed, onConfirmSafe, onAcknowledge, onAllClear }: Props) {
+export function AlertOverlay({ alert, acknowledged, settings, label, safeConfirmed, onConfirmSafe, onAcknowledge, onAllClear, responder }: Props) {
   // Ignore clicks for a moment after the overlay appears so a double-tap on a
   // trigger button can't accidentally acknowledge or all-clear the alert.
   const [armed, setArmed] = useState(false);
@@ -110,6 +112,23 @@ export function AlertOverlay({ alert, acknowledged, settings, label, safeConfirm
           <span className="safe-note">
             <Icon name="check-circle" /> Reported safe — your supervisor can see this
           </span>
+        )}
+
+        {/* The question the person having the emergency is actually asking.
+            Shown only when a supervisor has said they are coming, and phrased
+            without false precision: an ETA from a straight line is announced
+            as approaching, not as a promise of arrival at a minute. */}
+        {responder && (
+          <div className="responder-note" role="status" aria-live="polite">
+            <Icon name="check-circle" />
+            <span>
+              <strong>{responder.supervisor}</strong> is on the way
+              {responder.etaS != null && (
+                <> — about <strong>{Math.max(1, Math.round(responder.etaS / 60))} min</strong> away</>
+              )}
+              {responder.etaS != null && !responder.routed && ' (estimated)'}
+            </span>
+          </div>
         )}
         <button
           className={`btn btn-clear ${confirmClear ? 'btn-clear-confirm' : ''}`}

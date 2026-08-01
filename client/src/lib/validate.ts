@@ -117,6 +117,24 @@ export function parseWireMessage(raw: unknown): WireMessage | null {
       const workers = m.workers.map(parseWorker).filter((w): w is WorkerInfo => w !== null);
       return { kind: 'roster', workers };
     }
+    case 'responding': {
+      // Must name the incident it answers, or it could attach itself to a
+      // later emergency and tell someone help was coming when it is not.
+      const incidentId = str(m.incidentId);
+      if (!incidentId) return null;
+      return {
+        kind: 'responding',
+        incidentId: incidentId.slice(0, 64),
+        supervisor: str(m.supervisor, 'A supervisor').slice(0, 80),
+        // Nulls are meaningful here: "on the way, distance unknown" is a real
+        // state, and better than inventing a number.
+        etaS: numOrNull(m.etaS),
+        distanceM: numOrNull(m.distanceM),
+        routed: m.routed === true,
+        timestamp: num(m.timestamp, Date.now()),
+        cancelled: m.cancelled === true,
+      };
+    }
     default:
       return null;
   }

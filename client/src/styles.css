@@ -2197,3 +2197,22 @@ body {
   text-transform: uppercase;
   text-align: center;
 }
+
+/* "Someone is coming." Shown inside the alert overlay, deliberately calm
+   against the flashing border — this is the one piece of good news on that
+   screen and it should read as reassurance, not another warning. */
+.responder-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--cmd-safe);
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.35);
+  font-size: 14px;
+  line-height: 1.4;
+  text-align: left;
+}
+.responder-note strong { font-weight: 600; }
+.responder-note svg { flex: 0 0 auto; color: var(--cmd-safe); }

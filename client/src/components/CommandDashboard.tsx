@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AlarmState } from '../hooks/useAlarmState';
 import type { SocketStatus } from '../hooks/useAlertSocket';
 import type { AlertType, LogEntry, Severity, SystemStatusLevel, WorkerInfo } from '../types';
@@ -39,6 +39,8 @@ interface Props {
   token?: string;
   /** This supervisor's own live position, when they are sharing it. */
   selfPosition?: { lat: number; lng: number } | null;
+  /** Tell the site this supervisor is en route, and how far off. */
+  onRespond?: (r: { incidentId: string; etaS: number | null; distanceM: number | null; routed: boolean }) => void;
 }
 
 /** Human duration between two ISO timestamps, e.g. "2m 5s". */
@@ -161,7 +163,7 @@ function useMapPoints(
  * about the page scrolls; the three list panels scroll inside themselves, so
  * the state of the site is never below the fold.
  */
-export function CommandDashboard({ roster, alarm, log, history, stats, persistence, historyError, profile, selfName, status, onAcknowledge, onAllClear, standing, onSetStatus, reports, reportsError, onEscalateReport, onDismissReport, token, selfPosition }: Props) {
+export function CommandDashboard({ roster, alarm, log, history, stats, persistence, historyError, profile, selfName, status, onAcknowledge, onAllClear, standing, onSetStatus, reports, reportsError, onEscalateReport, onDismissReport, token, selfPosition, onRespond }: Props) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -199,6 +201,29 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
   );
 
   const { points, unlocated, paths, routePath } = useMapPoints(roster, track, navRoute?.geometry ?? []);
+
+  // Announce the response to the site as soon as there is a route to announce.
+  //
+  // Deliberately automatic rather than a button: a supervisor who has opened
+  // the incident and is being navigated to it *is* responding, and asking them
+  // to also press "I'm coming" is one more thing to forget while moving. The
+  // route itself is already throttled, so this sends a handful of times per
+  // incident rather than continuously.
+  const lastAnnounced = useRef<string>('');
+  useEffect(() => {
+    if (!alert || !navRoute || !onRespond) return;
+    // Only re-announce when the number a person would read actually changes.
+    const minutes = navRoute.durationS == null ? 'x' : Math.max(1, Math.round(navRoute.durationS / 60));
+    const key = `${alert.id}:${minutes}:${navRoute.degraded}`;
+    if (key === lastAnnounced.current) return;
+    lastAnnounced.current = key;
+    onRespond({
+      incidentId: alert.id,
+      etaS: navRoute.durationS,
+      distanceM: navRoute.distanceM,
+      routed: !navRoute.degraded,
+    });
+  }, [alert, navRoute, onRespond]);
 
   // The roll call. Only people who tapped "I am safe" for THIS alert count —
   // a device reporting itself 'safe' is a device that has not fallen over, not

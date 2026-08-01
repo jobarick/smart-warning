@@ -4,6 +4,7 @@ import type {
   AlertType,
   AllClearMessage,
   LogEntry,
+  RespondingMessage,
   Severity,
   SirenTone,
   SystemStatusLevel,
@@ -90,6 +91,7 @@ export default function App() {
   // Standing status set by a supervisor, plus the liveness facts the status bar
   // and footer report. 'emergency' is derived from an active alert, not stored.
   const [standing, setStanding] = useState<{ level: SystemStatusLevel; note: string }>({ level: 'clear', note: '' });
+  const [responder, setResponder] = useState<RespondingMessage | null>(null);
   const [lastAlert, setLastAlert] = useState<number | null>(null);
   const [lastSync, setLastSync] = useState<number | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
@@ -251,6 +253,13 @@ export default function App() {
 
       if (m.kind === 'status') {
         setStanding({ level: m.status, note: m.note });
+        return;
+      }
+
+      // A supervisor is on their way. Kept only while it refers to the alarm
+      // actually ringing, so it can never be shown against a later one.
+      if (m.kind === 'responding') {
+        setResponder(m.cancelled ? null : m);
         return;
       }
 
@@ -460,6 +469,19 @@ export default function App() {
     };
     if (!send(msg)) handleWire(msg);
   }, [send, handleWire, settings.deviceName]);
+
+  // Tell the site this supervisor is on their way.
+  //
+  // Sent over the relay rather than the REST API so it reaches the person's
+  // screen at alarm speed. Deliberately NOT queued in the outbox on failure:
+  // an ETA is only true for a minute or two, and replaying a stale one after a
+  // reconnect would tell somebody help was two minutes away when it is not.
+  const onRespond = useCallback(
+    (r: { incidentId: string; etaS: number | null; distanceM: number | null; routed: boolean }) => {
+      send({ kind: 'responding', ...r, supervisor: settings.deviceName, timestamp: Date.now() });
+    },
+    [send, settings.deviceName],
+  );
 
   // Supervisor sets the standing status. Applied locally too, so a relay that
   // is briefly down doesn't leave the person who pressed it staring at nothing.
@@ -681,6 +703,7 @@ export default function App() {
           onDismissReport={onDismissReport}
           token={token}
           selfPosition={telemetry.lat !== null && telemetry.lng !== null ? { lat: telemetry.lat, lng: telemetry.lng } : null}
+          onRespond={onRespond}
         />
         </Suspense>
       ) : showSettings ? (
@@ -764,6 +787,9 @@ export default function App() {
           onConfirmSafe={confirmSafe}
           onAcknowledge={() => dispatch({ type: 'ACKNOWLEDGE' })}
           onAllClear={allClear}
+          // Matched by incident id at the point of use, so a response to an
+          // earlier emergency can never be shown against this one.
+          responder={responder && responder.incidentId === alarm.alert.id ? responder : null}
         />
       )}
 
