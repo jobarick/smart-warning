@@ -55,6 +55,10 @@ captures/
 # Keystore files
 *.jks
 *.keystore
+# Holds the store and key passwords for the release signing config in
+# app/build.gradle. Committing it would publish the upload key's passwords
+# alongside the repository. See docs/ANDROID_RELEASE.md.
+keystore.properties
 
 # External native build folder generated in Android Studio 2.2 and later
 .externalNativeBuild

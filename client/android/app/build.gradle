@@ -1,5 +1,26 @@
 apply plugin: 'com.android.application'
 
+// Release signing material, kept out of the repository.
+//
+// Read from keystore.properties for a local release build, or from the
+// environment for CI. If neither is present the release build still runs and
+// simply produces an unsigned artifact, so a developer who only wants to check
+// that the release variant compiles is not forced to hold the upload key.
+//
+// Losing this key means never being able to update the Play listing again —
+// see docs/ANDROID_RELEASE.md.
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+def storeFilePath = keystoreProperties['storeFile'] ?: System.getenv('ANDROID_KEYSTORE_FILE')
+def storePassword = keystoreProperties['storePassword'] ?: System.getenv('ANDROID_KEYSTORE_PASSWORD')
+def keyAliasValue = keystoreProperties['keyAlias'] ?: System.getenv('ANDROID_KEY_ALIAS')
+def keyPasswordValue = keystoreProperties['keyPassword'] ?: System.getenv('ANDROID_KEY_PASSWORD')
+def hasSigningConfig = storeFilePath != null && file(storeFilePath).exists()
+
 android {
     namespace = "com.smartwarning.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +28,10 @@ android {
         applicationId "com.smartwarning.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // Play rejects an upload whose versionCode it has already seen, so CI
+        // passes the build number in: -PversionCode=42 -PversionName=1.0.42
+        versionCode project.hasProperty('versionCode') ? project.versionCode.toInteger() : 1
+        versionName project.hasProperty('versionName') ? project.versionName : "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,10 +39,43 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (hasSigningConfig) {
+                storeFile file(storeFilePath)
+                storePassword storePassword
+                keyAlias keyAliasValue
+                keyPassword keyPasswordValue
+            }
+        }
+    }
+
     buildTypes {
         release {
+            // Deliberately left off. R8 strips classes it cannot see being
+            // used, and Capacitor resolves plugins reflectively — a wrong keep
+            // rule produces an app that builds, installs, and then fails to
+            // register push or geolocation at the moment of an emergency.
+            // Turning this on is worth doing, but only together with an
+            // on-device test of the release variant, which cannot be done from
+            // the build alone. The app is ~6 MB; size is not the constraint.
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (hasSigningConfig) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    // Say plainly at build time which artifact came out, so an unsigned bundle
+    // is never mistaken for an uploadable one.
+    applicationVariants.configureEach { variant ->
+        if (variant.buildType.name == 'release') {
+            variant.outputs.configureEach {
+                println hasSigningConfig
+                    ? "[smart-warning] release build will be signed with ${keyAliasValue}"
+                    : "[smart-warning] WARNING: no keystore found — release output will be UNSIGNED and Play will reject it. See docs/ANDROID_RELEASE.md"
+            }
         }
     }
 }
