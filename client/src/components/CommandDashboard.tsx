@@ -8,6 +8,8 @@ import type { Incident, Report, Stats, TrackPoint } from '../lib/api';
 import { PendingReports } from './PendingReports';
 import { useIncidentTrack } from '../hooks/useIncidentTrack';
 import { assess, accountedFor, unaccountedFor, musterPopulation } from '../lib/advisor';
+import { useNavigationRoute, formatEta } from '../hooks/useNavigationRoute';
+import { formatDistance } from '../lib/geo';
 
 interface Props {
   roster: WorkerInfo[];
@@ -35,6 +37,8 @@ interface Props {
   onDismissReport: (id: string) => Promise<void>;
   /** Supervisor bearer token — needed to read the incident movement history. */
   token?: string;
+  /** This supervisor's own live position, when they are sharing it. */
+  selfPosition?: { lat: number; lng: number } | null;
 }
 
 /** Human duration between two ISO timestamps, e.g. "2m 5s". */
@@ -82,7 +86,11 @@ function lastSeen(updatedAt: number, now: number): string {
  * is the whole reason they are computed together: fit them separately and a
  * person's trail would end somewhere other than the person.
  */
-function useMapPoints(roster: WorkerInfo[], track: TrackPoint[]) {
+function useMapPoints(
+  roster: WorkerInfo[],
+  track: TrackPoint[],
+  routeGeometry: [number, number][] = [],
+) {
   return useMemo(() => {
     const W = 760;
     const H = 380;
@@ -90,9 +98,12 @@ function useMapPoints(roster: WorkerInfo[], track: TrackPoint[]) {
     const located = roster.filter((w) => w.lat !== null && w.lng !== null) as (WorkerInfo & { lat: number; lng: number })[];
     const unlocated = roster.filter((w) => w.lat === null || w.lng === null);
 
-    const lats = [...located.map((w) => w.lat), ...track.map((p) => p.lat)];
-    const lngs = [...located.map((w) => w.lng), ...track.map((p) => p.lng)];
-    if (lats.length === 0) return { points: [], unlocated: roster, paths: [] };
+    // The route joins the bounds calculation for the same reason the trails do:
+    // fit them separately and the route leaves the canvas, or ends somewhere
+    // other than the person it leads to.
+    const lats = [...located.map((w) => w.lat), ...track.map((p) => p.lat), ...routeGeometry.map((p) => p[0])];
+    const lngs = [...located.map((w) => w.lng), ...track.map((p) => p.lng), ...routeGeometry.map((p) => p[1])];
+    if (lats.length === 0) return { points: [], unlocated: roster, paths: [], routePath: '' };
 
     const minLat = Math.min(...lats);
     const maxLat = Math.max(...lats);
@@ -128,8 +139,17 @@ function useMapPoints(roster: WorkerInfo[], track: TrackPoint[]) {
           .join(' '),
       }));
 
-    return { points, unlocated, paths };
-  }, [roster, track]);
+    const routePath = routeGeometry.length > 1
+      ? routeGeometry
+          .map(([lat, lng], i) => {
+            const { x, y } = project(lat, lng);
+            return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+          })
+          .join(' ')
+      : '';
+
+    return { points, unlocated, paths, routePath };
+  }, [roster, track, routeGeometry]);
 }
 
 /**
@@ -141,7 +161,7 @@ function useMapPoints(roster: WorkerInfo[], track: TrackPoint[]) {
  * about the page scrolls; the three list panels scroll inside themselves, so
  * the state of the site is never below the fold.
  */
-export function CommandDashboard({ roster, alarm, log, history, stats, persistence, historyError, profile, selfName, status, onAcknowledge, onAllClear, standing, onSetStatus, reports, reportsError, onEscalateReport, onDismissReport, token }: Props) {
+export function CommandDashboard({ roster, alarm, log, history, stats, persistence, historyError, profile, selfName, status, onAcknowledge, onAllClear, standing, onSetStatus, reports, reportsError, onEscalateReport, onDismissReport, token, selfPosition }: Props) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -156,7 +176,29 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
   // Movement history only exists while an incident is open and only when the
   // backend is storing anything.
   const track = useIncidentTrack(alert?.id ?? null, !!persistence, token);
-  const { points, unlocated, paths } = useMapPoints(roster, track);
+
+  // Where the person who raised this alarm is *now*, taken from the live
+  // roster rather than the alert. The alert carries where they were when they
+  // pressed the button; during an evacuation that is exactly the position that
+  // stops being true first.
+  const raiser = useMemo(
+    () => (alert ? roster.find((w) => w.name === alert.sender && w.lat !== null && w.lng !== null) ?? null : null),
+    [alert, roster],
+  );
+  const target = raiser && raiser.lat !== null && raiser.lng !== null
+    ? { lat: raiser.lat, lng: raiser.lng }
+    : null;
+
+  // Navigate this supervisor to them, recalculating as either one moves, and
+  // only while the incident is open.
+  const { route: navRoute } = useNavigationRoute(
+    selfPosition ?? null,
+    target,
+    { token },
+    { profile: 'driving', active: Boolean(alert && selfPosition && target) },
+  );
+
+  const { points, unlocated, paths, routePath } = useMapPoints(roster, track, navRoute?.geometry ?? []);
 
   // The roll call. Only people who tapped "I am safe" for THIS alert count —
   // a device reporting itself 'safe' is a device that has not fallen over, not
@@ -244,6 +286,26 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
                   </div>
                   <div><dt>Battery</dt><dd>{sender ? batteryLabel(sender.battery) : '—'}</dd></div>
                 </dl>
+
+                {/* Navigation to the person. Only appears once both ends are
+                    sharing a position — an ETA to an unknown place would be
+                    worse than none. */}
+                {navRoute && (
+                  <div className="mc-nav" aria-live="polite">
+                    <span className="mc-nav-label">Your route</span>
+                    <span className="mc-nav-eta">{formatEta(navRoute.durationS)}</span>
+                    <span className="mc-nav-dist">{formatDistance(navRoute.distanceM)}</span>
+                    {/* Said plainly rather than implied. A straight-line
+                        estimate and a road route are different promises, and a
+                        free-flow ETA is not a traffic-aware one. */}
+                    <span className="mc-nav-note">
+                      {navRoute.degraded ? 'straight line — routing unavailable' : 'road route, no live traffic'}
+                    </span>
+                  </div>
+                )}
+                {!navRoute && alert && !selfPosition && (
+                  <p className="mc-nav-hint">Share your own location to get a route to this person.</p>
+                )}
                 <ol className="mc-proto">
                   {protocol.map((step, i) => (
                     <li key={i}><span className="mc-step-n">{String(i + 1).padStart(2, '0')}</span>{step}</li>
@@ -374,6 +436,9 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
                 {paths.map((p) => (
                   <path key={p.workerId} className="mc-trail" d={p.d} fill="none" />
                 ))}
+                {/* The supervisor's own route to the person who raised the
+                    alarm. Drawn beneath the pins so it never hides them. */}
+                {routePath && <path className="mc-route" d={routePath} fill="none" />}
                 {points.length === 0 ? (
                   <text x="380" y="190" textAnchor="middle" className="cmd-map-empty">No devices are sharing location yet</text>
                 ) : (

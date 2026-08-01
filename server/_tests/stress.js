@@ -52,9 +52,11 @@ async function main() {
     Array.from({ length: DEVICES }, (_, i) => new Promise((resolve) => {
       const ws = new WebSocket(`ws://127.0.0.1:${PORT}`);
       ws.on('open', () => {
+        // Top-level fields — see the note in stress-orgs.js.
         ws.send(JSON.stringify({
           kind: 'hello',
-          worker: { id: `dev-${i}`, name: `Device ${i}`, role: 'worker', status: 'safe', battery: 80 },
+          id: `dev-${i}`, name: `Device ${i}`, role: 'worker', status: 'safe',
+          battery: 0.8, zone: 'Line B', lat: -6.79 + i / 100000, lng: 39.2 + i / 100000, accuracy: 12,
         }));
         sockets.push(ws);
         resolve();

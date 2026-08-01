@@ -19,6 +19,7 @@ const fcm = require('./fcm');
 const staticFiles = require('./static');
 const emergencyNumbers = require('./emergency-numbers');
 const places = require('./places');
+const routing = require('./routing');
 const mailer = require('./mailer');
 const plans = require('./billing/plans');
 const entitlements = require('./billing/entitlements');
@@ -147,6 +148,9 @@ const server = http.createServer(async (req, res) => {
       nativePush: fcm.enabled(),
       mail: mailer.enabled(),
       mailProvider: mailer.providerName(),
+      // Reported so "is the ETA a real road route or a straight line?" is
+      // answerable without reading logs.
+      routing: routing.status(),
       mobileMoney: payments.status().mobileMoney.enabled,
       card: payments.status().card.enabled,
     },
@@ -467,6 +471,31 @@ const server = http.createServer(async (req, res) => {
       }
       if (!allowPlaces(req)) return sendJson(res, 429, { error: 'too many lookups — please wait a moment' });
       return sendJson(res, 200, { places: await places.nearby(kind, lat, lng) });
+    }
+
+    // --- Road route between two points ---
+    //
+    // Used two ways: a supervisor navigating to the person who raised an
+    // alarm, and a worker being guided to their safe destination. Org
+    // credentials are required — a route request carries two live positions,
+    // and this must not become an open geocoding service.
+    //
+    // Never returns an error for a routing failure. On any provider problem it
+    // answers with a straight-line estimate and `degraded: true`, because
+    // during an incident an approximate bearing now beats an exact answer that
+    // never arrives.
+    if (path === '/api/route' && req.method === 'GET') {
+      const ctx = await orgContext(req, url);
+      if (!ctx) return sendJson(res, 401, { error: 'org credentials required' });
+      if (!allowPlaces(req)) return sendJson(res, 429, { error: 'too many route requests — please wait a moment' });
+
+      const from = { lat: Number(url.searchParams.get('fromLat')), lng: Number(url.searchParams.get('fromLng')) };
+      const to = { lat: Number(url.searchParams.get('toLat')), lng: Number(url.searchParams.get('toLng')) };
+      const profile = url.searchParams.get('profile') === 'walking' ? 'walking' : 'driving';
+
+      const out = await routing.route(from, to, { profile });
+      if (out.ok === false) return sendJson(res, 400, out);
+      return sendJson(res, 200, out);
     }
 
     // --- Where to go for this emergency ---

@@ -475,3 +475,42 @@
 @media (max-width: 780px) {
   .mc-split > .mc-col:last-child { display: flex; }
 }
+
+/* Supervisor's route to the person who raised the alarm. Silver and dashed so
+   it reads as guidance under the pins, never competing with a live position. */
+.mc-route {
+  stroke: var(--text);
+  stroke-width: 2;
+  stroke-opacity: 0.55;
+  stroke-dasharray: 1 5;
+  stroke-linecap: round;
+}
+.mc-nav {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.mc-nav-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.mc-nav-eta { font-size: 20px; font-weight: 600; }
+.mc-nav-dist { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.mc-nav-note {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--faint);
+  margin-left: auto;
+}
+.mc-nav-hint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--faint);
+}

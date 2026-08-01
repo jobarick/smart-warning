@@ -345,6 +345,45 @@ function credQuery(creds: OrgCreds, extra: Record<string, string> = {}): string 
   return q ? `?${q}` : '';
 }
 
+/** A road route, or a straight-line estimate when routing was unavailable. */
+export interface RouteResult {
+  ok: true;
+  /** true when this is a straight line rather than a real road route. */
+  degraded: boolean;
+  provider: string;
+  /**
+   * Always false today. No routing provider offers live traffic without a
+   * commercial key, and the number is reported honestly rather than implied —
+   * someone deciding whether to drive or run deserves to know.
+   */
+  trafficAware: boolean;
+  distanceM: number;
+  durationS: number;
+  /** [lat, lng] pairs, ready for Leaflet. */
+  geometry: [number, number][];
+  alternatives: { distanceM: number; durationS: number; geometry: [number, number][] }[];
+  bearing: number;
+  cached?: boolean;
+}
+
+export async function fetchRoute(
+  from: { lat: number; lng: number },
+  to: { lat: number; lng: number },
+  creds: OrgCreds,
+  profile: 'driving' | 'walking' = 'driving',
+): Promise<RouteResult> {
+  const extra: Record<string, string> = {
+    fromLat: String(from.lat), fromLng: String(from.lng),
+    toLat: String(to.lat), toLng: String(to.lng),
+    profile,
+  };
+  const res = await fetch(`${API_BASE}/api/route${credQuery(creds, extra)}`, {
+    headers: authHeaders(creds.token),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not calculate a route'));
+  return res.json();
+}
+
 export async function fetchDestinations(creds: OrgCreds, operatorId?: string): Promise<Destination[]> {
   const extra: Record<string, string> = operatorId ? { operatorId } : {};
   const res = await fetch(`${API_BASE}/api/destinations${credQuery(creds, extra)}`, {

@@ -86,15 +86,18 @@ async function main() {
         ws.send(JSON.stringify(isSupervisor
           ? { kind: 'join', token: 'supervisor-token' }
           : { kind: 'join', orgCode: JOIN_CODE }));
+        // Worker fields go at the TOP level — the client sends
+        // `{ kind:'hello', ...info }` and the relay calls sanitizeWorker(msg).
+        // Nesting them under `worker` is silently accepted and produces a
+        // roster full of "Unknown" entries with no coordinates, which makes
+        // every payload measurement here far smaller than reality.
         ws.send(JSON.stringify({
           kind: 'hello',
-          worker: {
-            id: isSupervisor ? `sup-${index}` : `dev-${index}`,
-            name: isSupervisor ? `Supervisor ${index}` : `Device ${index}`,
-            role: isSupervisor ? 'supervisor' : 'worker',
-            status: 'safe', battery: 0.8, zone: 'Line B',
-            lat: -6.79 + index / 100000, lng: 39.2 + index / 100000, accuracy: 12,
-          },
+          id: isSupervisor ? `sup-${index}` : `dev-${index}`,
+          name: isSupervisor ? `Supervisor ${index}` : `Device ${index}`,
+          role: isSupervisor ? 'supervisor' : 'worker',
+          status: 'safe', battery: 0.8, zone: 'Line B',
+          lat: -6.79 + index / 100000, lng: 39.2 + index / 100000, accuracy: 12,
         }));
         sockets.push(ws);
         resolve();
