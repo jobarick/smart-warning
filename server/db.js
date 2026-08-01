@@ -299,7 +299,78 @@ async function init() {
     CREATE INDEX IF NOT EXISTS transactions_external_idx ON transactions (external_reference);
   `);
   await backfillPublicCodes();
+  await linkOrphanTables();
   return true;
+}
+
+// Tables that grew an org_id without a foreign key behind it.
+//
+// incidents, location_pings, feedback, outbound_mail and device_tokens all
+// carry an organization id that nothing enforces, because each was added at a
+// different time and org_id was bolted on afterwards. Nothing can orphan today
+// — there is no code path that deletes an organization — but that is an
+// accident of what has not been built yet, not a property of the schema.
+//
+// It matters because the deletion path is coming: Google Play requires an
+// account deletion mechanism for any app offering sign-up, and this one has
+// it. On the day that lands, an unconstrained org_id means a deleted customer
+// leaves behind their incidents and, worse, their location_pings — precise
+// GPS traces of named people, retained after they asked to be forgotten.
+//
+// CASCADE rather than SET NULL on all five: every one of these tables holds
+// personal data, so "delete the organization" has to mean it.
+const ORG_FOREIGN_KEYS = [
+  { table: 'incidents', constraint: 'incidents_org_fk' },
+  { table: 'location_pings', constraint: 'location_pings_org_fk' },
+  { table: 'feedback', constraint: 'feedback_org_fk' },
+  { table: 'outbound_mail', constraint: 'outbound_mail_org_fk' },
+  { table: 'device_tokens', constraint: 'device_tokens_org_fk' },
+];
+
+async function linkOrphanTables() {
+  if (!pool) return;
+
+  for (const { table, constraint } of ORG_FOREIGN_KEYS) {
+    // Each in its own try/catch. A failure here must not abort the rest of
+    // init(): the schema above is what the running product depends on, and
+    // this is hardening for a feature that does not exist yet.
+    try {
+      const { rows } = await pool.query(
+        `SELECT 1 FROM pg_constraint WHERE conname = $1 LIMIT 1`,
+        [constraint],
+      );
+      if (rows.length > 0) continue;
+
+      // Adding the constraint fails outright if any row already points at an
+      // organization that is gone, so clear those first. They are unreachable
+      // records — every query in this file is org-scoped — so detaching them
+      // loses nothing that was being read.
+      const { rowCount } = await pool.query(
+        `UPDATE ${table} SET org_id = NULL
+         WHERE org_id IS NOT NULL
+           AND NOT EXISTS (SELECT 1 FROM organizations o WHERE o.id = ${table}.org_id)`,
+      );
+      if (rowCount > 0) {
+        console.warn(`[db] ${table}: detached ${rowCount} row(s) pointing at a missing organization`);
+      }
+
+      await pool.query(
+        `ALTER TABLE ${table}
+         ADD CONSTRAINT ${constraint} FOREIGN KEY (org_id)
+         REFERENCES organizations(id) ON DELETE CASCADE`,
+      );
+      console.log(`[db] ${table}: org_id now references organizations`);
+    } catch (e) {
+      console.error(`[db] could not add ${constraint} to ${table}: ${e.message}`);
+    }
+  }
+
+  // users.org_id is queried on every seat count and has no index of its own.
+  try {
+    await pool.query(`CREATE INDEX IF NOT EXISTS users_org_idx ON users (org_id)`);
+  } catch (e) {
+    console.error(`[db] could not index users.org_id: ${e.message}`);
+  }
 }
 
 // Give any organization created before public reporting existed a code, so the
