@@ -58,6 +58,33 @@ CLICKPESA_API_KEY=your-api-key
 CLICKPESA_CHECKSUM_KEY=your-checksum-key      # optional
 ```
 
+Paste the values without surrounding quotes. Render stores them literally, and
+a quoted value is sent to the gateway with the quotes still attached — which
+comes back as `Invalid client details` and looks exactly like a wrong key.
+
+### Check them before trusting them
+
+```bash
+node server/tools/clickpesa-check.js 0713455454 8000
+```
+
+Three checks in order: are the credentials present, do they authenticate, and
+can that number actually be charged and for how much. The third uses the
+gateway's `preview` endpoint, which reports the available wallets and their
+fees **without sending a USSD prompt and without moving money**.
+
+It prints no secrets — only whether each variable is set, its length, and
+whether it arrived with stray quotes or whitespace. It also separates "the
+gateway could not be reached" from "the gateway rejected these credentials",
+which are different problems with different fixes.
+
+There is deliberately no option to raise a real charge from the command line.
+The first genuine payment should be made by a person, through the app, watching
+their own handset.
+
+Run it locally with the values you are about to set, or from Render's shell to
+confirm what the deployment itself sees.
+
 ### Register the webhook
 
 Point the application's webhook at:
