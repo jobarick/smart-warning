@@ -606,6 +606,126 @@ something is.
 
 ---
 
+---
+
+# Part II — Advanced UX & Safety Coordination brief (2026-08-05)
+
+A second brief arrived covering account recovery, terminology, the coordinator
+dashboard, emergency-only chat, category grouping and professional
+consultation. This part records where each of its 17 sections stands.
+
+## Status by section
+
+| § | Requirement | Status |
+|---|---|---|
+| 1 | Password visibility + account recovery | ✅ **BUILT** — see below |
+| 2 | "Supervisor" → "Safety Coordinator" | ✅ **BUILT** (labels; see the protocol note) |
+| 3 | Coordinator dashboard distinct from the user app | Phase 1 — partly true already (server-side role separation exists; the shells still share a skeleton) |
+| 4 | 🔴 emergency / 🟢 responder markers | Phase 5 — the command map already draws pins and the coordinator's route; the colour semantics and the "not an official responder" caveat are not built |
+| 5 | Live position: live / recent / stale / unavailable | Phase 5 — **the honesty requirement here is not met today**; the map shows a position without saying how old it is |
+| 6 | Emergency response map + routing | Partly built — OSRM routing, facilities via OSM, assembly points. Copy audited: nothing claims "best" or "fastest", and `trafficAware:false` is reported. Alternative routes and closures are not built |
+| 7 | Emergency-only chat, incident-scoped | Phase 5 — not built |
+| 8 | Daily safety notification | Phase 4 — not built |
+| 9 | Idefenda Lab attribution | ✅ **BUILT** — About, Support, Terms, Privacy Policy, generated legal docs, reset emails |
+| 10 | Minimal primary categories | Phase 1 + 2 |
+| 11 | Secondary categories grouped | Phase 1 + 2 — grouping design is in Appendix B |
+| 12 | User-customisable dashboard, core preserved | Phase 1 |
+| 13 | Country-based emergency services | Mostly built — 55 countries, bbox lookup, offline. Missing: showing WHICH country the numbers apply to, and letting somebody correct it |
+| 14 | Top 8 services per country | Phase 6 — the data model supports it; the ranking does not exist |
+| 15 | African-first design | Ongoing; measured in Phase 1 |
+| 16 | Consultation with emergency professionals | ⛔ **Cannot be done by me — see below** |
+| 17 | Final UX philosophy | The frame for phases 1–8 |
+
+## What was built in this pass
+
+**§1 — Password visibility and account recovery.**
+`PasswordField` reveals a password with an eye control; hidden stays the
+default. Recovery is a full flow: `POST /api/auth/forgot` → emailed link and a
+pasteable code → `POST /api/auth/reset` → signed straight in. Design decisions
+worth keeping:
+
+- The response is identical whether or not the address is registered. Otherwise
+  the endpoint answers "does this company use Smart Warning, and who runs it".
+- Only a SHA-256 hash of the token is stored, so a copy of the database is not
+  a set of working reset links.
+- One hour, one use, enforced in the UPDATE's `WHERE` clause so a mail client
+  prefetching the link cannot spend it twice.
+- Choosing a new password retires every other outstanding link for that account.
+- A rejected password (too short) does **not** burn the link.
+- When no mail provider is configured the screen says so instead of sending
+  somebody to watch an empty inbox. **This is the live state today —
+  `mailProvider: "none"` on Render — so recovery emails will queue and not send
+  until `SMTP_URL` is set.** The queue drains by itself once it is.
+- Covered by 9 tests in `server/_tests/password-reset.test.js`.
+
+**§2 — Safety Coordinator.** Every user-facing string, in the app, the terms,
+the privacy policy, the account-deletion doc and the notification copy.
+
+> ⚠️ **The wire value `'supervisor'` was deliberately NOT renamed.** It is a
+> protocol value: every installed app sends it, `users.role` stores it, the JWT
+> carries it, and both ends validate against a fixed set. Renaming it would
+> coerce every already-installed device to `'worker'` — silently removing
+> coordinator rights from the people whose job is to receive the alarms. The
+> label is what users read; the string is what devices agree on. `types.ts`
+> carries this warning at the type itself.
+
+**§9 — Idefenda Lab.** Named once in `terms.ts` as `PROVIDER` and used
+everywhere, so the app cannot end up with three spellings of who stands behind
+it. The terms now also state plainly that there is no partnership with, or
+authorization from, any emergency service or government authority.
+
+**Terms bumped 1.1 → 1.2, effective 5 August 2026.** Naming the provider
+changes who the reader is agreeing with, which is material, so it re-prompts
+everyone for consent by design. **Deploying this shows the consent screen to
+every existing user once.**
+
+## §16 — Consultation with emergency professionals
+
+**I cannot do this, and no amount of research substitutes for it.** Validating
+escalation procedure, terminology and responder expectations against real fire,
+medical, police and disaster-management practice in Tanzania requires talking to
+those people. What I can do is make the conversation cheap to have, so here is
+what to take into it.
+
+**Take:** this document, the alert categories in `client/src/types.ts`, the
+grouping in Appendix B, the emergency numbers in `server/emergency-numbers.js`
+for their country, and a live demo of the SOS flow.
+
+**Ask each professional:**
+
+1. Are these the categories you would want reported, in these words?
+2. At what point should a report become an alarm, and who should decide?
+3. What does a coordinator need to see in the first ten seconds?
+4. What should the app tell someone who is waiting for help — and what should it
+   never promise?
+5. How should a false alarm be withdrawn, and what should be recorded about it?
+6. How long should location traces and incident records be kept?
+7. Which of these numbers are correct today, and who publishes the authoritative
+   list?
+8. What would make you distrust a tool like this?
+
+**Two things to decide with them, not for them:** whether "Safety Coordinator"
+is the right title in their sector, and what the app is allowed to say when a
+coordinator is en route (§4's green marker must not read as "an ambulance is
+coming").
+
+**Until that consultation happens**, every emergency-facing claim in the product
+should stay conservative, and the terms should keep saying — as they now do —
+that Smart Warning is not an emergency service and has no authority behind it.
+
+## Follow-ups created by this pass
+
+- **Per-address cooldown on reset requests.** The IP limiter was raised to
+  30/15min because a whole office shares one address and a tight cap would lock
+  a team out of recovery. Mail-bombing one person is better answered by a
+  per-address cooldown, which is not built.
+- **`SMTP_URL` on Render** — without it, §1 recovery cannot deliver.
+- **`APP_URL` on Render** — the reset link host. Defaults to the Vercel domain;
+  it is read from configuration, never from the request's `Host` header, so a
+  forged header cannot put an attacker's domain into an email carrying a token.
+
+---
+
 ## Appendix A — Benchmarking: what other emergency apps get right
 
 Patterns worth adopting (not designs worth copying):
