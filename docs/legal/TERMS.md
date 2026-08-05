@@ -1,6 +1,6 @@
 # Smart Warning — Terms & Conditions
 
-**Version 1.1 — effective 1 August 2026**
+**Version 1.2 — effective 5 August 2026**
 
 <!-- Generated from client/src/lib/terms.ts by tools/generate-legal.js.
      Do not edit by hand: this must stay identical to the text shown in the
@@ -8,9 +8,9 @@
 
 ## 1. Purpose of the Service
 
-Smart Warning is an emergency communication, safety coordination, and incident management platform designed to help individuals and organizations report emergencies, share location information, coordinate responses, and improve situational awareness.
+Smart Warning is an emergency communication, safety coordination, and incident management platform designed to help individuals and organizations report emergencies, share location information, coordinate responses, and improve situational awareness. The Service, and the software and product design behind it, are provided by Idefenda Lab.
 
-Smart Warning is an assistance tool and is not a replacement for police, fire departments, ambulance services, hospitals, government emergency agencies, or any official emergency response organization.
+Smart Warning is an assistance tool and is not a replacement for police, fire departments, ambulance services, hospitals, government emergency agencies, or any official emergency response organization. Idefenda Lab is not an emergency service, is not an emergency dispatch provider, and has no partnership with, authorization from, or affiliation to any emergency service or government authority unless a specific arrangement is stated in writing.
 
 ## 2. Emergency Response Disclaimer
 
@@ -23,7 +23,7 @@ Actual response depends on factors including but not limited to:
 - Device battery level
 - Internet connectivity
 - Organization configuration
-- Supervisor availability
+- Safety Coordinator availability
 - Emergency service availability
 - Third-party providers
 
@@ -31,7 +31,7 @@ If your life is in immediate danger, contact your local emergency services immed
 
 ## 3. Location Services
 
-By activating an emergency, you authorize Smart Warning to collect, process, transmit, and display your live location to authorized supervisors, responders, or organization administrators for the duration of the incident.
+By activating an emergency, you authorize Smart Warning to collect, process, transmit, and display your live location to authorized Safety Coordinators, responders, or organization administrators for the duration of the incident.
 
 Location tracking may continue until the emergency is resolved or cancelled.
 
@@ -111,7 +111,7 @@ Data is processed according to our Privacy Policy, which is included in this app
 
 You may request access to, correction of, or deletion of your personal data at any time.
 
-A supervisor who administers an organization may delete that organization from within the application. Deleting an organization permanently removes its account, its members, its incident history, its stored location records and its reports. This cannot be undone.
+A Safety Coordinator who administers an organization may delete that organization from within the application. Deleting an organization permanently removes its account, its members, its incident history, its stored location records and its reports. This cannot be undone.
 
 If you do not administer an organization, you may request deletion by contacting us using the details in section 16, and we will action it within 30 days.
 

@@ -73,6 +73,19 @@ export interface SystemStatusMessage extends Replayable {
 }
 
 export type WorkerStatus = 'safe' | 'sos' | 'idle';
+/**
+ * The two roles on the wire.
+ *
+ * ⚠️ `'supervisor'` is a PROTOCOL VALUE, not a label. Its display name
+ * throughout the product is "Safety Coordinator"; the string itself is spoken
+ * by every device in the field, stored in `users.role`, carried in the JWT and
+ * validated against a fixed set at both ends. Renaming it would silently
+ * demote every already-installed app to 'worker' — which is the safe direction
+ * for a coercion to fail in, and a catastrophic one for the person who is
+ * supposed to be receiving the alarms.
+ *
+ * Change the labels; leave these two strings alone.
+ */
 export type WorkerRole = 'worker' | 'supervisor';
 
 /** Per-device telemetry the relay tracks and rebroadcasts as a roster. */

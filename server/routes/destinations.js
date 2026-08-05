@@ -60,7 +60,7 @@ async function handle({ req, res, url, path }) {
       // null assigns it to the whole organization; an operator id overrides
       // the org default for that one person.
       assignedTo: String(body.assignedTo || '').trim().slice(0, 80) || null,
-      createdBy: ctx.user?.name || 'Supervisor',
+      createdBy: ctx.user?.name || 'Safety Coordinator',
     });
     sendJson(res, 201, { destination: publicDestination(row) });
     return true;

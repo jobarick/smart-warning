@@ -102,7 +102,7 @@ export function BillingPanel({ token, onBack }: Props) {
       <p className="bill-promise">
         <Icon name="siren" /> Emergency alerting is never billed. SOS, all-clear, roll call and
         live location work on every plan — including while a payment is pending, overdue or
-        cancelled. Plans only affect supervisor tools.
+        cancelled. Plans only affect Safety Coordinator tools.
       </p>
 
       {entitlements && (

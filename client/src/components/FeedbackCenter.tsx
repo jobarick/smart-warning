@@ -146,7 +146,7 @@ export function FeedbackCenter({ token }: Props) {
               </div>
               <p className="fb-item-msg">{f.message}</p>
               <span className="fb-item-meta">
-                {f.authorName || 'Supervisor'} · {when(f.createdAt)}
+                {f.authorName || 'Safety Coordinator'} · {when(f.createdAt)}
               </span>
             </li>
           ))}

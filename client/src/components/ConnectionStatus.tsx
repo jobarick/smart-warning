@@ -34,7 +34,7 @@ export function ConnectionStatus({ status, deviceCount, audioArmed, onArmAudio, 
           {userName.trim() || 'Me'}
         </button>
         <button role="tab" aria-selected={view === 'command'} className={view === 'command' ? 'active' : ''} onClick={() => onViewChange('command')}>
-          Supervisor
+          Safety Coordinator
         </button>
       </div>
       <div className="status-items">

@@ -78,7 +78,7 @@ export function SettingsPanel({ settings, onChange, onTestSiren, onTestAlarm, si
           onChange={(e) => onChange({ shareLocation: e.target.checked })}
         />
         <span>
-          Share my location — <em>sends GPS coordinates to the command view so a supervisor can find you</em>
+          Share my location — <em>sends GPS coordinates to the command view so a Safety Coordinator can find you</em>
         </span>
       </label>
 

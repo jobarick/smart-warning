@@ -9,7 +9,7 @@ it, as required by the Google Play Developer Program policies.
 
 If you administer an organization:
 
-1. Open Smart Warning and sign in as a supervisor.
+1. Open Smart Warning and sign in as a Safety Coordinator.
 2. Go to **About & legal**.
 3. Choose **Delete organization and all data**.
 4. Type the organization's name to confirm.
@@ -31,7 +31,7 @@ in the app, so we can identify the right records.
 
 Deleting an organization permanently removes:
 
-- All supervisor accounts and their sign-in credentials
+- All Safety Coordinator accounts and their sign-in credentials
 - Organization membership records
 - Incident history, including alerts, roll-call answers and all-clears
 - Location records captured during incidents

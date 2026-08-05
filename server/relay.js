@@ -419,7 +419,7 @@ function attach(server) {
               }
             : {
                 title: '✓ All clear',
-                body: `Stood down by ${msg.sender || 'a supervisor'}`,
+                body: `Stood down by ${msg.sender || 'a Safety Coordinator'}`,
                 tag: 'sw-alert',
               };
           push.notifyOrg(ws.orgId, standDown).catch((e) => console.error('[push] notifyOrg:', e.message));
@@ -446,7 +446,7 @@ function attach(server) {
           kind: 'status',
           status: msg.status,
           note: typeof msg.note === 'string' ? msg.note.slice(0, 120) : '',
-          sender: typeof msg.sender === 'string' ? msg.sender.slice(0, 80) : 'Supervisor',
+          sender: typeof msg.sender === 'string' ? msg.sender.slice(0, 80) : 'Safety Coordinator',
           timestamp: Date.now(),
         };
         setStatus(ws.orgId, out);
@@ -472,7 +472,7 @@ function attach(server) {
         const out = {
           kind: 'responding',
           incidentId,
-          supervisor: typeof msg.supervisor === 'string' ? msg.supervisor.slice(0, 80) : 'A supervisor',
+          supervisor: typeof msg.supervisor === 'string' ? msg.supervisor.slice(0, 80) : 'A Safety Coordinator',
           etaS: numOrNull(msg.etaS),
           distanceM: numOrNull(msg.distanceM),
           routed: msg.routed === true,

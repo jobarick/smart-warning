@@ -252,6 +252,11 @@ a.support-value { color: var(--accent); }
 }
 .support-topics b { display: block; font-size: 14px; margin-bottom: 3px; }
 .support-topics span { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.support-provider {
+  margin: 20px 0 0; padding-top: 14px; border-top: 1px solid var(--border);
+  font-size: 12px; line-height: 1.6; color: var(--muted);
+}
+.support-provider strong { color: var(--text); font-weight: 650; }
 .support-topic-link {
   margin-left: auto;
   flex: none;

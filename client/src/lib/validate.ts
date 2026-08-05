@@ -129,7 +129,7 @@ export function parseWireMessage(raw: unknown): WireMessage | null {
       return {
         kind: 'responding',
         incidentId: incidentId.slice(0, 64),
-        supervisor: str(m.supervisor, 'A supervisor').slice(0, 80),
+        supervisor: str(m.supervisor, 'A Safety Coordinator').slice(0, 80),
         // Nulls are meaningful here: "on the way, distance unknown" is a real
         // state, and better than inventing a number.
         etaS: numOrNull(m.etaS),

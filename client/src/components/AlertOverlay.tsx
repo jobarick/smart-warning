@@ -122,7 +122,7 @@ export function AlertOverlay({ alert, acknowledged, settings, label, safeConfirm
           </button>
         ) : (
           <span className="safe-note">
-            <Icon name="check-circle" /> Reported safe — your supervisor can see this
+            <Icon name="check-circle" /> Reported safe — your Safety Coordinator can see this
           </span>
         )}
         {/* Raising an alarm by accident is common and the honest correction

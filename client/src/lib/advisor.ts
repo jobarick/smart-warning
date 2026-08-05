@@ -158,7 +158,7 @@ export function assess(input: AdvisorInput): Assessment | null {
           : []),
       ],
       resources: [],
-      factors: ['A supervisor has placed the site under advisory'],
+      factors: ['A Safety Coordinator has placed the site under advisory'],
     };
   }
 

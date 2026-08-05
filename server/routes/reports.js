@@ -57,7 +57,7 @@ async function handle({ req, res, url, path }) {
     if (!ctx) { sendJson(res, 501, { error: 'reports require a database' }); return true; }
     const [, reportId, action] = handleMatch;
     if (!UUID_RE.test(reportId)) { sendJson(res, 404, { error: 'no pending report with that id' }); return true; }
-    const by = ctx.user?.name || 'Supervisor';
+    const by = ctx.user?.name || 'Safety Coordinator';
 
     if (action === 'dismiss') {
       const row = await db.handleReport({ id: reportId, orgId: ctx.orgId, status: 'dismissed', handledBy: by });

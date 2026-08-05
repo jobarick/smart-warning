@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { PRIVACY_SECTIONS, SUPPORT_EMAIL, SUPPORT_PHONE, TERMS_EFFECTIVE_DATE, TERMS_SECTIONS, TERMS_VERSION } from '../lib/terms';
+import { PRIVACY_SECTIONS, PROVIDER, SUPPORT_EMAIL, SUPPORT_PHONE, TERMS_EFFECTIVE_DATE, TERMS_SECTIONS, TERMS_VERSION } from '../lib/terms';
 import { deleteOrganization } from '../lib/api';
 import { LegalText } from './LegalText';
 import { Icon } from './Icon';
 
 interface Props {
-  /** Supervisor bearer token, when this person administers the organization. */
+  /** Safety Coordinator bearer token, when this person administers the organization. */
   token?: string;
   /** The organization's exact name, which must be typed to confirm deletion. */
   orgName?: string;
@@ -67,9 +67,16 @@ export function AboutPanel({ token, orgName, onDeleted, onBack }: Props) {
       </button>
 
       <h2 className="about-h">About Smart Warning</h2>
+      {/* Who made this, said plainly and without any claim beyond it. An
+          emergency app that is vague about who stands behind it is asking for
+          trust it has not offered anything in return for. */}
+      <p className="about-provider">
+        Smart Warning — the application, the system and its product design — is by <strong>{PROVIDER}</strong>.
+      </p>
       <dl className="about-facts">
         <div><dt>App version</dt><dd className="mono">{APP_VERSION}</dd></div>
         <div><dt>Terms version</dt><dd className="mono">{TERMS_VERSION}</dd></div>
+        <div><dt>Provided by</dt><dd>{PROVIDER}</dd></div>
       </dl>
 
       {/* Restated here, not only in the terms. It is the single most important
@@ -99,7 +106,7 @@ export function AboutPanel({ token, orgName, onDeleted, onBack }: Props) {
         <>
           <h3 className="about-sub">Delete this organization</h3>
           <p className="about-warn">
-            This permanently deletes <strong>{orgName}</strong> — its supervisors, every member,
+            This permanently deletes <strong>{orgName}</strong> — its Safety Coordinators, every member,
             all incident history, all stored location records and all reports. It cannot be undone.
           </p>
           {!confirming ? (

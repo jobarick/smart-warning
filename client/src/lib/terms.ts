@@ -12,12 +12,22 @@
  * That is the point: agreement to a document is agreement to *that* document,
  * and silently carrying it forward to a rewritten one is not consent.
  */
-export const TERMS_VERSION = '1.1';
+export const TERMS_VERSION = '1.2';
 
-export const TERMS_EFFECTIVE_DATE = '1 August 2026';
+export const TERMS_EFFECTIVE_DATE = '5 August 2026';
 
 export const SUPPORT_EMAIL = 'jobarick@gmail.com';
 export const SUPPORT_PHONE = '+255 713 455 454';
+
+/**
+ * Who provides the Service.
+ *
+ * Named in one place and used everywhere — the terms, the privacy policy, the
+ * About screen and the support page — because a document that asks somebody to
+ * agree to something should say who they are agreeing with, and three
+ * different spellings of that across an app is its own kind of unreliable.
+ */
+export const PROVIDER = 'Idefenda Lab';
 
 export interface TermsSection {
   heading: string;
@@ -31,8 +41,8 @@ export const TERMS_SECTIONS: TermsSection[] = [
   {
     heading: '1. Purpose of the Service',
     body: [
-      'Smart Warning is an emergency communication, safety coordination, and incident management platform designed to help individuals and organizations report emergencies, share location information, coordinate responses, and improve situational awareness.',
-      'Smart Warning is an assistance tool and is not a replacement for police, fire departments, ambulance services, hospitals, government emergency agencies, or any official emergency response organization.',
+      `Smart Warning is an emergency communication, safety coordination, and incident management platform designed to help individuals and organizations report emergencies, share location information, coordinate responses, and improve situational awareness. The Service, and the software and product design behind it, are provided by ${PROVIDER}.`,
+      `Smart Warning is an assistance tool and is not a replacement for police, fire departments, ambulance services, hospitals, government emergency agencies, or any official emergency response organization. ${PROVIDER} is not an emergency service, is not an emergency dispatch provider, and has no partnership with, authorization from, or affiliation to any emergency service or government authority unless a specific arrangement is stated in writing.`,
     ],
   },
   {
@@ -47,7 +57,7 @@ export const TERMS_SECTIONS: TermsSection[] = [
       'Device battery level',
       'Internet connectivity',
       'Organization configuration',
-      'Supervisor availability',
+      'Safety Coordinator availability',
       'Emergency service availability',
       'Third-party providers',
     ],
@@ -59,7 +69,7 @@ export const TERMS_SECTIONS: TermsSection[] = [
   {
     heading: '3. Location Services',
     body: [
-      'By activating an emergency, you authorize Smart Warning to collect, process, transmit, and display your live location to authorized supervisors, responders, or organization administrators for the duration of the incident.',
+      'By activating an emergency, you authorize Smart Warning to collect, process, transmit, and display your live location to authorized Safety Coordinators, responders, or organization administrators for the duration of the incident.',
       'Location tracking may continue until the emergency is resolved or cancelled.',
       'You are responsible for enabling GPS and location permissions.',
     ],
@@ -151,7 +161,7 @@ export const TERMS_SECTIONS: TermsSection[] = [
     heading: '9a. Your data rights and account deletion',
     body: [
       'You may request access to, correction of, or deletion of your personal data at any time.',
-      'A supervisor who administers an organization may delete that organization from within the application. Deleting an organization permanently removes its account, its members, its incident history, its stored location records and its reports. This cannot be undone.',
+      'A Safety Coordinator who administers an organization may delete that organization from within the application. Deleting an organization permanently removes its account, its members, its incident history, its stored location records and its reports. This cannot be undone.',
       'If you do not administer an organization, you may request deletion by contacting us using the details in section 16, and we will action it within 30 days.',
       'Some records may be retained where a law, regulation or a legitimate safety or accounting obligation requires it. Where that applies, only the data covered by that obligation is kept, and only for as long as the obligation lasts.',
     ],
@@ -246,27 +256,29 @@ export const TERMS_SECTIONS: TermsSection[] = [
  *
  * Written to describe what the software actually does. Every claim here is
  * checkable against the code: location is written only between an alert and its
- * all-clear (server/index.js trackPosition), the roster carries position only
- * to supervisors (broadcastRoster), and deleting an organization cascades to
- * incidents, location_pings, feedback, mail and device tokens (db.js).
+ * all-clear (server/relay.js trackPosition), the roster carries position only
+ * to Safety Coordinators (broadcastRoster), and deleting an organization
+ * cascades to incidents, location_pings, feedback, mail and device tokens
+ * (db.js).
  */
 export const PRIVACY_SECTIONS: TermsSection[] = [
   {
     heading: 'Who we are',
     body: [
-      `Smart Warning provides this Service. For any privacy question, or to exercise the rights below, contact ${SUPPORT_EMAIL} or ${SUPPORT_PHONE}.`,
+      `Smart Warning is provided by ${PROVIDER}, which is responsible for the personal data described in this policy. For any privacy question, or to exercise the rights below, contact ${SUPPORT_EMAIL} or ${SUPPORT_PHONE}.`,
+      `Your employer or the organization whose team code you joined decides who in that organization can see your information. ${PROVIDER} operates the Service on their behalf.`,
     ],
   },
   {
     heading: 'What we collect, and why',
     body: ['We collect only what the Service needs to work:'],
     bullets: [
-      'Account details — name, email address, phone number and password, so supervisors can sign in. Passwords are stored only as a salted hash and are never readable by us.',
+      'Account details — name, email address, phone number and password, so Safety Coordinators can sign in. Passwords are stored only as a salted hash and are never readable by us.',
       'Organization membership — which site or team you belong to, so an emergency reaches the right people and no others.',
-      'Device information — device name, battery level, network status and app version, so a supervisor can tell a silent phone from a flat one during an incident.',
+      'Device information — device name, battery level, network status and app version, so a Safety Coordinator can tell a silent phone from a flat one during an incident.',
       'Location — see the section below.',
       'Emergency history — the alerts raised, who raised them, when they were resolved and who reported themselves safe. This is the organization’s safety record.',
-      'Incident reports — including reports submitted from a public link, which are held for a supervisor to review.',
+      'Incident reports — including reports submitted from a public link, which are held for a Safety Coordinator to review.',
       'System logs — technical records used to keep the Service running and to investigate faults.',
       'Payment records — plan, amount, currency and a masked reference. Card and mobile money credentials are handled by the payment provider and never reach our servers.',
     ],
@@ -274,10 +286,10 @@ export const PRIVACY_SECTIONS: TermsSection[] = [
   {
     heading: 'Location — when it is and is not collected',
     body: [
-      'Your live position is shared with your organization’s supervisors while you are signed in and location sharing is switched on, so that a supervisor can find you if something happens.',
+      'Your live position is shared with your organization’s Safety Coordinators while you are signed in and location sharing is switched on, so that a Safety Coordinator can find you if something happens.',
       'Your position is written down and kept only between an emergency alert being raised and its all-clear. Outside an active incident, no location history is stored.',
-      'Your position is visible to supervisors of your own organization only. It is never shared with other organizations, and it is not sold or used for advertising.',
-      'You can stop sharing at any time by turning off location sharing in Settings, by signing out, or by revoking the permission in your device settings. The application will keep working; a supervisor will simply not be able to see where you are.',
+      'Your position is visible to Safety Coordinators of your own organization only. It is never shared with other organizations, and it is not sold or used for advertising.',
+      'You can stop sharing at any time by turning off location sharing in Settings, by signing out, or by revoking the permission in your device settings. The application will keep working; a Safety Coordinator will simply not be able to see where you are.',
       'The app does not collect location in the background when it is closed.',
     ],
   },
@@ -285,7 +297,7 @@ export const PRIVACY_SECTIONS: TermsSection[] = [
     heading: 'Who your data is shared with',
     body: ['We do not sell personal data. It is shared only with:'],
     bullets: [
-      'Supervisors and administrators of your own organization.',
+      'Safety Coordinators and administrators of your own organization.',
       'Service providers who host or deliver the Service on our behalf — hosting, database, push notification delivery, mapping and routing, email delivery and payment processing. They may process data only to provide those services to us.',
       'Authorities, where we are legally required to disclose it.',
     ],
@@ -304,7 +316,7 @@ export const PRIVACY_SECTIONS: TermsSection[] = [
     bullets: [
       'Give you a copy of the personal data we hold about you.',
       'Correct data that is wrong.',
-      'Delete your data. A supervisor who administers an organization can delete it directly in the application; anyone else can ask us and we will action it within 30 days.',
+      'Delete your data. A Safety Coordinator who administers an organization can delete it directly in the application; anyone else can ask us and we will action it within 30 days.',
       'Withdraw consent to location sharing, by switching it off at any time.',
     ],
   },
@@ -354,7 +366,7 @@ export const CONSENT_POINTS: { id: string; label: string }[] = [
   },
   {
     id: 'location',
-    label: 'I consent to sharing my live location with authorized supervisors and responders during an active emergency.',
+    label: 'I consent to sharing my live location with authorized Safety Coordinators and responders during an active emergency.',
   },
   {
     id: 'misuse',

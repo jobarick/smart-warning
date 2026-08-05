@@ -1,4 +1,5 @@
 import { canDial, telHref } from '../lib/emergency';
+import { PROVIDER } from '../lib/terms';
 import { Icon } from './Icon';
 
 /** Smart Warning's own support contacts — not an emergency service. */
@@ -18,7 +19,7 @@ const TOPICS: { title: string; body: string; subject: string }[] = [
   },
   {
     title: 'Feature requests',
-    body: 'Something your site needs that the platform does not do yet. Supervisors can also send these from the dashboard.',
+    body: 'Something your site needs that the platform does not do yet. Safety Coordinators can also send these from the dashboard.',
     subject: 'Feature request',
   },
   {
@@ -88,6 +89,12 @@ export function ContactSupport({ onBack }: Props) {
           </li>
         ))}
       </ul>
+
+      <p className="support-provider">
+        Smart Warning is by <strong>{PROVIDER}</strong>. It is a safety coordination tool, not an
+        emergency service, and it has no partnership with or authorization from any emergency
+        service or government authority.
+      </p>
     </section>
   );
 }

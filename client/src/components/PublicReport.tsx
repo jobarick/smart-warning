@@ -77,7 +77,7 @@ export function PublicReport({ publicCode }: Props) {
           <div className="pub-done"><Icon name="check-circle" /></div>
           <h1>Report submitted</h1>
           <p className="pub-muted">
-            A supervisor at <b>{siteName}</b> will review it. You will not get a reply here.
+            A Safety Coordinator at <b>{siteName}</b> will review it. You will not get a reply here.
           </p>
           <p className="pub-emergency">
             This is not an emergency call. If someone is in danger right now, call your local
@@ -99,7 +99,7 @@ export function PublicReport({ publicCode }: Props) {
         <span className="pub-site">{siteName}</span>
         <h1>Report a concern</h1>
         <p className="pub-muted">
-          This goes to the site’s supervisors for review. It does <b>not</b> sound an alarm.
+          This goes to the site’s Safety Coordinators for review. It does <b>not</b> sound an alarm.
         </p>
 
         <label className="pub-label" htmlFor="pub-msg">What is happening?</label>
