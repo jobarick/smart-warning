@@ -153,6 +153,38 @@ export async function login(input: { email: string; password: string }): Promise
   return res.json();
 }
 
+/**
+ * Ask for a password reset link.
+ *
+ * Succeeds whether or not the address is registered — the server will not say,
+ * because answering would turn this into a way to discover who runs a site. So
+ * the screen after this one can only ever say "if that address is registered".
+ *
+ * `mailConfigured` describes the deployment, not the account: when it is false
+ * no email can leave the server at all, and the UI must say so rather than send
+ * somebody to watch an inbox that will stay empty.
+ */
+export async function requestPasswordReset(email: string): Promise<{ ok: boolean; mailConfigured: boolean }> {
+  const res = await fetch(`${API_BASE}/api/auth/forgot`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not start password recovery'));
+  return res.json();
+}
+
+/** Spend a reset link and set a new password. Returns a signed-in session. */
+export async function resetPassword(input: { token: string; password: string }): Promise<AuthResult> {
+  const res = await fetch(`${API_BASE}/api/auth/reset`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not reset the password'));
+  return res.json();
+}
+
 // Validate a stored supervisor token; returns the fresh user or null if invalid.
 export async function fetchMe(token: string): Promise<AuthUser | null> {
   const res = await fetch(`${API_BASE}/api/auth/me`, { headers: authHeaders(token) });

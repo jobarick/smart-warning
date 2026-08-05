@@ -27,6 +27,8 @@ export type IconName =
   | 'send'
   | 'plus'
   | 'trash'
+  | 'eye'
+  | 'eye-off'
   | 'help';
 
 const PATHS: Record<IconName, React.ReactNode> = {
@@ -62,6 +64,20 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <polyline points="3 6 5 6 21 6" />
       <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </>
+  ),
+  eye: (
+    <>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  'eye-off': (
+    <>
+      <path d="M10.6 5.2A9.9 9.9 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1" />
+      <path d="M6.3 6.4A17.5 17.5 0 0 0 2 12s3.5 7 10 7a9.8 9.8 0 0 0 5.1-1.4" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+      <line x1="3" y1="3" x2="21" y2="21" />
     </>
   ),
   help: (

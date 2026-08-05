@@ -1,9 +1,11 @@
 // Supervisor authentication: bcrypt password hashing + JWT sessions, plus the
 // signup/login/lookup flows over the db layer. Workers don't authenticate here —
 // they join an org with its code; only supervisors have accounts.
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('./db');
+const mailer = require('./mailer');
 
 // In production JWT_SECRET must be set. In dev we fall back to a random secret so
 // the server still boots — tokens just don't survive a restart, which is fine.
@@ -121,6 +123,111 @@ async function login({ email, password }) {
   return { token: signToken(user), user: publicUser(user, org) };
 }
 
+// --- Password reset ---------------------------------------------------------
+//
+// The person locked out here is the one who watches a site's emergencies. So
+// this path is built to be usable under pressure and still safe:
+//
+//   • The response never says whether an email is registered. Otherwise this
+//     endpoint becomes a way to ask "does this company use Smart Warning, and
+//     who runs it" — which is reconnaissance, not a password reset.
+//   • Only a hash of the token is stored (see db.js).
+//   • One hour, one use.
+//   • Whether mail actually left the building is reported honestly, because a
+//     deployment with no SMTP credentials must not tell somebody to go and
+//     check an inbox that will stay empty.
+
+const RESET_TTL_MS = 60 * 60 * 1000;
+
+// Where the reset link should point. Taken from configuration and never from
+// the request's Host header: a forged Host would otherwise put an attacker's
+// domain into an email we send, with a live token attached to it.
+const APP_URL = (process.env.APP_URL || 'https://smart-warning.vercel.app').replace(/\/+$/, '');
+
+const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+
+/**
+ * Begin recovery for an email address.
+ *
+ * Always resolves. The caller answers the same way whether or not the account
+ * exists; `mailConfigured` describes the deployment, not the account, so it
+ * gives nothing away.
+ */
+async function requestPasswordReset({ email }) {
+  const address = String(email || '').trim().toLowerCase();
+  const out = { ok: true, mailConfigured: mailer.enabled() };
+  if (!EMAIL_RE.test(address)) return out;
+
+  const user = await db.getUserByEmail(address);
+  if (!user) {
+    console.log(`[auth] reset requested for an unknown address — answered normally`);
+    return out;
+  }
+
+  const token = crypto.randomBytes(32).toString('base64url');
+  await db.createPasswordReset({
+    tokenHash: hashToken(token),
+    userId: user.id,
+    expiresAt: new Date(Date.now() + RESET_TTL_MS),
+  });
+
+  const link = `${APP_URL}/?reset=${token}`;
+  const body = [
+    `Hello ${user.name || 'there'},`,
+    '',
+    'Somebody asked to reset the password for your Smart Warning account.',
+    'If that was you, open this link within the next hour:',
+    '',
+    link,
+    '',
+    'If the link does not open, start the app, choose "Forgot password?" and',
+    'paste this code when it asks for one:',
+    '',
+    token,
+    '',
+    'If you did not ask for this, you can ignore this message — your password',
+    'has not changed, and the link above stops working after an hour.',
+    '',
+    'Smart Warning — by Idefenda Lab',
+  ].join('\n');
+
+  const res = await mailer.send({
+    to: user.email,
+    subject: 'Reset your Smart Warning password',
+    body,
+    kind: 'password-reset',
+    // Deliberately NOT keyed by user id: that would make the queue's unique
+    // index collapse a second, legitimate request into the first one's row.
+    refId: null,
+    orgId: user.org_id || null,
+  });
+  console.log(`[auth] reset link issued for ${user.email} (delivered: ${res.delivered})`);
+  return out;
+}
+
+/**
+ * Finish recovery: spend the ticket and set the new password.
+ *
+ * Returns a signed-in session. The holder of the link has already proved
+ * control of the registered address, and making somebody type the password
+ * they have just chosen into a second form is friction with no security in it.
+ */
+async function resetPassword({ token, password }) {
+  if (!token || typeof token !== 'string') throw httpError(400, 'that reset link is not valid');
+  if (!password || password.length < 8) throw httpError(400, 'password must be at least 8 characters');
+
+  const user = await db.consumePasswordReset(hashToken(token.trim()));
+  if (!user) throw httpError(400, 'that reset link has expired or has already been used');
+
+  const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+  const updated = await db.setUserPassword(user.id, passwordHash);
+  if (!updated) throw httpError(404, 'that account no longer exists');
+
+  const org = await db.getOrgById(updated.org_id);
+  console.log(`[auth] password reset completed for ${updated.email}`);
+  return { token: signToken(updated), user: publicUser(updated, org) };
+}
+
 // Resolve the current user from a bearer token (for GET /api/auth/me and guards).
 async function userFromToken(token) {
   const payload = token && verifyToken(token);
@@ -137,4 +244,7 @@ function httpError(status, message) {
   return e;
 }
 
-module.exports = { signup, login, updateOrg, userFromToken, verifyToken, publicUser, httpError, normalizePhone };
+module.exports = {
+  signup, login, updateOrg, userFromToken, verifyToken, publicUser, httpError, normalizePhone,
+  requestPasswordReset, resetPassword,
+};

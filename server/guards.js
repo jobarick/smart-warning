@@ -99,7 +99,21 @@ const allowPlaces = rateLimiter({ windowMs: 60 * 1000, max: 30, name: 'places' }
 // away from telling us a customer has paid.
 const allowWebhook = rateLimiter({ windowMs: 60 * 1000, max: 240, name: 'payment-webhook' });
 
+// Password recovery is unauthenticated by definition, so it gets a ceiling.
+//
+// Deliberately generous, because this limiter is keyed by IP and a whole site
+// office sits behind one address: a tight cap would mean one colleague
+// fumbling their password locks the rest of the team out of recovery, on the
+// product whose entire promise is being reachable in an emergency.
+//
+// It is also not the control that stops token guessing — a reset token is 32
+// random bytes, so guessing is hopeless at any rate. What this actually
+// contains is bulk abuse: somebody scripting thousands of requests to grow the
+// mail queue. Mail-bombing ONE address is better answered by a per-address
+// cooldown, which is worth adding next.
+const allowPasswordReset = rateLimiter({ windowMs: 15 * 60 * 1000, max: 30, name: 'password-reset' });
+
 module.exports = {
   requireAuth, guardOrg, orgContext, orgIdFromRequest, allowFeature,
-  allowReport, allowPlaces, allowWebhook,
+  allowReport, allowPlaces, allowWebhook, allowPasswordReset,
 };

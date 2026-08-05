@@ -1474,6 +1474,26 @@ body {
   background: var(--bg-2); border: 1px solid var(--panel-border); border-radius: 11px; outline: none;
 }
 .auth-field input:focus { border-color: var(--accent); }
+.auth-field span small { font-weight: 500; opacity: 0.75; margin-left: 6px; }
+
+/* Password field with a reveal control. The input keeps its own full-width
+   styling and the button sits over its trailing edge, so the two never
+   disagree about height the way a flex row of input + button does. */
+.auth-password { position: relative; display: block; }
+.auth-password input { width: 100%; padding-right: 46px; }
+.auth-reveal {
+  position: absolute; top: 50%; right: 4px; transform: translateY(-50%);
+  display: flex; align-items: center; justify-content: center;
+  /* 40px square: a comfortable target on a phone, and it never overlaps the
+     text because the input reserves 46px of padding for it. */
+  width: 40px; height: 40px; padding: 0;
+  background: none; border: none; border-radius: 9px; cursor: pointer;
+  color: var(--muted); font-size: 1.05rem;
+}
+.auth-reveal:hover { color: var(--text); }
+.auth-reveal:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.auth-reveal[aria-pressed='true'] { color: var(--accent); }
+
 .auth-submit {
   width: 100%; margin-top: 20px; padding: 13px; cursor: pointer;
   font-size: 0.98rem; font-weight: 650; color: #fff;
@@ -2319,6 +2339,8 @@ body {
   color: var(--faint);
 }
 .about-meta { margin: 0; font-family: var(--mono); font-size: 11px; color: var(--faint); }
+.about-provider { margin: 0; font-size: 14px; line-height: 1.55; color: var(--muted); }
+.about-provider strong { color: var(--text); font-weight: 650; }
 .about-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0; }
 .about-facts dt {
   font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em;

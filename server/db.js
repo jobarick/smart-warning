@@ -322,6 +322,26 @@ async function init() {
     );
     CREATE INDEX IF NOT EXISTS consents_org_idx  ON consents (org_id, accepted_at DESC);
     CREATE INDEX IF NOT EXISTS consents_user_idx ON consents (user_id, accepted_at DESC);
+
+    -- Password reset tickets.
+    --
+    -- Only the HASH of the token is stored. The token itself exists in exactly
+    -- two places — the email that was sent, and the link the person clicks —
+    -- so a copy of this table is not a set of working reset links. That matters
+    -- more here than in most products: the account being reset can see the live
+    -- position of everyone on a site.
+    --
+    -- Single use and short lived, both enforced in the UPDATE that consumes a
+    -- ticket rather than by a read-then-write, so two clicks on the same link
+    -- cannot both succeed.
+    CREATE TABLE IF NOT EXISTS password_resets (
+      token_hash TEXT PRIMARY KEY,
+      user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      used_at    TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS password_resets_user_idx ON password_resets (user_id, created_at DESC);
   `);
   await backfillPublicCodes();
   await linkOrphanTables();
@@ -570,6 +590,62 @@ async function getUserById(id) {
   if (!pool) return null;
   const { rows } = await pool.query(`SELECT * FROM users WHERE id = $1`, [id]);
   return rows[0] || null;
+}
+
+// --- Password reset ---------------------------------------------------------
+
+async function createPasswordReset({ tokenHash, userId, expiresAt }) {
+  if (!pool) throw new Error('persistence disabled');
+  const { rows } = await pool.query(
+    `INSERT INTO password_resets (token_hash, user_id, expires_at)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (token_hash) DO NOTHING
+     RETURNING *`,
+    [tokenHash, userId, expiresAt],
+  );
+  return rows[0] || null;
+}
+
+/**
+ * Spend a reset ticket, returning the user it belongs to.
+ *
+ * The unused/unexpired test lives in the UPDATE's WHERE clause on purpose: a
+ * reset link that is clicked twice — which happens routinely, because mail
+ * clients prefetch links — must succeed exactly once. Reading the row first and
+ * then updating it would let two requests both pass the check.
+ */
+async function consumePasswordReset(tokenHash) {
+  if (!pool) return null;
+  const { rows } = await pool.query(
+    `UPDATE password_resets
+        SET used_at = now()
+      WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()
+      RETURNING user_id`,
+    [tokenHash],
+  );
+  if (!rows[0]) return null;
+  return getUserById(rows[0].user_id);
+}
+
+/**
+ * Set a new password and retire every outstanding ticket for that account.
+ *
+ * Both halves matter. Somebody who has just recovered an account may have
+ * requested several links while working out which email arrived; leaving the
+ * others live would mean an old message in an inbox still grants entry.
+ */
+async function setUserPassword(userId, passwordHash) {
+  if (!pool) return null;
+  const { rows } = await pool.query(
+    `UPDATE users SET password_hash = $2 WHERE id = $1 RETURNING *`,
+    [userId, passwordHash],
+  );
+  if (!rows[0]) return null;
+  await pool.query(
+    `UPDATE password_resets SET used_at = now() WHERE user_id = $1 AND used_at IS NULL`,
+    [userId],
+  );
+  return rows[0];
 }
 
 // --- Incidents (all scoped to an org) --------------------------------------
@@ -1382,6 +1458,9 @@ module.exports = {
   createUser,
   getUserByEmail,
   getUserById,
+  createPasswordReset,
+  consumePasswordReset,
+  setUserPassword,
   recordAlert,
   resolveActive,
   listIncidents,
