@@ -85,15 +85,24 @@ export function AuthGate({ onAuthed, notice }: Props) {
 
         {step === 'choose' && (
           <>
-            <h1 className="auth-title">Get connected</h1>
-            <p className="auth-sub">Join your team to send and receive alerts, or sign in to run the command dashboard.</p>
+            <h1 className="auth-title">Get started</h1>
+            <p className="auth-sub">Nothing exists here until you create it. Set up a new team, or join one you have a code for.</p>
             <button className="auth-choice" onClick={() => go('worker')}>
               <Icon name="check-circle" />
-              <span><b>Join your team</b><small>You have a team code from your supervisor</small></span>
+              <span><b>Join an existing team</b><small>You have a team code from your supervisor</small></span>
+            </button>
+            {/* Creating a team used to be reachable only by opening
+                "Supervisor sign in" and then noticing "New here?" underneath a
+                login form. Somebody setting up a site for the first time has no
+                reason to look for it behind a sign-in they do not yet have —
+                so the first screen now says it outright. */}
+            <button className="auth-choice" onClick={() => go('signup')}>
+              <Icon name="siren" />
+              <span><b>Create a new team</b><small>Set up a site and invite your people</small></span>
             </button>
             <button className="auth-choice" onClick={() => go('login')}>
               <Icon name="lock" />
-              <span><b>Supervisor sign in</b><small>Manage a site and view the dashboard</small></span>
+              <span><b>Supervisor sign in</b><small>You already have an account</small></span>
             </button>
           </>
         )}
