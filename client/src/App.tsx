@@ -27,6 +27,7 @@ import { ConnectionStatus, type AppView } from './components/ConnectionStatus';
 import { AlertLog } from './components/AlertLog';
 import { SystemStatusBar } from './components/SystemStatusBar';
 import { SystemFooter } from './components/SystemFooter';
+import { TabBar, type UserTab } from './components/TabBar';
 import { Icon } from './components/Icon';
 import { Logo } from './components/Logo';
 import { getProfile, alertLabel } from './lib/profiles';
@@ -117,7 +118,9 @@ export default function App() {
   }, []);
   const [view, setView] = useState<AppView>(() => (localStorage.getItem(VIEW_KEY) === 'command' ? 'command' : 'worker'));
   const [showSettings, setShowSettings] = useState(false);
-  const [showMore, setShowMore] = useState(false);
+  // Which of the user's four screens is open. Not persisted: the app should
+  // open on Home, where the SOS button is, however it was last left.
+  const [tab, setTab] = useState<UserTab>('home');
   const [showSupport, setShowSupport] = useState(false);
   // Plans & billing. Supervisors only — it needs an account token, and it is
   // administrative by definition. Nothing here can reach the alert path.
@@ -641,8 +644,13 @@ export default function App() {
   // An active alarm outranks anything a supervisor set by hand.
   const statusLevel: SystemStatusLevel = alarm.alert ? 'emergency' : standing.level;
 
+  // The user's screens run inside a fixed shell: the chrome stays put and the
+  // active tab scrolls inside it. Scoped to this view — the command centre has
+  // its own carefully-fitted layout and must not inherit a scroll container.
+  const tabbed = view === 'worker' && !showSettings && !showAbout && !showSupport && !showBilling;
+
   return (
-    <div className="app">
+    <div className={`app${tabbed ? ' app-tabbed' : ''}`}>
       <SystemStatusBar
         level={statusLevel}
         note={alarm.alert ? '' : standing.note}
@@ -771,39 +779,44 @@ export default function App() {
           />
         </main>
       ) : (
-        <main className="worker">
-          <SosPanel profile={profile} disabled={alarmActive} onTrigger={trigger} />
-          {/* Both of these are quiet until they matter: the route panel renders
-              nothing without a live alert, and the call pocket sits collapsed
-              until one opens it. */}
-          <SafeRoutePanel
-            alertType={alarm.alert?.type ?? null}
-            lat={settings.shareLocation ? telemetry.lat : null}
-            lng={settings.shareLocation ? telemetry.lng : null}
-            creds={joinCreds ?? {}}
-            operatorId={sessionId.current}
-          />
-          <EmergencyCallPocket
-            lat={telemetry.lat}
-            lng={telemetry.lng}
-            alertType={alarm.alert?.type ?? null}
-          />
-          <OperatorStatus
-            name={settings.deviceName}
-            operatorId={settings.operatorId}
-            telemetry={telemetry}
-            network={network}
-            shareLocation={settings.shareLocation}
-            assembly={{ lat: settings.assemblyLat, lng: settings.assemblyLng, label: settings.assemblyLabel }}
-            alarm={alarm}
-            now={now}
-          />
-          {/* The map and the history are reference, not action. Keeping them on
-              the primary screen pushed the SOS and the live telemetry into a
-              second scroll; behind a toggle, the screen someone opens under
-              pressure is only the parts they act on. */}
-          {showMore && (
+        // One screen, one job. This used to be a single column with the SOS
+        // button, the route panel, the call list, the telemetry tiles, the map
+        // and the history stacked down it, so the thing a person opens the app
+        // to press could sit below the fold behind five other things.
+        <main className="worker worker-tabbed">
+          {tab === 'home' && (
             <>
+              <SosPanel profile={profile} disabled={alarmActive} onTrigger={trigger} />
+              <OperatorStatus
+                name={settings.deviceName}
+                operatorId={settings.operatorId}
+                telemetry={telemetry}
+                network={network}
+                shareLocation={settings.shareLocation}
+                assembly={{ lat: settings.assemblyLat, lng: settings.assemblyLng, label: settings.assemblyLabel }}
+                alarm={alarm}
+                now={now}
+              />
+            </>
+          )}
+
+          {tab === 'emergency' && (
+            <>
+              {/* Both of these are quiet until they matter: the route panel
+                  renders nothing without a live alert, and the call pocket sits
+                  collapsed until one opens it. */}
+              <SafeRoutePanel
+                alertType={alarm.alert?.type ?? null}
+                lat={settings.shareLocation ? telemetry.lat : null}
+                lng={settings.shareLocation ? telemetry.lng : null}
+                creds={joinCreds ?? {}}
+                operatorId={sessionId.current}
+              />
+              <EmergencyCallPocket
+                lat={telemetry.lat}
+                lng={telemetry.lng}
+                alertType={alarm.alert?.type ?? null}
+              />
               <Suspense fallback={<PanelFallback label="map" />}>
                 <MapPanel
                   userLat={telemetry.lat}
@@ -811,25 +824,30 @@ export default function App() {
                   assembly={{ lat: settings.assemblyLat, lng: settings.assemblyLng, label: settings.assemblyLabel }}
                 />
               </Suspense>
-              <AlertLog entries={log} />
             </>
           )}
-          <div className="worker-tools">
-            <button className="btn settings-link" onClick={() => setShowMore((v) => !v)}>
-              {showMore ? 'Hide map & history' : 'Map & history'}
-            </button>
-            <button className="btn settings-link" onClick={() => setShowAbout(true)}>
-              About &amp; legal
-            </button>
-            <button className="btn settings-link" onClick={() => setShowSettings(true)}>
-              <Icon name="settings" /> Settings
-            </button>
-            <button className="btn settings-link" onClick={() => setShowSupport(true)}>
-              <Icon name="help" /> Support
-            </button>
-          </div>
+
+          {tab === 'alerts' && <AlertLog entries={log} />}
+
+          {tab === 'profile' && (
+            <div className="worker-tools">
+              <button className="btn settings-link" onClick={() => setShowAbout(true)}>
+                About &amp; legal
+              </button>
+              <button className="btn settings-link" onClick={() => setShowSettings(true)}>
+                <Icon name="settings" /> Settings
+              </button>
+              <button className="btn settings-link" onClick={() => setShowSupport(true)}>
+                <Icon name="help" /> Support
+              </button>
+            </div>
+          )}
         </main>
       )}
+
+      {/* Hidden whenever a full-screen panel is open, so those keep their own
+          Back button as the single way out rather than competing with it. */}
+      {tabbed && <TabBar tab={tab} onChange={setTab} alertCount={log.length} active={alarmActive} />}
 
       {view === 'worker' && alarm.alert && (
         <AlertOverlay

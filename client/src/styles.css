@@ -2396,3 +2396,83 @@ body {
   border-color: rgba(0, 0, 0, 0.4);
   color: rgba(0, 0, 0, 0.8);
 }
+
+/* ---------- user navigation (tab bar) ----------
+   Sits in the normal column flow above the system footer rather than floating
+   over the content, so nothing is ever hidden behind it. Sticky, so it stays
+   reachable while a tab's own content scrolls. */
+.tabbar {
+  z-index: 30;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2px;
+  padding: 6px 8px;
+  /* Clears the home indicator on a phone without adding space on a desktop. */
+  padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+  background: var(--panel);
+  border-top: 1px solid var(--panel-border);
+}
+.tabbar-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  /* 52px: comfortably above the 48px minimum, and this is pressed in a hurry. */
+  min-height: 52px;
+  padding: 6px 2px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+.tabbar-item:hover { color: var(--text); }
+.tabbar-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tabbar-item.is-current { color: var(--text); background: var(--bg-2); }
+/* An alarm is running: the Emergency tab says so without moving anybody off
+   the screen they are already looking at. */
+.tabbar-item.is-live { color: var(--accent); }
+.tabbar-icon { position: relative; display: flex; font-size: 20px; line-height: 1; }
+.tabbar-label { font-size: 11px; font-weight: 600; letter-spacing: 0.01em; }
+.tabbar-badge {
+  position: absolute;
+  top: -5px;
+  right: -9px;
+  min-width: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+}
+/* The tabbed screens carry their own spacing; the old single column relied on
+   the tools row at the end for its bottom gap. */
+.worker-tabbed { padding-bottom: 8px; }
+
+/* The user's shell is exactly one viewport tall: the status bar, org bar, tab
+   bar and footer hold their positions, and only the active tab's content
+   scrolls. Sticky was tried first and does not engage here, because body is a
+   fixed height while .app overflows past it — so the bar simply sat below the
+   fold, which is the one place a navigation bar must never be.
+
+   Scoped to .app-tabbed. The command centre is deliberately fitted to its own
+   viewport and must not inherit a scroll container. */
+.app-tabbed {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+.app-tabbed .worker-tabbed {
+  flex: 1 1 auto;
+  /* Without this a flex child refuses to shrink below its content height and
+     the scrollbar never appears. */
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
