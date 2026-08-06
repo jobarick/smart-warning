@@ -726,6 +726,107 @@ that Smart Warning is not an emergency service and has no authority behind it.
 
 ---
 
+---
+
+# Part III — Master Product & Design Specification (2026-08-06)
+
+A third brief, this one the most detailed: 35 sections covering UX, emergency
+logic, frontend states, backend architecture, data model, permissions,
+real-time communication and safety constraints.
+
+**Most of it is already written down or built.** This part records the mapping
+rather than restating it, and then deals with the two places where the spec and
+the running system genuinely disagree.
+
+## Where the spec's requirements already live
+
+| Spec § | Requirement | Where it stands |
+|---|---|---|
+| 1 | Inspect before modifying; produce an audit | Part I §0–1 — done before any code was touched |
+| 2, 35 | Product philosophy | Part I, and the tab shell built 2026-08-06 |
+| 3 | User vs Safety Coordinator separation | Part I §9; rename shipped; shells split in Phase 1 |
+| 4–6 | 8 primary categories + collapsed secondary + full taxonomy | **See the conflict below** |
+| 7 | Location-aware prioritisation | Phase 6 — the country bbox lookup already exists to drive it |
+| 8 | User-customisable shortcuts | Phase 1 remainder |
+| 9 | Deliberate SOS workflow | Part I §8.4 |
+| 10 | Live location + status | Part II §5 — the freshness honesty requirement is **not yet met** |
+| 11–12 | Coordinator dashboard and incident map | Part II §3–4, Phase 5 |
+| 13 | Emergency chat | Part II §7, Phase 5 — **largest single unbuilt item** |
+| 14–15 | Emergency contacts, top 8 by country | 55 countries already bundled offline; ranking is Phase 6 |
+| 16 | Three notification levels | Part I §11, Phase 4 |
+| 17 | African-first, globally scalable | Part I §8.3 |
+| 18 | Offline states | **Largely built already** — `outbox.ts` queues before sending, retires on the relay's echo, and diverts stale replays. Duplicate SOS on retry is prevented by alert id + `ON CONFLICT DO NOTHING` |
+| 19 | Modular backend | ✅ **Done** — `routes/`, `relay.js`, `guards.js`, `http.js`, `wire.js`, `config.js` |
+| 20–22 | Data model, incident lifecycle, response timer | Part I §6.4 (`incident_events`), Phase 5 |
+| 23 | Server-side role enforcement | ✅ Already true — `guardOrg`, org-scoped queries, roster restricted to coordinators |
+| 24 | Minimal permissions | ✅ Verified in the APK: no contacts, SMS, call log, camera, mic, or background location |
+| 25 | Design system | See the note below |
+| 26–27 | Responsive, no unnecessary scrolling | Phase 1 — user shell done, coordinator shell next |
+| 28 | Accessibility | Ongoing; the red/green requirement is Part II §4 |
+| 29 | Payment verified server-side | ✅ Already true — webhooks are hints, `refreshFromGateway()` re-queries the gateway for the verdict |
+| 30 | Safety content model | Part I §6.5, Phase 2 |
+| 31 | Professional consultation | Part II — the consultation pack. **Still cannot be done by me** |
+| 32 | Testing requirements | Partly met: 85 server tests. The SOS, location and chat matrices are not covered |
+| 33 | Do not overclaim | ✅ Audited — no "guaranteed" language anywhere; the terms state the limits explicitly |
+
+## ⚠️ Conflict: eight primary categories vs. the wire protocol
+
+§4 asks for Medical, Fire, Road Accident, Security, Flood, Severe Weather,
+Hazard and Evacuate on the first screen. The wire protocol has **six** canonical
+types — `fire`, `medical`, `security`, `hazard`, `cyber`, `evacuation` — checked
+against a fixed set at both ends and stored in `incidents.type`.
+
+Adding wire values breaks every installed app: an older relay coerces an
+unknown type, an older client drops the message, and the failure is silent in
+both directions. This is the same shape of problem as the Supervisor rename.
+
+**§6 already contains the right answer** — an extensible taxonomy. Build a
+category layer above the wire types, exactly as `profiles.ts` already does for
+labels:
+
+```
+Road Accident   → medical
+Flood           → hazard
+Severe Weather  → hazard
+Water Emergency → medical
+Structural collapse → hazard
+Chemical / Gas  → hazard
+Extreme heat    → medical
+Wildfire        → fire
+```
+
+Many user-facing categories, six stable wire types, no device left behind.
+
+> **This mapping is a safety decision, not a technical one.** It decides which
+> siren sounds and which protocol steps appear. It belongs in the §31
+> consultation with emergency professionals, and should not be settled by a
+> developer — including me. The table above is a starting point for that
+> conversation, not a conclusion.
+
+## Note on §25, the design system
+
+The spec asks for a Figma-style design system before implementing screens. This
+repository has no Figma file and 65 KB of hand-written CSS that is already
+consistent. A parallel design artifact would drift from the code within a
+sprint, and the code is what ships.
+
+**Recommendation:** build the component inventory *in code* — the buttons,
+status badges, cards, sheets, dialogs, empty/loading/error/offline states the
+spec lists — as real components with a documented set of tokens. If a Figma
+file is wanted for stakeholders, generate it from the built components rather
+than maintaining both.
+
+## What is built as of this part
+
+- ✅ Modular backend (§19)
+- ✅ Password visibility + recovery, Safety Coordinator, Idefenda Lab
+- ✅ Hosted legal pages, Play launch guide, backup hardening
+- ✅ **User tab shell (§27)** — four screens, page never scrolls, 52px targets
+- ▶ **Phase 2 in progress:** the safety library (§30, and the Safety tab the
+  shell is waiting for)
+
+---
+
 ## Appendix A — Benchmarking: what other emergency apps get right
 
 Patterns worth adopting (not designs worth copying):
