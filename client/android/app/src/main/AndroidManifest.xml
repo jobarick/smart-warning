@@ -1,8 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Backup is off deliberately. The webview's localStorage holds the
+         signed-in session (sw-session-v1), and that token is what lets a
+         device see the live position of everyone on a site. With backup on,
+         Android copies it to the user's Google account and restores it onto
+         whatever device they set up next — including a replacement phone in
+         somebody else's hands. The cost of turning it off is that a restored
+         device asks the person to sign in again, which is the correct thing
+         for it to ask. dataExtractionRules covers the Android 12+ paths that
+         allowBackup alone does not, notably device-to-device transfer. -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"

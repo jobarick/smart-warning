@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ backup and transfer rules.
+
+  allowBackup="false" stops cloud backup, but device-to-device transfer is a
+  separate path with its own switch — so both are refused here explicitly.
+
+  What is being protected is the webview's localStorage: it holds the signed-in
+  session, and that session can see where every person on a site currently is.
+  A phone handed on, sold, or replaced must not carry that with it. Signing in
+  again on a new device is the intended cost.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="file" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="file" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>
