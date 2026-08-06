@@ -38,11 +38,18 @@ const LIFE_SAFETY = new Set([
   'emergency_numbers',
   'safe_route',
   'public_report',
+  // Knowing what to do in a fire is not a premium feature. The library is
+  // bundled with the app and works offline; withholding it from somebody whose
+  // trial lapsed would be gating the one thing this product exists to give
+  // away, and it would not even save a request.
+  'safety_library',
+  'daily_safety_tip',
 ]);
 
-// Subscription states. `pending_payment` is the window between a USSD push
-// going out and the customer entering their PIN.
-const STATUSES = new Set(['active', 'pending_payment', 'past_due', 'canceled', 'expired']);
+// Subscription states. `trialing` is the first month of any new account;
+// `pending_payment` is the window between a USSD push going out and the
+// customer entering their PIN.
+const STATUSES = new Set(['trialing', 'active', 'pending_payment', 'past_due', 'canceled', 'expired']);
 
 // How long a failed renewal keeps its features. Mobile money fails for
 // mundane reasons — no balance on payday, a phone that was off, a network
@@ -54,6 +61,7 @@ const GRACE_MS = 14 * 24 * 60 * 60 * 1000;
 // The tier whose features a customer should be getting right now, which is not
 // always the tier they have signed up for.
 //
+//   trialing        → the trial tier, until trialEndsAt; free after
 //   active          → the plan they pay for
 //   past_due        → the plan they pay for, until the grace period lapses
 //   pending_payment → whatever they had before; a push that has not been
@@ -63,11 +71,22 @@ const GRACE_MS = 14 * 24 * 60 * 60 * 1000;
 function effectiveTier(subscription, now = Date.now()) {
   if (!subscription) return 'free';
 
-  const tier = plans.isPlan(subscription.tier) ? subscription.tier : 'free';
-  const previous = plans.isPlan(subscription.previousTier) ? subscription.previousTier : 'free';
+  // canonicalId, so a subscription still naming a renamed plan keeps what its
+  // owner bought instead of silently dropping to free.
+  const tier = plans.isPlan(subscription.tier) ? plans.canonicalId(subscription.tier) : 'free';
+  const previous = plans.isPlan(subscription.previousTier) ? plans.canonicalId(subscription.previousTier) : 'free';
   const status = subscription.status;
 
   if (status === 'active') return tier;
+
+  if (status === 'trialing') {
+    const ends = toMs(subscription.trialEndsAt);
+    // A trial with no end date has no way to expire, and an account that can
+    // never lapse is a pricing bug that would be invisible for a month. Treat
+    // the missing date as already over.
+    if (ends == null) return 'free';
+    return now < ends ? tier : 'free';
+  }
 
   if (status === 'pending_payment') return previous;
 
@@ -126,6 +145,9 @@ function summarize(subscription, { activeSeats = 0 } = {}, now = Date.now()) {
     features: plans.planFeatures(tier),
     currentPeriodEnd: subscription?.currentPeriodEnd ?? null,
     graceEndsAt: graceEndsAt(subscription),
+    // Everything a "you have N days left" banner needs, resolved here so the
+    // UI never has to do date arithmetic and never has to know the rules.
+    trial: trialState(subscription, now),
     seats: {
       limit: seatLimit,
       used: activeSeats,
@@ -135,6 +157,28 @@ function summarize(subscription, { activeSeats = 0 } = {}, now = Date.now()) {
     // Restated on every response so a client author does not have to read this
     // file to know that alerting is unconditional.
     alertingAlwaysAvailable: true,
+  };
+}
+
+/**
+ * Where an account stands in its free month.
+ *
+ * `daysLeft` rounds UP: with eleven hours to go a person has "1 day left", not
+ * zero. Telling somebody their trial has ended while they can still use it is
+ * the kind of small dishonesty that makes the rest of the billing screen hard
+ * to believe.
+ */
+function trialState(subscription, now = Date.now()) {
+  const endsAt = toMs(subscription?.trialEndsAt);
+  if (endsAt == null) return { active: false, endsAt: null, daysLeft: 0, ended: false };
+  const active = subscription.status === 'trialing' && now < endsAt;
+  return {
+    active,
+    endsAt: new Date(endsAt).toISOString(),
+    daysLeft: active ? Math.max(1, Math.ceil((endsAt - now) / 86400000)) : 0,
+    // Distinguishes "never had one" from "had one and it ran out", which are
+    // different sentences on screen.
+    ended: subscription.status === 'trialing' && now >= endsAt,
   };
 }
 
@@ -171,4 +215,5 @@ module.exports = {
   summarize,
   seatState,
   graceEndsAt,
+  trialState,
 };

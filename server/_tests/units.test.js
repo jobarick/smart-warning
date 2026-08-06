@@ -60,10 +60,12 @@ test('maps ClickPesa channel names back to operators', () => {
 
 test('prices match the published rate card', () => {
   assert.strictEqual(plans.priceFor('free', 'TZS'), 0);
-  assert.strictEqual(plans.priceFor('personal_pro', 'TZS'), 8000);
+  // The individual tier was Personal Pro at 8,000 TZS / $3. It is now Personal
+  // at 2,500 TZS / $1, sold with multi-month bundles — see _tests/trial.test.js.
+  assert.strictEqual(plans.priceFor('personal', 'TZS'), 2500);
   assert.strictEqual(plans.priceFor('team', 'TZS'), 80000);
   assert.strictEqual(plans.priceFor('business', 'TZS'), 260000);
-  assert.strictEqual(plans.priceFor('personal_pro', 'USD'), 3);
+  assert.strictEqual(plans.priceFor('personal', 'USD'), 1);
   assert.strictEqual(plans.priceFor('team', 'USD'), 30);
   assert.strictEqual(plans.priceFor('business', 'USD'), 100);
 });

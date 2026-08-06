@@ -5,6 +5,9 @@
 // relay runs exactly as before (in-memory, single global room). Orgs and
 // accounts only exist when a database is configured.
 const { Pool } = require('pg');
+// The plan catalogue is the single source for trial length and trial tier, so
+// the schema layer asks it rather than carrying a second copy of both.
+const plans = require('./billing/plans');
 
 const connectionString = process.env.DATABASE_URL || '';
 const isLocal = /@(localhost|127\.0\.0\.1)/.test(connectionString);
@@ -254,8 +257,35 @@ async function init() {
       created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
     );
-    CREATE UNIQUE INDEX IF NOT EXISTS subscriptions_org_idx ON subscriptions (org_id);
     CREATE INDEX IF NOT EXISTS subscriptions_period_idx ON subscriptions (status, current_period_end);
+
+    -- A subscription belongs to a SUBJECT, which is an organisation or a
+    -- person. Until now only organisations could hold one, which is why a
+    -- consumer plan could not be sold: there was nothing to sell it to.
+    ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS user_id       UUID REFERENCES users(id) ON DELETE CASCADE;
+    ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMPTZ;
+    ALTER TABLE subscriptions ALTER COLUMN org_id DROP NOT NULL;
+
+    -- One live subscription per subject. Two partial indexes rather than one
+    -- over both columns: a composite would happily allow two rows for the same
+    -- org as long as their user_id differed, which is exactly the state the
+    -- old index existed to prevent.
+    DROP INDEX IF EXISTS subscriptions_org_idx;
+    CREATE UNIQUE INDEX IF NOT EXISTS subscriptions_subject_org_idx
+      ON subscriptions (org_id)  WHERE org_id  IS NOT NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS subscriptions_subject_user_idx
+      ON subscriptions (user_id) WHERE user_id IS NOT NULL;
+
+    -- A person can now exist without an organisation.
+    --
+    -- 'kind' distinguishes somebody who signed up for themselves from a member
+    -- of a site. Both are users, share one auth path, one password rule and one
+    -- deletion path — a parallel accounts table would have meant maintaining
+    -- all three twice and getting them subtly different.
+    ALTER TABLE users ALTER COLUMN org_id DROP NOT NULL;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS kind    TEXT NOT NULL DEFAULT 'org_member';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS country TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS locale  TEXT NOT NULL DEFAULT 'en';
 
     -- Every collection attempt, successful or not.
     --
@@ -298,6 +328,11 @@ async function init() {
     -- routine, and Stripe's own idempotency key already covers that path.
     CREATE UNIQUE INDEX IF NOT EXISTS transactions_one_open_per_org
       ON transactions (org_id) WHERE status = 'pending' AND method = 'mobile_money';
+    -- Stated here rather than beside the subscriptions changes above, because
+    -- init() runs as one ordered script: an ALTER placed before its CREATE
+    -- TABLE works on every existing database and fails on every new one.
+    ALTER TABLE transactions ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id) ON DELETE SET NULL;
+
     CREATE INDEX IF NOT EXISTS transactions_org_idx     ON transactions (org_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS transactions_status_idx  ON transactions (status, created_at DESC);
     CREATE INDEX IF NOT EXISTS transactions_external_idx ON transactions (external_reference);
@@ -1038,8 +1073,10 @@ function publicSubscription(row) {
   return {
     id: row.id,
     orgId: row.org_id,
+    userId: row.user_id ?? null,
     tier: row.tier,
     previousTier: row.previous_tier,
+    trialEndsAt: row.trial_ends_at ?? null,
     status: row.status,
     paymentMethod: row.payment_method,
     provider: row.provider,
@@ -1067,15 +1104,49 @@ async function getSubscription(orgId) {
 // Every org gets a row, including free ones. A missing row and a free plan
 // would otherwise be indistinguishable, and the billing code would have to
 // handle null everywhere it handles 'free'.
+//
+// A row created here starts the free month. Existing rows are untouched — the
+// ON CONFLICT is a no-op update — so switching this on does not retroactively
+// put every organisation already using the product into a trial that will
+// later expire underneath them.
+//
+// The conflict target names the partial index's predicate, because that is the
+// index Postgres has to infer; without WHERE org_id IS NOT NULL this raises
+// "no unique or exclusion constraint matching the ON CONFLICT specification".
 async function ensureSubscription(orgId) {
   if (!pool || !orgId) return null;
+  const tier = plans.TRIAL_TIER.org;
+  const trialEnds = new Date(Date.now() + plans.TRIAL_DAYS * 86400000);
   const { rows } = await pool.query(
-    `INSERT INTO subscriptions (org_id, tier, previous_tier, status)
-     VALUES ($1, 'free', 'free', 'active')
-     ON CONFLICT (org_id) DO UPDATE SET org_id = EXCLUDED.org_id
+    `INSERT INTO subscriptions (org_id, tier, previous_tier, status, trial_ends_at)
+     VALUES ($1, $2, 'free', 'trialing', $3)
+     ON CONFLICT (org_id) WHERE org_id IS NOT NULL
+       DO UPDATE SET org_id = EXCLUDED.org_id
      RETURNING *`,
-    [orgId],
+    [orgId, tier, trialEnds],
   );
+  return publicSubscription(rows[0]);
+}
+
+// The same, for a person rather than a site.
+async function ensureUserSubscription(userId) {
+  if (!pool || !userId) return null;
+  const tier = plans.TRIAL_TIER.individual;
+  const trialEnds = new Date(Date.now() + plans.TRIAL_DAYS * 86400000);
+  const { rows } = await pool.query(
+    `INSERT INTO subscriptions (user_id, tier, previous_tier, status, trial_ends_at)
+     VALUES ($1, $2, 'free', 'trialing', $3)
+     ON CONFLICT (user_id) WHERE user_id IS NOT NULL
+       DO UPDATE SET user_id = EXCLUDED.user_id
+     RETURNING *`,
+    [userId, tier, trialEnds],
+  );
+  return publicSubscription(rows[0]);
+}
+
+async function getUserSubscription(userId) {
+  if (!pool || !userId) return null;
+  const { rows } = await pool.query(`SELECT * FROM subscriptions WHERE user_id = $1`, [userId]);
   return publicSubscription(rows[0]);
 }
 
@@ -1100,6 +1171,7 @@ const SUBSCRIPTION_FIELDS = {
   currentPeriodEnd: 'current_period_end',
   pastDueSince: 'past_due_since',
   canceledAt: 'canceled_at',
+  trialEndsAt: 'trial_ends_at',
 };
 
 async function updateSubscription(orgId, patch = {}) {
@@ -1461,6 +1533,8 @@ module.exports = {
   createPasswordReset,
   consumePasswordReset,
   setUserPassword,
+  ensureUserSubscription,
+  getUserSubscription,
   recordAlert,
   resolveActive,
   listIncidents,

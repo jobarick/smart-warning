@@ -24,6 +24,19 @@ const FEATURES = {
 
 const F = FEATURES;
 
+// Every new account starts with a month of the paid experience.
+//
+// When it lapses the account falls to 'free', which still raises alarms, still
+// calls emergency numbers, still receives alerts and still reads the safety
+// library — see billing/entitlements.js. A trial that expires into a product
+// that cannot call for help would be a worse thing to ship than no trial.
+const TRIAL_DAYS = 30;
+
+// What a trial serves, by the shape of the account. A person gets the personal
+// tier; an organisation gets the entry business tier, because a coordinator
+// evaluating this needs the dashboard to evaluate it at all.
+const TRIAL_TIER = { individual: 'personal', org: 'team' };
+
 // Ordered cheapest → richest. `rank` lets an upgrade/downgrade be compared
 // without hardcoding the order at each call site.
 const PLANS = [
@@ -41,13 +54,25 @@ const PLANS = [
     includes: ['Emergency SOS alerts', 'Standard emergency contacts', 'Live location during an alert'],
   },
   {
-    id: 'personal_pro',
+    id: 'personal',
     rank: 1,
-    name: 'Personal Pro',
+    name: 'Personal',
     audience: 'individual',
-    tagline: 'For families who want everyone accounted for.',
+    tagline: 'For one person, wherever they are.',
     seats: 1,
-    price: { USD: 3, TZS: 8000 },
+    price: { USD: 1, TZS: 2500 },
+    // Explicit bundle prices rather than a multiplier, for the same reason the
+    // monthly prices are explicit: a customer should recognise the number.
+    //
+    // Multi-month terms matter more here than anywhere else in the catalogue.
+    // Collecting 2,500 TZS by mobile money costs a gateway fee and a USSD
+    // prompt the customer has to complete, every single month — at this price
+    // the monthly cycle barely pays for itself, and prepaid airtime has
+    // already taught this market to buy time in blocks.
+    bundles: {
+      USD: { monthly: 1, quarterly: 2.6, half_year: 4.8, annual: 8.8 },
+      TZS: { monthly: 2500, quarterly: 6500, half_year: 12000, annual: 22000 },
+    },
     features: [F.UNLIMITED_CONTACTS, F.FAMILY_LOCATION, F.SAFETY_ASSISTANT],
     includes: ['Everything in Free', 'Unlimited emergency contacts', 'Family location sharing', 'Safety assistant guidance'],
   },
@@ -63,7 +88,7 @@ const PLANS = [
       F.UNLIMITED_CONTACTS, F.FAMILY_LOCATION, F.SAFETY_ASSISTANT,
       F.SUPERVISOR_DASHBOARD, F.INCIDENT_REPORTS,
     ],
-    includes: ['Everything in Personal Pro', 'Supervisor command centre', 'Incident history & roll call', 'Up to 50 people'],
+    includes: ['Everything in Personal', 'Safety Coordinator command centre', 'Incident history & roll call', 'Up to 50 people'],
   },
   {
     id: 'business',
@@ -103,23 +128,45 @@ const PLANS = [
 
 const BY_ID = PLANS.reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
 
+// Ids that have been renamed. A stored subscription still naming the old one
+// must keep resolving to the tier the customer bought — without this, an
+// unrecognised id falls through to 'free' and quietly removes what they paid
+// for. Cheaper than a data migration and impossible to forget to run.
+const LEGACY_IDS = { personal_pro: 'personal' };
+
 const CURRENCIES = ['TZS', 'USD'];
 
-// Only monthly is sold today. The cycle is carried through the schema and the
-// API so annual terms can be added without a migration; anything else is
-// rejected rather than silently treated as monthly.
-const CYCLES = new Set(['monthly', 'annual']);
+// Terms that can be bought. Anything else is rejected rather than silently
+// treated as monthly.
+const CYCLES = new Set(['monthly', 'quarterly', 'half_year', 'annual']);
 
-// Annual is billed at ten months — two months free. Kept here rather than as a
-// second price field so the two can never disagree.
+// How much time a term buys. Used to extend the period on renewal, so this is
+// the calendar length — not the number of months charged for.
+const CYCLE_MONTHS = { monthly: 1, quarterly: 3, half_year: 6, annual: 12 };
+
+// Fallback for plans without explicit bundle prices: annual is billed at ten
+// months, two months free. Plans that state their own bundle prices ignore it.
 const ANNUAL_MONTHS = 10;
 
-function getPlan(id) {
-  return BY_ID[id] || null;
+function canonicalId(id) {
+  return LEGACY_IDS[id] || id;
 }
 
+function getPlan(id) {
+  return BY_ID[canonicalId(id)] || null;
+}
+
+/** Calendar months a term covers, for extending a subscription period. */
+function monthsFor(cycle) {
+  return CYCLE_MONTHS[cycle] ?? 1;
+}
+
+// Recognised, including under a name it used to have. This has to resolve
+// aliases as well: every caller uses it as the guard before trusting a stored
+// tier, so if it answered false for a renamed id the alias would never be
+// reached and the customer would silently drop to free.
 function isPlan(id) {
-  return Boolean(BY_ID[id]);
+  return Boolean(BY_ID[canonicalId(id)]);
 }
 
 // Price of one billing period, in the currency's own units (TZS is a whole
@@ -129,10 +176,27 @@ function priceFor(planId, currency, cycle = 'monthly') {
   const plan = getPlan(planId);
   if (!plan) return null;
   if (!CURRENCIES.includes(currency)) return null;
+  if (!CYCLES.has(cycle)) return null;
+
+  // An explicit bundle price always wins. It is the number a customer was
+  // quoted, and arithmetic that disagrees with the rate card is a support
+  // ticket rather than a saving.
+  const bundle = plan.bundles?.[currency]?.[cycle];
+  if (bundle != null) return bundle;
+
   const monthly = plan.price[currency];
   if (monthly == null) return null;
+  if (cycle === 'monthly') return monthly;
   if (cycle === 'annual') return monthly * ANNUAL_MONTHS;
-  return monthly;
+  // A term this plan does not sell. Not an error, and deliberately not a
+  // guess: silently inventing a quarterly price for a business tier would put
+  // a number in front of a customer that nobody chose.
+  return null;
+}
+
+/** Is this term on sale for this plan, in this currency? */
+function cyclesFor(planId, currency = 'TZS') {
+  return [...CYCLES].filter((c) => priceFor(planId, currency, c) != null);
 }
 
 // A plan is chargeable if it has a price we can actually collect. Free needs no
@@ -172,6 +236,14 @@ function catalogue(currency = 'TZS', cycle = 'monthly') {
     perSeat: p.perSeat ? p.perSeat[cur] ?? null : null,
     contactOnly: Boolean(p.contactOnly),
     chargeable: isChargeable(p.id, cur, cycle),
+    // What terms this plan is actually sold on, and what each costs, so a
+    // pricing screen can offer bundles without doing arithmetic of its own.
+    cycles: cyclesFor(p.id, cur).map((c) => ({
+      cycle: c,
+      months: monthsFor(c),
+      price: priceFor(p.id, cur, c),
+    })),
+    trialDays: TRIAL_DAYS,
     features: p.features.slice(),
     includes: p.includes.slice(),
   }));
@@ -182,10 +254,16 @@ module.exports = {
   PLANS,
   CURRENCIES,
   CYCLES,
+  CYCLE_MONTHS,
   ANNUAL_MONTHS,
+  TRIAL_DAYS,
+  TRIAL_TIER,
+  canonicalId,
   getPlan,
   isPlan,
   priceFor,
+  cyclesFor,
+  monthsFor,
   isChargeable,
   planFeatures,
   seatsFor,
