@@ -85,7 +85,17 @@ function resolveFile(pathname) {
   if (rel.startsWith('..') || path.isAbsolute(rel)) return null;
 
   try {
-    if (fs.statSync(candidate).isFile()) return candidate;
+    const stat = fs.statSync(candidate);
+    if (stat.isFile()) return candidate;
+    // A directory serves its index.html, the way every static host does.
+    // Without this, /legal/ has no extension and no file, so it falls through
+    // to the single-page fallback below and answers with the app shell — which
+    // means the hosted legal pages behave differently depending on which host
+    // is serving them, and one of those hosts is the URL on a Play listing.
+    if (stat.isDirectory()) {
+      const index = path.join(candidate, 'index.html');
+      if (fs.statSync(index).isFile()) return index;
+    }
   } catch {
     /* not there */
   }
