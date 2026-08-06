@@ -1,6 +1,6 @@
 import { Icon, type IconName } from './Icon';
 
-export type UserTab = 'home' | 'emergency' | 'alerts' | 'profile';
+export type UserTab = 'home' | 'emergency' | 'safety' | 'alerts' | 'profile';
 
 interface Props {
   tab: UserTab;
@@ -14,6 +14,7 @@ interface Props {
 const TABS: { id: UserTab; label: string; icon: IconName }[] = [
   { id: 'home', label: 'Home', icon: 'home' },
   { id: 'emergency', label: 'Emergency', icon: 'siren' },
+  { id: 'safety', label: 'Safety', icon: 'shield-alert' },
   { id: 'alerts', label: 'Alerts', icon: 'bell' },
   { id: 'profile', label: 'Profile', icon: 'user' },
 ];
@@ -21,7 +22,7 @@ const TABS: { id: UserTab; label: string; icon: IconName }[] = [
 /**
  * The user's navigation.
  *
- * Four destinations, each with one job, replacing a single column that had the
+ * Five destinations, each with one job, replacing a single column that had the
  * SOS button, the route panel, the call list, the telemetry tiles, the map and
  * the history stacked down it. The screen a person opens under pressure should
  * be the part they act on, not a page they have to scroll through to find it.
@@ -29,10 +30,6 @@ const TABS: { id: UserTab; label: string; icon: IconName }[] = [
  * Deliberately at the bottom: on a phone held one-handed, that is where the
  * thumb already is, and this app is used standing up and in a hurry more often
  * than at a desk.
- *
- * There is no "Safety" tab yet. Adding one now would open an empty screen, and
- * a tab that leads nowhere teaches people not to trust the others; it arrives
- * with the safety library it is meant to hold.
  */
 export function TabBar({ tab, onChange, alertCount = 0, active = false }: Props) {
   return (

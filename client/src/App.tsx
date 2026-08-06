@@ -28,6 +28,7 @@ import { AlertLog } from './components/AlertLog';
 import { SystemStatusBar } from './components/SystemStatusBar';
 import { SystemFooter } from './components/SystemFooter';
 import { TabBar, type UserTab } from './components/TabBar';
+import { SafetyPanel } from './components/SafetyPanel';
 import { Icon } from './components/Icon';
 import { Logo } from './components/Logo';
 import { getProfile, alertLabel } from './lib/profiles';
@@ -826,6 +827,8 @@ export default function App() {
               </Suspense>
             </>
           )}
+
+          {tab === 'safety' && <SafetyPanel />}
 
           {tab === 'alerts' && <AlertLog entries={log} />}
 
