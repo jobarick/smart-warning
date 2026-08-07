@@ -382,6 +382,40 @@ async function init() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS password_resets_user_idx ON password_resets (user_id, created_at DESC);
+
+    -- The people a personal account has asked to be told when they raise an
+    -- alarm.
+    --
+    -- Scoped to a user and to nothing else. There is no org_id here on
+    -- purpose: this is the private list of one person, and an organisation has
+    -- its own roster and its own coordinators. Mixing the two would be the
+    -- fastest way to send somebody's home emergency to their employer.
+    --
+    -- 'notify' is a per-contact switch rather than a delete, because a person
+    -- may want to keep a number on the list without alarming it every time —
+    -- and deleting a contact to silence it is how a number gets lost.
+    CREATE TABLE IF NOT EXISTS emergency_contacts (
+      id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name       TEXT NOT NULL,
+      relation   TEXT,
+      phone      TEXT,
+      email      TEXT,
+      -- Lower sorts first. This is the order they are told in, and the order
+      -- the screen lists them in, so the two can never disagree.
+      priority   INT  NOT NULL DEFAULT 1,
+      notify     BOOLEAN NOT NULL DEFAULT true,
+      -- Set when the person has confirmed the details reach the right human.
+      verified_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      -- A contact must be reachable by something, or it is a name that creates
+      -- a false sense of cover. Enforced here rather than only in the API,
+      -- because this is the promise the whole feature rests on.
+      CONSTRAINT emergency_contacts_reachable CHECK (phone IS NOT NULL OR email IS NOT NULL)
+    );
+    CREATE INDEX IF NOT EXISTS emergency_contacts_user_idx
+      ON emergency_contacts (user_id, priority, created_at);
   `);
   await backfillPublicCodes();
   await linkOrphanTables();
@@ -698,6 +732,100 @@ async function setUserPassword(userId, passwordHash) {
     [userId],
   );
   return rows[0];
+}
+
+// --- Personal emergency contacts -------------------------------------------
+//
+// Every function here takes the owner's user id and uses it in the WHERE
+// clause, including the updates and the delete. Not a convenience: it is what
+// makes it impossible for one person to read or change another's list by
+// guessing a row id.
+
+function publicContact(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    relation: row.relation || null,
+    phone: row.phone || null,
+    email: row.email || null,
+    priority: row.priority,
+    notify: row.notify === true,
+    verifiedAt: row.verified_at || null,
+  };
+}
+
+async function listContacts(userId) {
+  if (!pool || !userId) return [];
+  const { rows } = await pool.query(
+    `SELECT * FROM emergency_contacts WHERE user_id = $1
+      ORDER BY priority ASC, created_at ASC LIMIT 20`,
+    [userId],
+  );
+  return rows.map(publicContact);
+}
+
+/** The contacts that should actually be told, in the order they are told. */
+async function listNotifiableContacts(userId) {
+  if (!pool || !userId) return [];
+  const { rows } = await pool.query(
+    `SELECT * FROM emergency_contacts
+      WHERE user_id = $1 AND notify = true
+      ORDER BY priority ASC, created_at ASC LIMIT 20`,
+    [userId],
+  );
+  return rows.map(publicContact);
+}
+
+async function createContact({ userId, name, relation, phone, email, priority, notify }) {
+  if (!pool) throw new Error('persistence disabled');
+  const { rows } = await pool.query(
+    `INSERT INTO emergency_contacts (user_id, name, relation, phone, email, priority, notify)
+     VALUES ($1, $2, $3, $4, $5, COALESCE($6, 1), COALESCE($7, true)) RETURNING *`,
+    [userId, name, relation ?? null, phone ?? null, email ?? null, priority ?? null, notify ?? null],
+  );
+  return publicContact(rows[0]);
+}
+
+const CONTACT_FIELDS = {
+  name: 'name', relation: 'relation', phone: 'phone', email: 'email',
+  priority: 'priority', notify: 'notify', verifiedAt: 'verified_at',
+};
+
+async function updateContact(id, userId, patch = {}) {
+  if (!pool || !userId) return null;
+  const sets = [];
+  const values = [];
+  for (const [key, column] of Object.entries(CONTACT_FIELDS)) {
+    if (patch[key] === undefined) continue;
+    values.push(patch[key]);
+    sets.push(`${column} = $${values.length}`);
+  }
+  if (!sets.length) return null;
+  values.push(id, userId);
+  const { rows } = await pool.query(
+    `UPDATE emergency_contacts SET ${sets.join(', ')}, updated_at = now()
+      WHERE id = $${values.length - 1} AND user_id = $${values.length} RETURNING *`,
+    values,
+  );
+  return publicContact(rows[0]);
+}
+
+async function deleteContact(id, userId) {
+  if (!pool || !userId) return null;
+  const { rows } = await pool.query(
+    `DELETE FROM emergency_contacts WHERE id = $1 AND user_id = $2 RETURNING id`,
+    [id, userId],
+  );
+  return rows[0] || null;
+}
+
+async function countContacts(userId) {
+  if (!pool || !userId) return 0;
+  const { rows } = await pool.query(
+    `SELECT count(*)::int AS n FROM emergency_contacts WHERE user_id = $1`, [userId],
+  );
+  return rows[0].n;
 }
 
 // --- Incidents (all scoped to an org) --------------------------------------
@@ -1611,6 +1739,12 @@ module.exports = {
   getUserSubscription,
   updateUserSubscription,
   subscriptionsFor,
+  listContacts,
+  listNotifiableContacts,
+  createContact,
+  updateContact,
+  deleteContact,
+  countContacts,
   recordAlert,
   resolveActive,
   listIncidents,

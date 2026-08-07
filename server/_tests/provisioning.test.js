@@ -159,7 +159,9 @@ test('refuses to sell what is not for sale online', async (t) => {
   const db = makeDb();
   const payments = loadPayments({ db, clickpesa: makeClickpesa() });
 
-  await assert.rejects(() => payments.initiateMobileMoney({ orgId: 'o', planId: 'enterprise', phoneNumber: '0713455454' }), /our team/);
+  // Enterprise now carries a published monthly price, so it IS for sale online
+  // — it used to be enquiry-only. Free still is not sellable, because there is
+  // nothing to collect.
   await assert.rejects(() => payments.initiateMobileMoney({ orgId: 'o', planId: 'free', phoneNumber: '0713455454' }), /free/);
   await assert.rejects(() => payments.initiateMobileMoney({ orgId: 'o', planId: 'nope', phoneNumber: '0713455454' }), /unknown plan/);
 });

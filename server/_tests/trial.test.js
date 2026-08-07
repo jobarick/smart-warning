@@ -108,13 +108,15 @@ test('a term a plan does not sell has no price, rather than an invented one', ()
 });
 
 test('business plans keep their two-months-free annual term', () => {
-  assert.equal(plans.priceFor('business', 'TZS', 'annual'), 260000 * plans.ANNUAL_MONTHS);
+  assert.equal(plans.priceFor('business', 'TZS', 'annual'), 125000 * plans.ANNUAL_MONTHS);
 });
 
-test('enterprise stays unpriced on every term', () => {
-  for (const cycle of [...plans.CYCLES]) {
-    assert.equal(plans.priceFor('enterprise', 'USD', cycle), null);
-  }
+test('enterprise is priced monthly and annually, but sells no bundles', () => {
+  assert.equal(plans.priceFor('enterprise', 'USD', 'monthly'), 100);
+  assert.equal(plans.priceFor('enterprise', 'USD', 'annual'), 100 * plans.ANNUAL_MONTHS);
+  // No bundle prices, so the mid-length terms are not offered rather than guessed.
+  assert.equal(plans.priceFor('enterprise', 'USD', 'quarterly'), null);
+  assert.equal(plans.priceFor('enterprise', 'USD', 'half_year'), null);
 });
 
 test('the catalogue tells a pricing screen which terms exist', () => {

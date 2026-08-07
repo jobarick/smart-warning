@@ -55,6 +55,17 @@ const MONTHLY_PRICE = {
   TZS: Number(process.env.MONTHLY_PRICE_TZS ?? 2500),
 };
 
+// The larger tiers, configured the same way and for the same reason: the local
+// figure is a price somebody chose, never a conversion computed at runtime.
+const BUSINESS_PRICE = {
+  USD: Number(process.env.BUSINESS_PRICE_USD ?? 50),
+  TZS: Number(process.env.BUSINESS_PRICE_TZS ?? 125000),
+};
+const ENTERPRISE_PRICE = {
+  USD: Number(process.env.ENTERPRISE_PRICE_USD ?? 100),
+  TZS: Number(process.env.ENTERPRISE_PRICE_TZS ?? 250000),
+};
+
 /** Bundle prices, held explicitly for the same reason as the monthly ones. */
 const BUNDLE_PRICE = {
   USD: {
@@ -130,7 +141,7 @@ const PLANS = [
     tagline: 'Multi-site operations that answer to an auditor.',
     seats: 250,
     minSeats: 51,
-    price: { USD: 100, TZS: 260000 },
+    price: BUSINESS_PRICE,
     features: [
       F.UNLIMITED_CONTACTS, F.FAMILY_LOCATION, F.SAFETY_ASSISTANT,
       F.SUPERVISOR_DASHBOARD, F.INCIDENT_REPORTS,
@@ -144,10 +155,11 @@ const PLANS = [
     name: 'Enterprise',
     audience: 'business',
     tagline: 'Priced per person, billed how your finance team needs.',
-    seats: null, // custom — negotiated, not self-serve
-    price: { USD: null, TZS: null },
-    perSeat: { USD: { min: 1, max: 3 } },
-    contactOnly: true,
+    // Seat count stays custom, but the price no longer is: Enterprise has a
+    // published monthly figure now, so it can be bought rather than only
+    // enquired about.
+    seats: null,
+    price: ENTERPRISE_PRICE,
     features: [
       F.UNLIMITED_CONTACTS, F.FAMILY_LOCATION, F.SAFETY_ASSISTANT,
       F.SUPERVISOR_DASHBOARD, F.INCIDENT_REPORTS,

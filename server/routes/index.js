@@ -17,6 +17,7 @@ const MODULES = [
   require('./reports'),
   require('./incidents'),
   require('./org'),
+  require('./contacts'),
   require('./destinations'),
   require('./emergency'),
   require('./feedback'),

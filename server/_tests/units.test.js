@@ -64,16 +64,16 @@ test('prices match the published rate card', () => {
   // at 2,500 TZS / $1, sold with multi-month bundles — see _tests/trial.test.js.
   assert.strictEqual(plans.priceFor('personal', 'TZS'), 2500);
   assert.strictEqual(plans.priceFor('team', 'TZS'), 2500);
-  assert.strictEqual(plans.priceFor('business', 'TZS'), 260000);
+  assert.strictEqual(plans.priceFor('business', 'TZS'), 125000);
   assert.strictEqual(plans.priceFor('personal', 'USD'), 1);
   assert.strictEqual(plans.priceFor('team', 'USD'), 1);
-  assert.strictEqual(plans.priceFor('business', 'USD'), 100);
+  assert.strictEqual(plans.priceFor('business', 'USD'), 50);
 });
 
 test('annual is ten months, and enterprise has no self-serve price', () => {
-  assert.strictEqual(plans.priceFor('business', 'USD', 'annual'), 1000);
-  assert.strictEqual(plans.priceFor('enterprise', 'USD'), null);
-  assert.strictEqual(plans.isChargeable('enterprise', 'USD'), false);
+  assert.strictEqual(plans.priceFor('business', 'USD', 'annual'), 500);
+  assert.strictEqual(plans.priceFor('enterprise', 'USD'), 100);
+  assert.strictEqual(plans.isChargeable('enterprise', 'USD'), true);
   assert.strictEqual(plans.isChargeable('free', 'TZS'), false);
   assert.strictEqual(plans.isChargeable('team', 'TZS'), true);
 });
