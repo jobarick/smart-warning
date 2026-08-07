@@ -112,9 +112,40 @@ function validatePlanRequest({ planId, currency, cycle }) {
 // The transaction row is written *before* the gateway is called. If the call
 // succeeds but our process dies before it returns, the reconciler still finds
 // the row and resolves it; the reverse order would lose the payment entirely.
-async function initiateMobileMoney({ orgId, planId, phoneNumber, cycle = 'monthly', currency = 'TZS' }) {
+/**
+ * Who is paying.
+ *
+ * Every caller either states a subject or passes the orgId this module has
+ * always taken; both end up here, so an organisation payment follows exactly
+ * the path it did before and a person gets their own.
+ */
+function toSubject({ subject, orgId, userId }) {
+  if (subject && subject.kind) return subject;
+  if (userId) return { kind: 'individual', userId, orgId: null };
+  if (orgId) return { kind: 'organization', orgId, userId: null };
+  return null;
+}
+
+/** The subject a stored transaction belongs to. Older rows carry only an org. */
+function subjectOf(tx) {
+  if (!tx) return null;
+  if (tx.userId) return { kind: 'individual', userId: tx.userId, orgId: null };
+  if (tx.orgId) return { kind: 'organization', orgId: tx.orgId, userId: null };
+  return null;
+}
+
+const storeFor = (subject) => (subject ? db.subscriptionsFor(subject) : null);
+const describe = (s) => (s?.kind === 'individual' ? `user ${s.userId}` : `org ${s?.orgId}`);
+
+async function initiateMobileMoney(input) {
+  const { planId, phoneNumber, cycle = 'monthly', currency = 'TZS' } = input;
   if (!db.enabled()) throw new PaymentError('payments require a database', 501);
   if (!clickpesa.enabled()) throw new PaymentError('mobile money is not configured on this deployment', 501);
+
+  const subject = toSubject(input);
+  if (!subject) throw new PaymentError('no billing subject for this payment', 400);
+  const store = storeFor(subject);
+  if (!store) throw new PaymentError('no billing subject for this payment', 400);
 
   const { plan, amount } = validatePlanRequest({ planId, currency, cycle });
 
@@ -125,7 +156,7 @@ async function initiateMobileMoney({ orgId, planId, phoneNumber, cycle = 'monthl
   }
 
   const operator = phone.operatorOf(msisdn);
-  const subscription = await db.ensureSubscription(orgId);
+  const subscription = await store.ensure();
 
   // Rejoin an attempt that is already on the customer's handset rather than
   // sending a second prompt. A double tap, an impatient refresh or two open
@@ -135,13 +166,14 @@ async function initiateMobileMoney({ orgId, planId, phoneNumber, cycle = 'monthl
   // Checked twice on purpose: this read catches the ordinary case, and the
   // partial unique index on transactions catches the race the read cannot,
   // where two requests both pass this check before either has inserted.
-  const existing = await db.findOpenTransactionForOrg?.(orgId, PUSH_TIMEOUT_MS);
+  const existing = await db.findOpenTransactionForSubject?.(subject, PUSH_TIMEOUT_MS);
   if (existing) return rejoin(existing, msisdn);
 
   const orderReference = clickpesa.makeOrderReference();
 
   const created = await db.createTransaction({
-    orgId,
+    orgId: subject.orgId ?? null,
+    userId: subject.userId ?? null,
     subscriptionId: subscription?.id ?? null,
     orderReference,
     provider: operator,
@@ -157,15 +189,15 @@ async function initiateMobileMoney({ orgId, planId, phoneNumber, cycle = 'monthl
 
   // The index rejected it — another request got there first.
   if (created === null) {
-    const winner = await db.findOpenTransactionForOrg?.(orgId, PUSH_TIMEOUT_MS);
+    const winner = await db.findOpenTransactionForSubject?.(subject, PUSH_TIMEOUT_MS);
     if (winner) return rejoin(winner, msisdn);
-    throw new PaymentError('another payment for this organization is already in progress', 409);
+    throw new PaymentError('another payment for this account is already in progress', 409);
   }
 
   // Hold the customer at whatever they are entitled to today. effectiveTier()
   // already returns the stored previousTier when a payment is mid-flight, so a
   // second attempt cannot overwrite it with the tier being bought.
-  await db.updateSubscription(orgId, {
+  await store.update({
     tier: planId,
     previousTier: entitlements.effectiveTier(subscription),
     status: 'pending_payment',
@@ -302,7 +334,7 @@ async function refreshFromGateway(orderReference) {
       // after it, the request never reached a handset.
       if (Date.now() - new Date(tx.createdAt).getTime() > PUSH_TIMEOUT_MS) {
         await db.updateTransactionStatus({ orderReference, status: 'failed', message: 'no response from the payment network' });
-        await revertPending(tx.orgId);
+        await revertPending(subjectOf(tx));
         return db.getTransactionByReference(orderReference);
       }
       return tx;
@@ -314,7 +346,7 @@ async function refreshFromGateway(orderReference) {
           orderReference, status: 'failed', rawStatus: remote.status,
           message: 'the payment was not authorised in time',
         });
-        await revertPending(tx.orgId);
+        await revertPending(subjectOf(tx));
         return db.getTransactionByReference(orderReference);
       }
       await db.updateTransactionStatus({ orderReference, status: 'pending', rawStatus: remote.status });
@@ -332,7 +364,7 @@ async function refreshFromGateway(orderReference) {
     });
 
     if (remote.outcome === 'paid') await applyOutcome(orderReference);
-    else await revertPending(tx.orgId);
+    else await revertPending(subjectOf(tx));
 
     return db.getTransactionByReference(orderReference);
   }
@@ -360,16 +392,21 @@ async function refreshFromGateway(orderReference) {
 // claim below succeeds once and only once.
 async function applyOutcome(orderReference) {
   const tx = await db.getTransactionByReference(orderReference);
-  if (!tx || tx.status !== 'paid' || !tx.orgId) return false;
+  if (!tx || tx.status !== 'paid') return false;
+  // The transaction names its own subject, so provisioning activates the
+  // subscription that was paid for and no other.
+  const subject = subjectOf(tx);
+  const store = storeFor(subject);
+  if (!store) return false;
 
   const claimed = await db.claimTransactionForProvisioning(orderReference);
   if (!claimed) return false; // already provisioned by an earlier delivery
 
   try {
-    const subscription = await db.getSubscription(tx.orgId);
+    const subscription = await store.get();
     const { start, end } = nextPeriod(subscription, tx.billingCycle);
 
-    await db.updateSubscription(tx.orgId, {
+    await store.update({
       tier: tx.planId,
       previousTier: tx.planId, // the pending window is over; this is now the floor
       status: 'active',
@@ -387,7 +424,7 @@ async function applyOutcome(orderReference) {
       canceledAt: null,
     });
 
-    console.log(`[payments] ${tx.planId} activated for org ${tx.orgId} until ${end.toISOString()} (${tx.orderReference})`);
+    console.log(`[payments] ${tx.planId} activated for ${describe(subject)} until ${end.toISOString()} (${tx.orderReference})`);
     return true;
   } catch (e) {
     // Release the claim so this can be retried — a customer who has paid must
@@ -400,22 +437,30 @@ async function applyOutcome(orderReference) {
 
 // A pending attempt that came to nothing. The subscription returns to whatever
 // it was before — never to free, unless free is where it started.
-async function revertPending(orgId) {
-  if (!orgId) return;
-  const sub = await db.getSubscription(orgId);
+async function revertPending(subjectOrOrgId) {
+  const subject = typeof subjectOrOrgId === 'string'
+    ? { kind: 'organization', orgId: subjectOrOrgId, userId: null }
+    : subjectOrOrgId;
+  const store = storeFor(subject);
+  if (!store) return;
+  const sub = await store.get();
   if (!sub || sub.status !== 'pending_payment') return;
-  await db.updateSubscription(orgId, { tier: sub.previousTier, status: 'active' });
+  await store.update({ tier: sub.previousTier, status: 'active' });
 }
 
 // Money that came back out after we had been paid. This is not a failed
 // payment — the customer had a live subscription — so it goes past_due and
 // picks up the grace period rather than being cut off mid-period.
-async function applyClawback(orgId, reason = 'payment reversed') {
-  if (!orgId) return;
-  const sub = await db.getSubscription(orgId);
+async function applyClawback(subjectOrOrgId, reason = 'payment reversed') {
+  const subject = typeof subjectOrOrgId === 'string'
+    ? { kind: 'organization', orgId: subjectOrOrgId, userId: null }
+    : subjectOrOrgId;
+  const store = storeFor(subject);
+  if (!store) return;
+  const sub = await store.get();
   if (!sub || sub.tier === 'free') return;
-  await db.updateSubscription(orgId, { status: 'past_due', pastDueSince: new Date() });
-  console.warn(`[payments] clawback on org ${orgId}: ${reason}`);
+  await store.update({ status: 'past_due', pastDueSince: new Date() });
+  console.warn(`[payments] clawback on ${describe(subject)}: ${reason}`);
 }
 
 // --- Webhooks --------------------------------------------------------------
@@ -448,7 +493,7 @@ async function handleClickPesaWebhook(body) {
   // that a status query would report as historic rather than current.
   if (clickpesa.CLAWBACK.has(rawStatus) && tx.status === 'paid') {
     await db.updateTransactionStatus({ orderReference, status: 'reversed', rawStatus });
-    await applyClawback(tx.orgId, `${event || rawStatus} on ${orderReference}`);
+    await applyClawback(subjectOf(tx), `${event || rawStatus} on ${orderReference}`);
     return { ok: true, applied: 'clawback' };
   }
 
@@ -474,7 +519,7 @@ async function handleStripeWebhook(rawBody, signatureHeader) {
 
   if (normalized.clawback) {
     await db.updateTransactionStatus({ orderReference: normalized.reference, status: 'reversed', rawStatus: normalized.eventType });
-    await applyClawback(tx.orgId, normalized.eventType);
+    await applyClawback(subjectOf(tx), normalized.eventType);
     return { ok: true, applied: 'clawback' };
   }
 
@@ -489,7 +534,7 @@ async function handleStripeWebhook(rawBody, signatureHeader) {
 
   if (normalized.outcome === 'failed') {
     await db.updateTransactionStatus({ orderReference: normalized.reference, status: 'failed', rawStatus: normalized.eventType });
-    await revertPending(tx.orgId);
+    await revertPending(subjectOf(tx));
     return { ok: true, applied: 'failed' };
   }
 
@@ -501,11 +546,15 @@ async function handleStripeWebhook(rawBody, signatureHeader) {
 // What the checkout screen polls. Pending transactions past the point where a
 // webhook should have arrived are actively chased, so the flow completes even
 // on a deployment whose webhook URL was never registered.
-async function getPaymentStatus(orderReference, { orgId = null } = {}) {
+async function getPaymentStatus(orderReference, { orgId = null, subject = null } = {}) {
   let tx = await db.getTransactionByReference(orderReference);
   if (!tx) return null;
-  // Never let one org read another's payment.
-  if (orgId && tx.orgId && tx.orgId !== orgId) return null;
+  // Never let one subject read another's payment. Checked against whichever
+  // identity the caller holds, and — importantly — a person may only read a
+  // transaction carrying their own user id, not merely one whose org matches.
+  const asking = subject || (orgId ? { kind: 'organization', orgId, userId: null } : null);
+  if (asking?.kind === 'organization' && tx.orgId && tx.orgId !== asking.orgId) return null;
+  if (asking?.kind === 'individual' && tx.userId !== asking.userId) return null;
 
   const ageMs = Date.now() - new Date(tx.createdAt).getTime();
   if (tx.status === 'pending' && ageMs > 4000) {

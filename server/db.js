@@ -333,10 +333,24 @@ async function init() {
     -- routine, and Stripe's own idempotency key already covers that path.
     CREATE UNIQUE INDEX IF NOT EXISTS transactions_one_open_per_org
       ON transactions (org_id) WHERE status = 'pending' AND method = 'mobile_money';
+
     -- Stated here rather than beside the subscriptions changes above, because
     -- init() runs as one ordered script: an ALTER placed before its CREATE
     -- TABLE works on every existing database and fails on every new one.
     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id) ON DELETE SET NULL;
+
+    -- The double-charge guard for a person. The org index above is keyed on
+    -- org_id and so does nothing at all for a personal account: without this,
+    -- one double tap puts two USSD prompts on one handset and a customer who
+    -- approves both is charged twice.
+    --
+    -- Stated AFTER the ALTER that adds the column, for the same reason as the
+    -- ALTER itself: init() runs as one ordered script, and an index over a
+    -- column that does not exist yet fails on every new database while
+    -- succeeding on every existing one.
+    CREATE UNIQUE INDEX IF NOT EXISTS transactions_one_open_per_user
+      ON transactions (user_id)
+      WHERE status = 'pending' AND method = 'mobile_money' AND user_id IS NOT NULL;
 
     CREATE INDEX IF NOT EXISTS transactions_org_idx     ON transactions (org_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS transactions_status_idx  ON transactions (status, created_at DESC);
@@ -1412,6 +1426,9 @@ function publicTransaction(row) {
   return {
     id: row.id,
     orgId: row.org_id,
+    // Which subject paid. A transaction names its own, so provisioning never
+    // has to guess whose subscription to activate.
+    userId: row.user_id ?? null,
     orderReference: row.order_reference,
     externalReference: row.external_reference,
     provider: row.provider,
@@ -1448,12 +1465,13 @@ async function createTransaction(tx) {
 async function insertTransaction(tx) {
   const { rows } = await pool.query(
     `INSERT INTO transactions
-       (org_id, subscription_id, order_reference, external_reference, provider, gateway,
+       (org_id, user_id, subscription_id, order_reference, external_reference, provider, gateway,
         method, phone_number, amount, currency, plan_id, billing_cycle, status)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
      RETURNING *`,
     [
       tx.orgId ?? null,
+      tx.userId ?? null,
       tx.subscriptionId ?? null,
       tx.orderReference,
       tx.externalReference ?? null,
@@ -1553,6 +1571,36 @@ async function findOpenTransactionForOrg(orgId, withinMs) {
     [orgId, String(Math.max(0, Math.floor(withinMs)))],
   );
   return publicTransaction(rows[0]);
+}
+
+/** The same question for a person: is a prompt already on their handset? */
+async function findOpenTransactionForUser(userId, withinMs) {
+  if (!pool || !userId) return null;
+  const { rows } = await pool.query(
+    `SELECT * FROM transactions
+     WHERE user_id = $1 AND status = 'pending'
+       AND created_at > now() - ($2 || ' milliseconds')::interval
+     ORDER BY created_at DESC LIMIT 1`,
+    [userId, String(Math.max(0, Math.floor(withinMs)))],
+  );
+  return publicTransaction(rows[0]);
+}
+
+/** Open attempt for either subject, chosen by the stated kind. */
+async function findOpenTransactionForSubject(subject, withinMs) {
+  if (!subject) return null;
+  if (subject.kind === 'individual') return findOpenTransactionForUser(subject.userId, withinMs);
+  if (subject.kind === 'organization') return findOpenTransactionForOrg(subject.orgId, withinMs);
+  return null;
+}
+
+async function listUserTransactions({ userId, limit = 20 } = {}) {
+  if (!pool || !userId) return [];
+  const { rows } = await pool.query(
+    `SELECT * FROM transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2`,
+    [userId, Math.min(Math.max(Number(limit) || 20, 1), 100)],
+  );
+  return rows.map(publicTransaction);
 }
 
 // Transactions still awaiting an answer, oldest first. The reconciler polls
@@ -1739,6 +1787,9 @@ module.exports = {
   getUserSubscription,
   updateUserSubscription,
   subscriptionsFor,
+  findOpenTransactionForUser,
+  findOpenTransactionForSubject,
+  listUserTransactions,
   listContacts,
   listNotifiableContacts,
   createContact,

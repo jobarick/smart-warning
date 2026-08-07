@@ -36,6 +36,53 @@ function makeDb() {
       Object.assign(subscriptions.get(orgId), patch);
       return { ...subscriptions.get(orgId) };
     },
+    async ensureUserSubscription(userId) {
+      const key = `user:${userId}`;
+      if (!subscriptions.has(key)) {
+        subscriptions.set(key, { id: `sub-${key}`, kind: 'individual', userId, orgId: null, tier: 'free', previousTier: 'free', status: 'active' });
+      }
+      return { ...subscriptions.get(key) };
+    },
+    async getUserSubscription(userId) {
+      const s = subscriptions.get(`user:${userId}`);
+      return s ? { ...s } : null;
+    },
+    async updateUserSubscription(userId, patch) {
+      await db.ensureUserSubscription(userId);
+      Object.assign(subscriptions.get(`user:${userId}`), patch);
+      return { ...subscriptions.get(`user:${userId}`) };
+    },
+    // Mirrors the real resolver, including its refusal to fall back from one
+    // subject to the other — a fake that guessed would hide exactly the bug
+    // this separation exists to prevent.
+    subscriptionsFor(subject) {
+      if (!subject) return null;
+      if (subject.kind === 'individual' && subject.userId) {
+        return {
+          get: () => db.getUserSubscription(subject.userId),
+          ensure: () => db.ensureUserSubscription(subject.userId),
+          update: (p) => db.updateUserSubscription(subject.userId, p),
+        };
+      }
+      if (subject.kind === 'organization' && subject.orgId) {
+        return {
+          get: () => db.getSubscription(subject.orgId),
+          ensure: () => db.ensureSubscription(subject.orgId),
+          update: (p) => db.updateSubscription(subject.orgId, p),
+        };
+      }
+      return null;
+    },
+    async findOpenTransactionForSubject(subject, withinMs) {
+      if (subject?.kind === 'individual') return db.findOpenTransactionForUser?.(subject.userId, withinMs) ?? null;
+      return db.findOpenTransactionForOrg?.(subject?.orgId, withinMs) ?? null;
+    },
+    async findOpenTransactionForUser(userId, withinMs) {
+      for (const t of transactions.values()) {
+        if (t.userId === userId && t.status === 'pending' && Date.now() - new Date(t.createdAt).getTime() < withinMs) return { ...t };
+      }
+      return null;
+    },
     async createTransaction(tx) {
       if (transactions.has(tx.orderReference)) throw new Error('duplicate order reference');
       const row = { applied: false, createdAt: new Date().toISOString(), paidAt: null, message: null, externalReference: null, ...tx };

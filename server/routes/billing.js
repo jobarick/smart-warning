@@ -77,14 +77,17 @@ async function handle({ req, res, url, path }) {
     return true;
   }
 
-  // Send the USSD prompt.
+  // Send the USSD prompt. Works for either subject — a person pays for their
+  // own plan, a coordinator for the site's.
   if (path === '/api/payments/mobile-money/initiate' && req.method === 'POST') {
-    const ctx = await guardOrg(req, res);
-    if (ctx === false) return true;
-    if (!ctx) { sendJson(res, 501, { error: 'payments require a database' }); return true; }
+    const ctx = await requireAuth(req);
+    if (!ctx) { sendJson(res, 401, { error: 'not authenticated' }); return true; }
+    if (!db.enabled()) { sendJson(res, 501, { error: 'payments require a database' }); return true; }
+    const subject = auth.billingSubject(ctx);
+    if (!subject) { sendJson(res, 403, { error: 'this account has no billing subject' }); return true; }
     const body = await readJson(req);
     const out = await payments.initiateMobileMoney({
-      orgId: ctx.orgId,
+      subject,
       planId: String(body.planId || ''),
       phoneNumber: String(body.phoneNumber || ''),
       cycle: String(body.cycle || 'monthly'),
@@ -150,12 +153,14 @@ async function handle({ req, res, url, path }) {
 
   // Polled by the checkout screen while the customer is at their keypad.
   if (path === '/api/payments/status' && req.method === 'GET') {
-    const ctx = await guardOrg(req, res);
-    if (ctx === false) return true;
-    if (!ctx) { sendJson(res, 501, { error: 'payments require a database' }); return true; }
+    const ctx = await requireAuth(req);
+    if (!ctx) { sendJson(res, 401, { error: 'not authenticated' }); return true; }
+    if (!db.enabled()) { sendJson(res, 501, { error: 'payments require a database' }); return true; }
+    const subject = auth.billingSubject(ctx);
+    if (!subject) { sendJson(res, 403, { error: 'this account has no billing subject' }); return true; }
     const reference = String(url.searchParams.get('reference') || '').trim();
     if (!reference) { sendJson(res, 400, { error: 'a payment reference is required' }); return true; }
-    const out = await payments.getPaymentStatus(reference, { orgId: ctx.orgId });
+    const out = await payments.getPaymentStatus(reference, { subject });
     if (!out) { sendJson(res, 404, { error: 'no payment with that reference' }); return true; }
     sendJson(res, 200, out);
     return true;
