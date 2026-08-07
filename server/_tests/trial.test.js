@@ -103,12 +103,12 @@ test('bundles are cheaper per month than paying monthly', () => {
 });
 
 test('a term a plan does not sell has no price, rather than an invented one', () => {
-  assert.equal(plans.priceFor('team', 'TZS', 'quarterly'), null);
+  assert.equal(plans.priceFor('business', 'TZS', 'quarterly'), null);
   assert.equal(plans.priceFor('personal', 'TZS', 'fortnightly'), null);
 });
 
 test('business plans keep their two-months-free annual term', () => {
-  assert.equal(plans.priceFor('team', 'TZS', 'annual'), 80000 * plans.ANNUAL_MONTHS);
+  assert.equal(plans.priceFor('business', 'TZS', 'annual'), 260000 * plans.ANNUAL_MONTHS);
 });
 
 test('enterprise stays unpriced on every term', () => {
@@ -122,8 +122,15 @@ test('the catalogue tells a pricing screen which terms exist', () => {
   assert.deepEqual(personal.cycles.map((c) => c.cycle), ['monthly', 'quarterly', 'half_year', 'annual']);
   assert.equal(personal.trialDays, 30);
 
+  // The organisation plan on sale is priced and bundled exactly like the
+  // personal one — same configured value, same terms.
   const team = plans.catalogue('TZS').find((p) => p.id === 'team');
-  assert.deepEqual(team.cycles.map((c) => c.cycle), ['monthly', 'annual']);
+  assert.deepEqual(team.cycles.map((c) => c.cycle), ['monthly', 'quarterly', 'half_year', 'annual']);
+  assert.equal(team.price, personal.price, 'a site and a person cost the same at this stage');
+
+  // Business has no bundle prices, so only the terms it actually sells.
+  const business = plans.catalogue('TZS').find((p) => p.id === 'business');
+  assert.deepEqual(business.cycles.map((c) => c.cycle), ['monthly', 'annual']);
 });
 
 // --- The rename -------------------------------------------------------------

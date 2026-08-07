@@ -199,6 +199,6 @@ test('the billing plan catalogue stays public and honest', async () => {
   assert.strictEqual(res.status, 200);
   const body = await res.json();
   const team = body.plans.find((p) => p.id === 'team');
-  assert.strictEqual(team.price, 80000);
+  assert.strictEqual(team.price, 2500);
   assert.strictEqual(body.enforcement, true);
 });

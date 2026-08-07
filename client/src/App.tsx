@@ -29,6 +29,7 @@ import { SystemStatusBar } from './components/SystemStatusBar';
 import { SystemFooter } from './components/SystemFooter';
 import { TabBar, type UserTab } from './components/TabBar';
 import { SafetyPanel } from './components/SafetyPanel';
+import { TrialBanner } from './components/TrialBanner';
 import { Icon } from './components/Icon';
 import { Logo } from './components/Logo';
 import { getProfile, alertLabel } from './lib/profiles';
@@ -204,7 +205,10 @@ export default function App() {
     setAuthNotice(null);
     const nm = sessionName(s);
     if (nm) setSettings((prev) => ({ ...prev, deviceName: nm }));
-    setView(s.kind === 'supervisor' ? 'command' : 'worker');
+    // An individual has an account and a token but no site to coordinate, so
+    // they belong in the personal view — the command centre would be empty and
+    // would imply they are watching over people who do not exist.
+    setView(s.kind === 'supervisor' && s.user.kind !== 'individual' ? 'command' : 'worker');
   }, []);
 
   // Accepting the terms must never depend on the network.
@@ -276,6 +280,18 @@ export default function App() {
   const runApp = orgsMode === false || !!session;
   const joinCreds = useMemo(() => joinCredentials(session), [session]);
   const token = sessionToken(session);
+
+  /**
+   * A personal account has no organisation, so it has no relay room to join.
+   *
+   * The socket must not even try. The relay refuses a token with no org — it
+   * has to, or every personal account would land in the one shared room and
+   * hear each other's emergencies — and the client reads that refusal as a
+   * rejected credential and signs the person out. So the connection is simply
+   * not attempted, which is also honest: there is nobody to broadcast to yet.
+   */
+  const isPersonal = session?.kind === 'supervisor' && session.user.kind === 'individual';
+  const runSocket = runApp && !isPersonal;
 
   const handleWire = useCallback(
     (m: WireMessage) => {
@@ -391,7 +407,7 @@ export default function App() {
     handleWire,
     getSelfInfo,
     joinCreds,
-    runApp,
+    runSocket,
   );
 
   // A rejected join (bad code / expired token) sends the user back to the gate.
@@ -641,6 +657,8 @@ export default function App() {
 
   const org = session?.kind === 'supervisor' ? session.user.org : undefined;
   const workerCode = session?.kind === 'worker' ? session.orgCode : undefined;
+  // A personal account: signed in, but with no organisation and no team code.
+  const personal = session?.kind === 'supervisor' && session.user.kind === 'individual';
 
   // An active alarm outranks anything a supervisor set by hand.
   const statusLevel: SystemStatusLevel = alarm.alert ? 'emergency' : standing.level;
@@ -672,7 +690,10 @@ export default function App() {
 
       {session && (
         <div className="org-bar">
-          {org ? (
+          {personal ? (
+            // No organisation and no team code to show — just who is signed in.
+            <span className="org-info"><b>{session.user.name}</b><span className="org-code">Personal account</span></span>
+          ) : org ? (
             <span className="org-info">
               <b>{org.name}</b>
               <span className="org-code" title="Share this code with your workers">Team code {org.joinCode}</span>
@@ -788,6 +809,11 @@ export default function App() {
           {tab === 'home' && (
             <>
               <SosPanel profile={profile} disabled={alarmActive} onTrigger={trigger} />
+              {/* Below the SOS, never above it. Billing is the least important
+                  thing on this screen and must never push the button that
+                  matters further down. Renders nothing unless there is
+                  something true to say. */}
+              {token && <TrialBanner token={token} onUpgrade={() => setShowBilling(true)} />}
               <OperatorStatus
                 name={settings.deviceName}
                 operatorId={settings.operatorId}

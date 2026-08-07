@@ -43,8 +43,17 @@ export interface AuthUser {
   email: string;
   name: string;
   role: string;
+  /**
+   * 'individual' — signed up for themselves and belongs to no organisation.
+   * 'org_member' — belongs to a site.
+   *
+   * Optional because a token issued before this existed will not carry it; the
+   * absent case is treated as an org member, which is what every account was.
+   */
+  kind?: 'individual' | 'org_member';
   phone?: string | null;
-  org: OrgProfile;
+  /** Absent for an individual account — there is no organisation. */
+  org?: OrgProfile;
 }
 
 export interface AuthResult {
@@ -135,6 +144,28 @@ export async function signup(input: {
   contactEmail?: string;
 }): Promise<AuthResult> {
   const res = await fetch(`${API_BASE}/api/auth/signup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'sign up failed'));
+  return res.json();
+}
+
+/**
+ * Register a person, with no organisation.
+ *
+ * A separate endpoint from signup(), not a flag on it: the two create
+ * different things, and the organisation flow is in daily use.
+ */
+export async function signupPersonal(input: {
+  name: string;
+  email: string;
+  password: string;
+  phone?: string;
+  country?: string;
+}): Promise<AuthResult> {
+  const res = await fetch(`${API_BASE}/api/auth/signup/personal`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),

@@ -122,7 +122,7 @@ test('initiating holds the customer at their existing tier until they pay', asyn
 
   assert.strictEqual(out.status, 'pending');
   assert.strictEqual(out.operator, 'mixx_by_yas');
-  assert.strictEqual(out.amount, 80000);
+  assert.strictEqual(out.amount, 2500);
   assert.strictEqual(out.currency, 'TZS');
   assert.strictEqual(out.phoneNumber, '+255 713 455 454');
 
@@ -134,7 +134,7 @@ test('initiating holds the customer at their existing tier until they pay', asyn
 
   const tx = await db.getTransactionByReference(out.orderReference);
   assert.strictEqual(tx.status, 'pending');
-  assert.strictEqual(tx.amount, 80000);
+  assert.strictEqual(tx.amount, 2500);
   assert.strictEqual(tx.provider, 'mixx_by_yas');
 });
 

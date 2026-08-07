@@ -4,13 +4,14 @@
 // relay does not import billing at all; these routes govern the supervisor's
 // administrative surface and nothing else. See server/billing/entitlements.js.
 const db = require('../db');
+const auth = require('../auth');
 const relay = require('../relay');
 const plans = require('../billing/plans');
 const entitlements = require('../billing/entitlements');
 const payments = require('../payments');
 const { BILLING_ENFORCE } = require('../config');
 const { sendJson, readJson, readText } = require('../http');
-const { guardOrg, allowWebhook } = require('../guards');
+const { guardOrg, requireAuth, allowWebhook } = require('../guards');
 
 async function handle({ req, res, url, path }) {
   // The pricing table. Public on purpose — a price behind a login is a price
@@ -30,25 +31,47 @@ async function handle({ req, res, url, path }) {
     return true;
   }
 
-  // What this org is entitled to right now, plus its payment history.
+  // What this SUBJECT is entitled to right now — a person or an organisation,
+  // stated explicitly and never inferred. Both kinds come through this one
+  // route; what differs is which id it resolves by.
   if (path === '/api/billing/subscription' && req.method === 'GET') {
-    const ctx = await guardOrg(req, res);
-    if (ctx === false) return true;
-    if (!ctx) { sendJson(res, 501, { error: 'billing requires a database' }); return true; }
-    const subscription = await db.ensureSubscription(ctx.orgId);
-    const registered = await db.countUsers(ctx.orgId);
-    const activeSeats = registered + relay.orgCount(ctx.orgId);
-    // Cached for reporting so seat usage is answerable without a live socket
-    // count. Never consulted to refuse anybody.
-    await db.setActiveSeats?.(ctx.orgId, activeSeats);
+    const ctx = await requireAuth(req);
+    if (!ctx) { sendJson(res, 401, { error: 'not authenticated' }); return true; }
+    if (!db.enabled()) { sendJson(res, 501, { error: 'billing requires a database' }); return true; }
+
+    const subject = auth.billingSubject(ctx);
+    const store = db.subscriptionsFor(subject);
+    if (!store) { sendJson(res, 403, { error: 'this account has no billing subject' }); return true; }
+
+    const subscription = await store.ensure();
+
+    // Seats only mean anything for an organisation. A personal account is one
+    // person by definition, and counting sockets for it would be theatre.
+    let activeSeats = 1;
+    if (subject.kind === 'organization') {
+      const registered = await db.countUsers(subject.orgId);
+      activeSeats = registered + relay.orgCount(subject.orgId);
+      // Cached for reporting so seat usage is answerable without a live socket
+      // count. Never consulted to refuse anybody.
+      await db.setActiveSeats?.(subject.orgId, activeSeats);
+    }
+
     sendJson(res, 200, {
+      // Echoed back so a client can never be in doubt about whose plan it is
+      // showing, and so a mismatch is visible rather than silent.
+      subject: { kind: subject.kind, orgId: subject.orgId, userId: subject.userId },
       subscription,
-      // Seats in use is registered supervisors plus devices currently in the
+      // Seats in use is registered coordinators plus devices currently in the
       // org's room. It is an estimate by nature — a worker who never opens
       // the app is invisible to us — and it is only ever used to prompt an
       // upgrade, never to refuse anybody.
       entitlements: entitlements.summarize(subscription, { activeSeats }),
-      transactions: await db.listTransactions({ orgId: ctx.orgId, limit: 20 }),
+      transactions: subject.kind === 'organization'
+        ? await db.listTransactions({ orgId: subject.orgId, limit: 20 })
+        : [],
+      // The price the client should quote, from the configured value rather
+      // than a number typed into a screen somewhere.
+      pricing: { monthly: plans.MONTHLY_PRICE, currencies: plans.CURRENCIES },
       enforcement: BILLING_ENFORCE,
     });
     return true;

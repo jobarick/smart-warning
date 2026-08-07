@@ -63,15 +63,15 @@ test('prices match the published rate card', () => {
   // The individual tier was Personal Pro at 8,000 TZS / $3. It is now Personal
   // at 2,500 TZS / $1, sold with multi-month bundles — see _tests/trial.test.js.
   assert.strictEqual(plans.priceFor('personal', 'TZS'), 2500);
-  assert.strictEqual(plans.priceFor('team', 'TZS'), 80000);
+  assert.strictEqual(plans.priceFor('team', 'TZS'), 2500);
   assert.strictEqual(plans.priceFor('business', 'TZS'), 260000);
   assert.strictEqual(plans.priceFor('personal', 'USD'), 1);
-  assert.strictEqual(plans.priceFor('team', 'USD'), 30);
+  assert.strictEqual(plans.priceFor('team', 'USD'), 1);
   assert.strictEqual(plans.priceFor('business', 'USD'), 100);
 });
 
 test('annual is ten months, and enterprise has no self-serve price', () => {
-  assert.strictEqual(plans.priceFor('team', 'USD', 'annual'), 300);
+  assert.strictEqual(plans.priceFor('business', 'USD', 'annual'), 1000);
   assert.strictEqual(plans.priceFor('enterprise', 'USD'), null);
   assert.strictEqual(plans.isChargeable('enterprise', 'USD'), false);
   assert.strictEqual(plans.isChargeable('free', 'TZS'), false);

@@ -106,7 +106,17 @@ function broadcastRoster(orgId) {
 async function resolveJoin(msg) {
   if (msg.token) {
     const ctx = await auth.userFromToken(msg.token);
-    return ctx ? { orgId: ctx.orgId, supervisor: true } : null;
+    if (!ctx) return null;
+    // An individual account belongs to no organisation, so it has no room.
+    //
+    // Refused rather than admitted with a null org id, which is the id the
+    // LEGACY single global room uses — every personal account would have been
+    // put in one shared room together, and one person's emergency would have
+    // sounded on every other person's phone. A personal account has nobody to
+    // alert yet; that arrives with emergency contacts, and until it does this
+    // says no rather than doing something surprising.
+    if (!ctx.orgId) return null;
+    return { orgId: ctx.orgId, supervisor: true };
   }
   if (msg.orgCode) {
     const org = await db.getOrgByCode(msg.orgCode);

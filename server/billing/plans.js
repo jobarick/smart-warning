@@ -37,6 +37,40 @@ const TRIAL_DAYS = 30;
 // evaluating this needs the dashboard to evaluate it at all.
 const TRIAL_TIER = { individual: 'personal', org: 'team' };
 
+/**
+ * The monthly price, in each currency it is collected in.
+ *
+ * One configured number per currency, deliberately NOT a USD figure passed
+ * through an exchange rate. A shilling price that drifts with the market is a
+ * support conversation every month, and 2,500 TZS is a number a customer can
+ * recognise on a USSD prompt in a way 2,483 TZS is not. When the rate moves
+ * far enough to matter, someone changes the configured local price on purpose.
+ *
+ * Both plans on sale today — a person and a site — cost the same. That is a
+ * deliberate stage, not an oversight: nothing about a site costs more to serve
+ * yet, and a price difference would have to be justified to a customer.
+ */
+const MONTHLY_PRICE = {
+  USD: Number(process.env.MONTHLY_PRICE_USD ?? 1),
+  TZS: Number(process.env.MONTHLY_PRICE_TZS ?? 2500),
+};
+
+/** Bundle prices, held explicitly for the same reason as the monthly ones. */
+const BUNDLE_PRICE = {
+  USD: {
+    monthly: MONTHLY_PRICE.USD,
+    quarterly: Number(process.env.QUARTERLY_PRICE_USD ?? 2.6),
+    half_year: Number(process.env.HALF_YEAR_PRICE_USD ?? 4.8),
+    annual: Number(process.env.ANNUAL_PRICE_USD ?? 8.8),
+  },
+  TZS: {
+    monthly: MONTHLY_PRICE.TZS,
+    quarterly: Number(process.env.QUARTERLY_PRICE_TZS ?? 6500),
+    half_year: Number(process.env.HALF_YEAR_PRICE_TZS ?? 12000),
+    annual: Number(process.env.ANNUAL_PRICE_TZS ?? 22000),
+  },
+};
+
 // Ordered cheapest → richest. `rank` lets an upgrade/downgrade be compared
 // without hardcoding the order at each call site.
 const PLANS = [
@@ -60,19 +94,13 @@ const PLANS = [
     audience: 'individual',
     tagline: 'For one person, wherever they are.',
     seats: 1,
-    price: { USD: 1, TZS: 2500 },
-    // Explicit bundle prices rather than a multiplier, for the same reason the
-    // monthly prices are explicit: a customer should recognise the number.
-    //
+    price: MONTHLY_PRICE,
     // Multi-month terms matter more here than anywhere else in the catalogue.
-    // Collecting 2,500 TZS by mobile money costs a gateway fee and a USSD
-    // prompt the customer has to complete, every single month — at this price
-    // the monthly cycle barely pays for itself, and prepaid airtime has
+    // Collecting the monthly price by mobile money costs a gateway fee and a
+    // USSD prompt the customer has to complete, every single month — at this
+    // price the monthly cycle barely pays for itself, and prepaid airtime has
     // already taught this market to buy time in blocks.
-    bundles: {
-      USD: { monthly: 1, quarterly: 2.6, half_year: 4.8, annual: 8.8 },
-      TZS: { monthly: 2500, quarterly: 6500, half_year: 12000, annual: 22000 },
-    },
+    bundles: BUNDLE_PRICE,
     features: [F.UNLIMITED_CONTACTS, F.FAMILY_LOCATION, F.SAFETY_ASSISTANT],
     includes: ['Everything in Free', 'Unlimited emergency contacts', 'Family location sharing', 'Safety assistant guidance'],
   },
@@ -83,7 +111,11 @@ const PLANS = [
     audience: 'business',
     tagline: 'A supervisor watching over a single site.',
     seats: 50,
-    price: { USD: 30, TZS: 80000 },
+    // The same price as a personal account, on purpose. Nothing about a site
+    // costs more to serve yet, and a difference would have to be justified to
+    // a customer rather than assumed. Both come from one configured value.
+    price: MONTHLY_PRICE,
+    bundles: BUNDLE_PRICE,
     features: [
       F.UNLIMITED_CONTACTS, F.FAMILY_LOCATION, F.SAFETY_ASSISTANT,
       F.SUPERVISOR_DASHBOARD, F.INCIDENT_REPORTS,
@@ -258,6 +290,8 @@ module.exports = {
   ANNUAL_MONTHS,
   TRIAL_DAYS,
   TRIAL_TIER,
+  MONTHLY_PRICE,
+  BUNDLE_PRICE,
   canonicalId,
   getPlan,
   isPlan,

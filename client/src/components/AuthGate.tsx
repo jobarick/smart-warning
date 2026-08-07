@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { login, signup, requestPasswordReset, resetPassword } from '../lib/api';
+import { login, signup, signupPersonal, requestPasswordReset, resetPassword } from '../lib/api';
 import type { Session } from '../lib/session';
 import { Icon } from './Icon';
 import { Logo } from './Logo';
 import { PasswordField } from './PasswordField';
 
-type Step = 'choose' | 'worker' | 'login' | 'signup' | 'forgot' | 'reset';
+type Step = 'choose' | 'worker' | 'login' | 'signup' | 'personal' | 'forgot' | 'reset';
 
 interface Props {
   onAuthed: (s: Session) => void;
@@ -99,6 +99,24 @@ export function AuthGate({ onAuthed, notice }: Props) {
     }
   };
 
+  const submitPersonal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true); setError(null);
+    try {
+      const res = await signupPersonal({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        phone: phone.trim() || undefined,
+      });
+      onAuthed({ kind: 'supervisor', token: res.token, user: res.user });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const submitForgot = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true); setError(null);
@@ -140,7 +158,13 @@ export function AuthGate({ onAuthed, notice }: Props) {
         {step === 'choose' && (
           <>
             <h1 className="auth-title">Get started</h1>
-            <p className="auth-sub">Nothing exists here until you create it. Set up a new team, or join one you have a code for.</p>
+            <p className="auth-sub">Use Smart Warning on your own, or with a team. You can change your mind later.</p>
+            {/* First, because it is the only option that needs nothing from
+                anybody else — no code, no employer, no site. */}
+            <button className="auth-choice" onClick={() => go('personal')}>
+              <Icon name="user" />
+              <span><b>Create a personal account</b><small>For you, on your own. Free for 30 days</small></span>
+            </button>
             <button className="auth-choice" onClick={() => go('worker')}>
               <Icon name="check-circle" />
               <span><b>Join an existing team</b><small>You have a team code from your Safety Coordinator</small></span>
@@ -152,7 +176,7 @@ export function AuthGate({ onAuthed, notice }: Props) {
                 screen now says it outright. */}
             <button className="auth-choice" onClick={() => go('signup')}>
               <Icon name="siren" />
-              <span><b>Create a new team</b><small>Set up a site and invite your people</small></span>
+              <span><b>Create an organization account</b><small>For a team or site, with a Safety Coordinator</small></span>
             </button>
             <button className="auth-choice" onClick={() => go('login')}>
               <Icon name="lock" />
@@ -256,6 +280,42 @@ export function AuthGate({ onAuthed, notice }: Props) {
               autoComplete="new-password"
             />
             <button className="auth-submit" type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save and sign in'}</button>
+          </form>
+        )}
+
+        {step === 'personal' && (
+          <form onSubmit={submitPersonal}>
+            <button type="button" className="auth-back" onClick={() => go('choose')}><Icon name="arrow-left" /> Back</button>
+            <h1 className="auth-title">Create a personal account</h1>
+            <p className="auth-sub">
+              For one person. No team code and no organization — just you. Free for 30 days, then
+              $1 a month.
+            </p>
+            <label className="auth-field">
+              <span>Your name</span>
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Asha Mwangi" autoComplete="name" />
+            </label>
+            <label className="auth-field">
+              <span>Email</span>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
+            </label>
+            {/* Optional, unlike the organisation form. Somebody signing up for
+                themselves has nobody to be reached through, and demanding a
+                number before they can use an emergency app is a barrier with
+                nothing behind it. */}
+            <label className="auth-field">
+              <span>Phone number <small>optional</small></span>
+              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+255 713 455 454" autoComplete="tel" />
+            </label>
+            <PasswordField
+              label="Password"
+              value={password}
+              onChange={setPassword}
+              placeholder="At least 8 characters"
+              autoComplete="new-password"
+            />
+            <button className="auth-submit" type="submit" disabled={busy}>{busy ? 'Creating…' : 'Create my account'}</button>
+            <p className="auth-alt">Setting this up for a team? <button type="button" onClick={() => go('signup')}>Create an organization instead</button></p>
           </form>
         )}
 

@@ -57,8 +57,27 @@ export interface Entitlements {
   currentPeriodEnd: string | null;
   graceEndsAt: string | null;
   seats: { limit: number | null; used: number; over: boolean };
+  /**
+   * Where the account stands in its free month. Computed on the server so the
+   * client never does date arithmetic — a countdown that disagrees with the
+   * server about when a trial ends is a support conversation.
+   */
+  trial: {
+    active: boolean;
+    endsAt: string | null;
+    daysLeft: number;
+    /** Had one and it ran out, as distinct from never having had one. */
+    ended: boolean;
+  };
   /** Always true. Sent by the server so the UI can state it without assuming it. */
   alertingAlwaysAvailable: boolean;
+}
+
+/** Whose plan this is. Stated by the server, never inferred by the client. */
+export interface BillingSubject {
+  kind: 'individual' | 'organization';
+  orgId: string | null;
+  userId: string | null;
 }
 
 export interface Transaction {
@@ -147,13 +166,18 @@ export function fetchPlans(currency: Currency = 'TZS', cycle: Cycle = 'monthly')
   );
 }
 
+export interface SubscriptionView {
+  subject: BillingSubject;
+  subscription: Subscription;
+  entitlements: Entitlements;
+  transactions: Transaction[];
+  /** The price to quote, from the server's configured value. */
+  pricing?: { monthly: { USD: number; TZS: number }; currencies: Currency[] };
+  enforcement: boolean;
+}
+
 export function fetchSubscription(token: string) {
-  return call<{
-    subscription: Subscription;
-    entitlements: Entitlements;
-    transactions: Transaction[];
-    enforcement: boolean;
-  }>('/api/billing/subscription', {}, token);
+  return call<SubscriptionView>('/api/billing/subscription', {}, token);
 }
 
 export function initiateMobileMoney(

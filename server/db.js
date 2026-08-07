@@ -264,6 +264,11 @@ async function init() {
     -- consumer plan could not be sold: there was nothing to sell it to.
     ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS user_id       UUID REFERENCES users(id) ON DELETE CASCADE;
     ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMPTZ;
+    -- 'organization' | 'individual'. Redundant with which id column is set, and
+    -- that redundancy is the point: a row states what it is instead of leaving
+    -- every reader to infer it from a null. Existing rows are all
+    -- organisations, which the default makes true without a backfill.
+    ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'organization';
     ALTER TABLE subscriptions ALTER COLUMN org_id DROP NOT NULL;
 
     -- One live subscription per subject. Two partial indexes rather than one
@@ -611,6 +616,18 @@ async function createUser({ orgId, email, passwordHash, name, role = 'supervisor
     `INSERT INTO users (org_id, email, password_hash, name, role, phone)
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
     [orgId, email.toLowerCase(), passwordHash, name, role, phone],
+  );
+  return rows[0];
+}
+
+// A person with no organisation. org_id stays null, which the schema now
+// allows; kind says so explicitly rather than leaving readers to infer it.
+async function createIndividual({ email, passwordHash, name, phone = null, country = null }) {
+  if (!pool) throw new Error('persistence disabled');
+  const { rows } = await pool.query(
+    `INSERT INTO users (org_id, email, password_hash, name, role, phone, kind, country)
+     VALUES (NULL, $1, $2, $3, 'individual', $4, 'individual', $5) RETURNING *`,
+    [email.toLowerCase(), passwordHash, name, phone, country],
   );
   return rows[0];
 }
@@ -1072,6 +1089,7 @@ function publicSubscription(row) {
   if (!row) return null;
   return {
     id: row.id,
+    kind: row.kind ?? 'organization',
     orgId: row.org_id,
     userId: row.user_id ?? null,
     tier: row.tier,
@@ -1118,8 +1136,8 @@ async function ensureSubscription(orgId) {
   const tier = plans.TRIAL_TIER.org;
   const trialEnds = new Date(Date.now() + plans.TRIAL_DAYS * 86400000);
   const { rows } = await pool.query(
-    `INSERT INTO subscriptions (org_id, tier, previous_tier, status, trial_ends_at)
-     VALUES ($1, $2, 'free', 'trialing', $3)
+    `INSERT INTO subscriptions (org_id, kind, tier, previous_tier, status, trial_ends_at)
+     VALUES ($1, 'organization', $2, 'free', 'trialing', $3)
      ON CONFLICT (org_id) WHERE org_id IS NOT NULL
        DO UPDATE SET org_id = EXCLUDED.org_id
      RETURNING *`,
@@ -1134,8 +1152,8 @@ async function ensureUserSubscription(userId) {
   const tier = plans.TRIAL_TIER.individual;
   const trialEnds = new Date(Date.now() + plans.TRIAL_DAYS * 86400000);
   const { rows } = await pool.query(
-    `INSERT INTO subscriptions (user_id, tier, previous_tier, status, trial_ends_at)
-     VALUES ($1, $2, 'free', 'trialing', $3)
+    `INSERT INTO subscriptions (user_id, kind, tier, previous_tier, status, trial_ends_at)
+     VALUES ($1, 'individual', $2, 'free', 'trialing', $3)
      ON CONFLICT (user_id) WHERE user_id IS NOT NULL
        DO UPDATE SET user_id = EXCLUDED.user_id
      RETURNING *`,
@@ -1146,8 +1164,63 @@ async function ensureUserSubscription(userId) {
 
 async function getUserSubscription(userId) {
   if (!pool || !userId) return null;
-  const { rows } = await pool.query(`SELECT * FROM subscriptions WHERE user_id = $1`, [userId]);
+  const { rows } = await pool.query(
+    // kind is asserted as well as user_id. Belt and braces: a row that somehow
+    // carried both ids must never be served to the wrong subject.
+    `SELECT * FROM subscriptions WHERE user_id = $1 AND kind = 'individual'`,
+    [userId],
+  );
   return publicSubscription(rows[0]);
+}
+
+async function updateUserSubscription(userId, patch = {}) {
+  if (!pool || !userId) return null;
+  await ensureUserSubscription(userId);
+
+  const sets = [];
+  const values = [];
+  for (const [key, column] of Object.entries(SUBSCRIPTION_FIELDS)) {
+    if (patch[key] === undefined) continue;
+    values.push(patch[key]);
+    sets.push(`${column} = $${values.length}`);
+  }
+  if (sets.length === 0) return getUserSubscription(userId);
+
+  values.push(userId);
+  const { rows } = await pool.query(
+    `UPDATE subscriptions SET ${sets.join(', ')}, updated_at = now()
+      WHERE user_id = $${values.length} AND kind = 'individual' RETURNING *`,
+    values,
+  );
+  // Deliberately no mirror onto organizations: a person's plan is not a site's.
+  return publicSubscription(rows[0]);
+}
+
+/**
+ * The one lookup the rest of the server should use.
+ *
+ * A subject is a person OR an organisation, never both and never inferred. The
+ * caller states which, so there is no code path where a lookup falls back from
+ * one to the other — that fallback is how one customer ends up being served
+ * another's entitlements.
+ */
+function subscriptionsFor(subject) {
+  if (!subject) return null;
+  if (subject.kind === 'individual' && subject.userId) {
+    return {
+      get: () => getUserSubscription(subject.userId),
+      ensure: () => ensureUserSubscription(subject.userId),
+      update: (patch) => updateUserSubscription(subject.userId, patch),
+    };
+  }
+  if (subject.kind === 'organization' && subject.orgId) {
+    return {
+      get: () => getSubscription(subject.orgId),
+      ensure: () => ensureSubscription(subject.orgId),
+      update: (patch) => updateSubscription(subject.orgId, patch),
+    };
+  }
+  return null;
 }
 
 // Partial update by column allow-list. Written this way because the callers
@@ -1528,6 +1601,7 @@ module.exports = {
   countUsers,
   setActiveSeats,
   createUser,
+  createIndividual,
   getUserByEmail,
   getUserById,
   createPasswordReset,
@@ -1535,6 +1609,8 @@ module.exports = {
   setUserPassword,
   ensureUserSubscription,
   getUserSubscription,
+  updateUserSubscription,
+  subscriptionsFor,
   recordAlert,
   resolveActive,
   listIncidents,

@@ -19,7 +19,11 @@ const BCRYPT_ROUNDS = 10;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function signToken(user) {
-  return jwt.sign({ sub: user.id, org: user.org_id, role: user.role }, JWT_SECRET, { expiresIn: TOKEN_TTL });
+  return jwt.sign(
+    { sub: user.id, org: user.org_id, role: user.role, kind: user.kind || 'org_member' },
+    JWT_SECRET,
+    { expiresIn: TOKEN_TTL },
+  );
 }
 
 function verifyToken(token) {
@@ -37,6 +41,10 @@ function publicUser(user, org) {
     email: user.email,
     name: user.name,
     role: user.role,
+    // 'individual' — signed up for themselves, belongs to no organisation.
+    // 'org_member' — belongs to a site. The client uses this to decide which
+    // shell to render and which billing subject to ask about.
+    kind: user.kind || 'org_member',
     phone: user.phone || null,
     org: org
       ? {
@@ -101,6 +109,42 @@ async function signup({ orgName, name, email, password, phone, adminName, contac
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
   const user = await db.createUser({ orgId: org.id, email, passwordHash, name: name.trim(), phone: orgPhone });
   return { token: signToken(user), user: publicUser(user, org) };
+}
+
+/**
+ * Register a person, with no organisation at all.
+ *
+ * Kept as its own function rather than a branch inside signup(): the two
+ * create different things and validate different fields, and the organisation
+ * flow above is in daily use. A shared function with an `if` in it would have
+ * meant every future change to one path being a chance to break the other.
+ *
+ * No org row, no join code, no team. The free month starts here.
+ */
+async function signupIndividual({ name, email, password, phone, country }) {
+  if (!name || !name.trim()) throw httpError(400, 'your name is required');
+  if (!EMAIL_RE.test(email || '')) throw httpError(400, 'a valid email is required');
+  if (!password || password.length < 8) throw httpError(400, 'password must be at least 8 characters');
+  // Optional here, unlike the organisation flow: a person signing up for
+  // themselves has nobody to be reached through, and demanding a number before
+  // they can use an emergency app is a barrier with nothing behind it.
+  const normalized = normalizePhone(phone);
+
+  if (await db.getUserByEmail(email)) throw httpError(409, 'an account with that email already exists');
+
+  const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+  const user = await db.createIndividual({
+    email,
+    passwordHash,
+    name: name.trim(),
+    phone: normalized,
+    country: country || null,
+  });
+  // Start the trial as part of registration, so an account is never in the
+  // state of existing with no subscription row at all.
+  await db.ensureUserSubscription(user.id);
+  console.log(`[auth] individual account created for ${user.email}`);
+  return { token: signToken(user), user: publicUser(user, null) };
 }
 
 // Edit the organization profile. Supervisors only — enforced by the route.
@@ -234,8 +278,24 @@ async function userFromToken(token) {
   if (!payload) return null;
   const user = await db.getUserById(payload.sub);
   if (!user) return null;
-  const org = await db.getOrgById(user.org_id);
-  return { user, org, orgId: user.org_id };
+  // Read from the row, not the token: a token outlives changes to the account
+  // it names, and org membership is the thing every guard downstream trusts.
+  const org = user.org_id ? await db.getOrgById(user.org_id) : null;
+  return { user, org, orgId: user.org_id || null, kind: user.kind || 'org_member' };
+}
+
+/**
+ * Which billing subject this request is about.
+ *
+ * States the kind explicitly and never falls back from one to the other. A
+ * lookup that quietly tried the organisation when the user had none is exactly
+ * how one customer ends up being served another's entitlements.
+ */
+function billingSubject(ctx) {
+  if (!ctx || !ctx.user) return null;
+  if (ctx.kind === 'individual') return { kind: 'individual', userId: ctx.user.id, orgId: null };
+  if (ctx.orgId) return { kind: 'organization', orgId: ctx.orgId, userId: null };
+  return null;
 }
 
 function httpError(status, message) {
@@ -245,6 +305,7 @@ function httpError(status, message) {
 }
 
 module.exports = {
-  signup, login, updateOrg, userFromToken, verifyToken, publicUser, httpError, normalizePhone,
+  signup, signupIndividual, login, updateOrg, userFromToken, verifyToken, publicUser,
+  httpError, normalizePhone, billingSubject,
   requestPasswordReset, resetPassword,
 };

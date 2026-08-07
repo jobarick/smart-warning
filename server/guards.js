@@ -30,6 +30,14 @@ async function guardOrg(req, res) {
   if (!ORGS) return null;
   const ctx = await requireAuth(req);
   if (!ctx) { sendJson(res, 401, { error: 'not authenticated' }); return false; }
+  // An individual account belongs to no organisation, so there is no org to
+  // scope this to. Refused explicitly rather than passed through with a null
+  // org id, which every query downstream would have quietly matched against
+  // rows whose org_id is also null.
+  if (!ctx.orgId) {
+    sendJson(res, 403, { error: 'this is a personal account and is not part of an organization' });
+    return false;
+  }
   return ctx;
 }
 

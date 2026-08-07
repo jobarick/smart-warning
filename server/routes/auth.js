@@ -13,6 +13,15 @@ async function handle({ req, res, path }) {
     return true;
   }
 
+  // A person, with no organisation. Separate route from the one above, because
+  // they create different things — and the organisation flow is in daily use.
+  if (path === '/api/auth/signup/personal' && req.method === 'POST') {
+    if (!ORGS) { sendJson(res, 501, { error: 'accounts require a database (DATABASE_URL)' }); return true; }
+    const body = await readJson(req);
+    sendJson(res, 201, await auth.signupIndividual(body));
+    return true;
+  }
+
   if (path === '/api/auth/login' && req.method === 'POST') {
     if (!ORGS) { sendJson(res, 501, { error: 'accounts require a database (DATABASE_URL)' }); return true; }
     const body = await readJson(req);
