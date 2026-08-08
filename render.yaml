@@ -54,3 +54,36 @@ services:
         sync: false
       - key: FEEDBACK_TO
         sync: false
+      # ClickPesa — mobile money collection (Mixx by Yas, M-Pesa, Airtel Money,
+      # HaloPesa, EzyPesa) in TZS. Optional: without these the app runs, every
+      # org sits on the free tier, and the plan catalogue is still served — there
+      # is simply no way to start a mobile money checkout. Paste the values
+      # without surrounding quotes; Render stores them literally and a quoted key
+      # reaches the gateway with the quotes attached, which comes back as
+      # "Invalid client details" and looks exactly like a wrong key.
+      # See docs/PAYMENTS_SETUP.md.
+      - key: CLICKPESA_CLIENT_ID
+        sync: false
+      - key: CLICKPESA_API_KEY
+        sync: false
+      # Optional per-application payload signing key. Defence in depth only —
+      # every callback is re-verified against the gateway before anything is
+      # provisioned, so an unsigned deployment is still not forgeable.
+      - key: CLICKPESA_CHECKSUM_KEY
+        sync: false
+      # Stripe — cards, for customers outside the mobile money footprint.
+      # Unlike the ClickPesa path the signature here IS the proof, so the
+      # webhook secret is required for the callback, not optional.
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      # Where Stripe Checkout returns the customer.
+      - key: APP_URL
+        sync: false
+      # Paywall enforcement. Leave unset (off) until existing organizations have
+      # been grandfathered — every org that predates billing migrates in as free,
+      # so switching this on without preparation paywalls dashboards in daily
+      # use. Alerting is never affected either way.
+      - key: BILLING_ENFORCE
+        sync: false
