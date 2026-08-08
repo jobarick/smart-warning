@@ -30,11 +30,15 @@
 param(
     [string]$Task = 'assembleDebug',
     [int]$VersionCode,
-    [string]$VersionName
+    [string]$VersionName,
+    # Skip the web build and copy. Only for iterating on native code — a
+    # release built this way may not contain the app you just changed.
+    [switch]$NoSync
 )
 
 $ErrorActionPreference = 'Stop'
-$androidDir = Join-Path (Split-Path $PSScriptRoot -Parent) 'client\android'
+$clientDir  = Join-Path (Split-Path $PSScriptRoot -Parent) 'client'
+$androidDir = Join-Path $clientDir 'android'
 
 # Gradle 8.14.x runs on JDK 17 through 24. Anything newer fails as above;
 # anything older is below what AGP requires.
@@ -84,6 +88,34 @@ Download JDK > version 21.
 }
 
 $env:JAVA_HOME = $chosen
+
+# Build the web app and copy it into the native project, before Gradle packages
+# whatever is currently sitting in android/app/src/main/assets/public.
+#
+# This used to be a documented manual step, which meant the documented failure
+# was also available: Gradle is perfectly happy to package a stale copy, report
+# BUILD SUCCESSFUL and hand back an .aab of an older app. Nothing about the
+# output says which version of the web bundle is inside it, so the mistake
+# survives review and ships. On 2026-08-08 a release bundle was produced
+# carrying assets two days old, including none of that day's changes.
+#
+# Doing it here costs a few seconds and removes the whole class of error.
+if (-not $NoSync) {
+    Push-Location $clientDir
+    try {
+        Write-Host '[android-build] npm run build'
+        & npm run build
+        if ($LASTEXITCODE -ne 0) { throw "the web build failed with $LASTEXITCODE" }
+
+        Write-Host '[android-build] npx cap sync android'
+        & npx cap sync android
+        if ($LASTEXITCODE -ne 0) { throw "cap sync failed with $LASTEXITCODE" }
+    } finally {
+        Pop-Location
+    }
+} else {
+    Write-Warning '[android-build] -NoSync: packaging whatever assets are already in the native project.'
+}
 
 # Passed as separate array elements: PowerShell splits an argument containing
 # '=' and '.' in ways that reach Gradle as a bogus task name otherwise.

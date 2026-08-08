@@ -41,6 +41,16 @@ package a stale copy of the app:
 cd client && npm run build && npx cap sync android
 ```
 
+**`tools/android-build.ps1` now does this for you**, before every Gradle
+invocation. It used to be a manual step, which meant the failure it warns about
+was reachable: Gradle happily packages whatever assets are already in the native
+project, reports `BUILD SUCCESSFUL`, and hands back an `.aab` of an older app —
+and nothing in the output says which web build is inside it. On 2026-08-08 that
+produced a release bundle carrying assets two days old.
+
+Pass `-NoSync` to skip it when iterating on native code only. Do not use it for
+anything you intend to upload.
+
 ## ⚠️ The JDK trap
 
 Android Studio ships its own JDK and **updates it silently**. On 2026-07-31
