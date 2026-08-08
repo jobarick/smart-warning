@@ -78,7 +78,14 @@ it, as required by the Google Play Developer Program policies.
 
 ## Delete from inside the app
 
-If you administer an organization:
+**If you have a personal account** — one that is not part of an organization:
+
+1. Open Smart Warning and sign in.
+2. Go to **About & legal**.
+3. Choose **Delete my account and all data**.
+4. Type your email address to confirm.
+
+**If you administer an organization:**
 
 1. Open Smart Warning and sign in as a Safety Coordinator.
 2. Go to **About & legal**.
@@ -89,14 +96,17 @@ Deletion is immediate and cannot be undone.
 
 ## Request deletion without the app
 
-If you do not administer an organization — for example you joined a team with a
-code — contact us and we will action the request within **30 days**:
+If you joined an organization with a team code, your records are part of that
+organization's safety record — its incident history and roll call refer to
+them — so they cannot be removed individually without breaking it. Ask your
+Safety Coordinator, or contact us and we will action the request within
+**30 days**:
 
 - Email: ${terms.SUPPORT_EMAIL}
 - Phone: ${terms.SUPPORT_PHONE}
 
-Include the name of the organization you belong to and the name or email you use
-in the app, so we can identify the right records.
+Tell us the name or email you use in the app, and the organization you belong
+to if you are in one, so we can identify the right records.
 
 ## What is deleted
 

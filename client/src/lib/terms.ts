@@ -162,7 +162,8 @@ export const TERMS_SECTIONS: TermsSection[] = [
     body: [
       'You may request access to, correction of, or deletion of your personal data at any time.',
       'A Safety Coordinator who administers an organization may delete that organization from within the application. Deleting an organization permanently removes its account, its members, its incident history, its stored location records and its reports. This cannot be undone.',
-      'If you do not administer an organization, you may request deletion by contacting us using the details in section 16, and we will action it within 30 days.',
+      'A personal account — one that is not part of an organization — may be deleted from within the application by its own holder. Deleting it permanently removes the account, its emergency contacts, its registered devices and its subscription. This cannot be undone.',
+      'If you belong to an organization you did not create, your records are part of that organization’s safety record and cannot be removed individually without breaking it. Ask your Safety Coordinator, or contact us using the details in section 16 and we will action the request within 30 days.',
       'Some records may be retained where a law, regulation or a legitimate safety or accounting obligation requires it. Where that applies, only the data covered by that obligation is kept, and only for as long as the obligation lasts.',
     ],
   },

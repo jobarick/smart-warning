@@ -428,6 +428,27 @@ export async function deleteOrganization(
 }
 
 /**
+ * Delete a personal account and everything held with it.
+ *
+ * `confirm` must equal the account's own email address; the backend rejects
+ * anything else, and refuses outright for an account that belongs to an
+ * organization — those records are part of that organization's safety history
+ * and are removed with it, not one person at a time. Irreversible.
+ */
+export async function deleteAccount(
+  confirm: string,
+  token: string,
+): Promise<{ deleted: { contacts: number; devices: number; subscriptions: number } }> {
+  const res = await fetch(`${API_BASE}/api/auth/account`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify({ confirm }),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not delete the account'));
+  return res.json();
+}
+
+/**
  * Record that this person accepted the terms.
  *
  * The durable record — a localStorage flag proves nothing and is under the

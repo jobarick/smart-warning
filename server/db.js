@@ -1742,6 +1742,41 @@ async function deleteOrg(orgId) {
   return counts[0];
 }
 
+/**
+ * Delete one person's account and everything held with it.
+ *
+ * The organisation path above cannot serve a personal account: an individual
+ * belongs to no organisation, so deleteOrg has nothing to delete for them.
+ * Google Play requires an account deletion mechanism from any app that offers
+ * sign-up, and personal accounts are on sale — so without this the product
+ * both fails that requirement and makes a promise the deletion page cannot
+ * keep.
+ *
+ * Everything personal cascades from users(id): emergency contacts, device
+ * tokens, the subscription, consent records. transactions are the same
+ * deliberate exception as for organisations — ON DELETE SET NULL, so the
+ * financial record survives the account it belonged to, carrying no identity
+ * or location data with it.
+ *
+ * Returns what was removed so the caller can say plainly what happened.
+ */
+async function deleteUser(userId) {
+  if (!pool || !userId) return null;
+
+  // Counted first; afterwards there is nothing left to count.
+  const { rows: counts } = await pool.query(
+    `SELECT
+       (SELECT COUNT(*) FROM emergency_contacts WHERE user_id = $1)::int AS contacts,
+       (SELECT COUNT(*) FROM device_tokens      WHERE user_id = $1)::int AS devices,
+       (SELECT COUNT(*) FROM subscriptions      WHERE user_id = $1)::int AS subscriptions`,
+    [userId],
+  );
+
+  const { rowCount } = await pool.query(`DELETE FROM users WHERE id = $1`, [userId]);
+  if (rowCount === 0) return null;
+  return counts[0];
+}
+
 // --- Terms & Conditions acceptance -----------------------------------------
 
 async function recordConsent({ orgId = null, userId = null, subject = null, version, points = [] }) {
@@ -1832,6 +1867,7 @@ module.exports = {
   recordConsent,
   listConsents,
   deleteOrg,
+  deleteUser,
   countUsers,
   setActiveSeats,
   createUser,
