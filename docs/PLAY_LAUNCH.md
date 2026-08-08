@@ -97,6 +97,11 @@ and give them:
 Create a real demo org for this, keep it separate from any customer, and expect
 the reviewer to raise test alerts in it.
 
+**[`PLAY_REVIEWER_GUIDE.md`](PLAY_REVIEWER_GUIDE.md) has the whole thing** —
+the Console text to paste, both roles explained, the safe test-alert steps, and
+the precise location and notification wording the data safety form has to
+agree with.
+
 ---
 
 ## Data safety form — answers drawn from the code
@@ -113,7 +118,22 @@ answer below is checkable against the source.
 | Approximate location | Yes | No | Optional | Country lookup for emergency numbers |
 | Device or other IDs | Yes | No | Optional | Push token (FCM / Web Push) |
 | App activity / other | Yes | No | Yes | Incident history, roll-call answers |
-| Purchase history | Yes | No | Optional | Plan, amount, currency, masked reference |
+| Purchase history | Yes | No | Optional | Plan, amount, currency, order reference, **and the paying mobile number** |
+
+**Two corrections worth making before you fill the form**, both checked
+against the schema rather than remembered:
+
+- `transactions.phone_number` holds the **full** payer number while the
+  account exists — not a masked one. Declare purchase history as including a
+  phone number. It is scrubbed on account or organization deletion
+  (`db.deleteUser` / `db.deleteOrg`), which is what makes the deletion page's
+  "no personal identifiers beyond the transaction itself" true.
+- Emergency contacts are a distinct data type. A personal account stores each
+  contact's **name, relation, phone and email** in `emergency_contacts`, keyed
+  to the user and cascading on deletion. These are third parties who never
+  installed the app, so declare them under *Contacts* → *other* only if Play's
+  form asks; they are collected by typing, never read from the device address
+  book, and the app holds **no** `READ_CONTACTS` permission.
 
 Also declare:
 

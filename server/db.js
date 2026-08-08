@@ -1737,6 +1737,14 @@ async function deleteOrg(orgId) {
     [orgId],
   );
 
+  // Same scrub, and for the same reason, as the personal path below: the
+  // number that paid is a personal identifier the accounting record does not
+  // need, and org_id is SET NULL so it cannot be found afterwards.
+  await pool.query(
+    `UPDATE transactions SET phone_number = NULL WHERE org_id = $1 AND phone_number IS NOT NULL`,
+    [orgId],
+  );
+
   const { rowCount } = await pool.query(`DELETE FROM organizations WHERE id = $1`, [orgId]);
   if (rowCount === 0) return null;
   return counts[0];
@@ -1769,6 +1777,19 @@ async function deleteUser(userId) {
        (SELECT COUNT(*) FROM emergency_contacts WHERE user_id = $1)::int AS contacts,
        (SELECT COUNT(*) FROM device_tokens      WHERE user_id = $1)::int AS devices,
        (SELECT COUNT(*) FROM subscriptions      WHERE user_id = $1)::int AS subscriptions`,
+    [userId],
+  );
+
+  // Scrub the payer's number from the financial records BEFORE the delete,
+  // while the link that finds them still exists — user_id is ON DELETE SET
+  // NULL, so afterwards there is no way to tell whose these were.
+  //
+  // The deletion page promises that retained payment records "contain no
+  // personal identifiers beyond the transaction itself". A full mobile number
+  // is exactly such an identifier, and accounting needs the amount, currency,
+  // date, plan and reference — never the number that paid.
+  await pool.query(
+    `UPDATE transactions SET phone_number = NULL WHERE user_id = $1 AND phone_number IS NOT NULL`,
     [userId],
   );
 
