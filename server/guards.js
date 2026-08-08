@@ -68,6 +68,36 @@ async function orgIdFromRequest(req, body) {
   return null;
 }
 
+/**
+ * Who a device registration belongs to: an organisation, or one person.
+ *
+ * Returns `{ orgId, userId }` with exactly one side populated, or null when the
+ * caller proved neither. Kept separate from orgIdFromRequest because that one
+ * answers with an org id and nothing else — a personal account resolved through
+ * it comes back null, indistinguishable from "no credentials", which is why
+ * individual subscribers could not register a handset at all.
+ *
+ * A personal account is never given an org id here, not even null. Null is a
+ * real org in this schema's terms: legacy single-room deployments use it, and
+ * an org broadcast matches it, so handing it back for a person would put every
+ * unrelated individual into one shared delivery list.
+ */
+async function deviceOwnerFromRequest(req, body) {
+  const ctx = await requireAuth(req);
+  if (ctx) {
+    if (ctx.kind === 'individual') return { orgId: null, userId: ctx.user.id };
+    if (ctx.orgId) return { orgId: ctx.orgId, userId: null };
+    // A signed-in user who is neither. Refused rather than guessed at.
+    return null;
+  }
+  // A worker holds a join code and never a JWT.
+  if (body && body.orgCode) {
+    const org = await db.getOrgByCode(body.orgCode);
+    if (org) return { orgId: org.id, userId: null };
+  }
+  return null;
+}
+
 // Gate one administrative capability behind the org's subscription.
 //
 // Returns true when the caller may proceed. Applied only to dashboard and
@@ -122,6 +152,6 @@ const allowWebhook = rateLimiter({ windowMs: 60 * 1000, max: 240, name: 'payment
 const allowPasswordReset = rateLimiter({ windowMs: 15 * 60 * 1000, max: 30, name: 'password-reset' });
 
 module.exports = {
-  requireAuth, guardOrg, orgContext, orgIdFromRequest, allowFeature,
+  requireAuth, guardOrg, orgContext, orgIdFromRequest, deviceOwnerFromRequest, allowFeature,
   allowReport, allowPlaces, allowWebhook, allowPasswordReset,
 };

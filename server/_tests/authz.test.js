@@ -64,15 +64,17 @@ before(() => {
       store.subscriptions.delete(endpoint);
       return 1;
     },
-    deleteDeviceToken: async (token, orgId = null) => {
+    // Mirrors the real scoping: an owner is required, and it must match.
+    deleteDeviceToken: async (token, { orgId = null, userId = null } = {}) => {
       const owner = store.tokens.get(token);
       if (owner === undefined) return 0;
-      if (orgId !== null && owner !== orgId) return 0;
+      const claimed = userId ?? orgId;
+      if (claimed === null || owner !== claimed) return 0;
       store.tokens.delete(token);
       return 1;
     },
     createPushSubscription: async ({ orgId, endpoint }) => { store.subscriptions.set(endpoint, orgId); },
-    saveDeviceToken: async ({ token, orgId }) => { store.tokens.set(token, orgId); },
+    saveDeviceToken: async ({ token, orgId, userId = null }) => { store.tokens.set(token, userId ?? orgId); },
     listPushSubscriptions: async () => [],
     listDeviceTokens: async () => [],
     recordAlert: async () => true,

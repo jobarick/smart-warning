@@ -215,6 +215,20 @@ async function init() {
       seen_at    TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS device_tokens_org_idx ON device_tokens (org_id);
+    -- A personal account belongs to no organisation, so its phone could not be
+    -- registered at all: the only owner this table understood was an org, and a
+    -- personal registration was refused rather than stored. That made native
+    -- push unreachable for every individual subscriber.
+    --
+    -- Owned by a user instead, and NEVER by a null org. Null org id is not a
+    -- free slot — listDeviceTokens matches it with IS NOT DISTINCT FROM, so
+    -- storing personal phones that way would have made one broadcast reach
+    -- every unrelated personal account at once. That is the same shared-room
+    -- mistake relay.js refuses for WebSocket rooms, and it must be refused
+    -- here too. See listDeviceTokens, which now excludes user-owned rows.
+    ALTER TABLE device_tokens ADD COLUMN IF NOT EXISTS user_id UUID
+      REFERENCES users(id) ON DELETE CASCADE;
+    CREATE INDEX IF NOT EXISTS device_tokens_user_idx ON device_tokens (user_id);
 
     -- Billing ---------------------------------------------------------------
     -- The tier is denormalised onto the organization so the common read — "what
@@ -1116,38 +1130,81 @@ async function mailQueueStats() {
 
 // --- Native push tokens ----------------------------------------------------
 
-async function saveDeviceToken({ token, orgId = null, platform = 'android', workerId = null, label = null }) {
+// A token is owned by exactly one subject: an organisation, or a person.
+//
+// The upsert overwrites BOTH owner columns on conflict, which is what makes a
+// handset safe to hand over or re-use. Signing in as someone else re-registers
+// the same FCM token, and the previous owner's claim on it has to disappear in
+// the same statement — otherwise the phone would keep receiving the alerts of
+// an account its holder has left.
+async function saveDeviceToken({ token, orgId = null, userId = null, platform = 'android', workerId = null, label = null }) {
   if (!pool) return null;
   const { rows } = await pool.query(
-    `INSERT INTO device_tokens (token, org_id, platform, worker_id, label)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO device_tokens (token, org_id, user_id, platform, worker_id, label)
+     VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (token) DO UPDATE
-       SET org_id = EXCLUDED.org_id, platform = EXCLUDED.platform,
+       SET org_id = EXCLUDED.org_id, user_id = EXCLUDED.user_id,
+           platform = EXCLUDED.platform,
            worker_id = EXCLUDED.worker_id, label = EXCLUDED.label, seen_at = now()
      RETURNING *`,
-    [token, orgId, platform, workerId, label],
+    [token, orgId, userId, platform, workerId, label],
   );
   return rows[0] || null;
 }
 
+// Every phone registered to one organisation.
+//
+// `user_id IS NULL` is load-bearing, not tidiness. The org match is
+// IS NOT DISTINCT FROM so that legacy single-room deployments (org id null)
+// still work, and without this second clause a null-org broadcast would sweep
+// up every personal account's handset and deliver one stranger's emergency to
+// all of them. Personal registrations are read by listDeviceTokensForUser.
 async function listDeviceTokens(orgId) {
   if (!pool) return [];
   const { rows } = await pool.query(
-    `SELECT token, platform FROM device_tokens WHERE org_id IS NOT DISTINCT FROM $1`,
+    `SELECT token, platform FROM device_tokens
+      WHERE org_id IS NOT DISTINCT FROM $1 AND user_id IS NULL`,
     [orgId],
   );
   return rows;
 }
 
 // Scoped the same way as deletePushSubscription: holding a registration token
-// must not be sufficient to unregister a device from its org's alerts. The
-// unscoped form is for FCM telling us a token is dead.
-async function deleteDeviceToken(token, orgId = null) {
+// must not be sufficient to unregister a device from its owner's alerts.
+//
+// An owner is now required. This used to fall back to deleting by token alone
+// whenever no org id was supplied, which was safe only because the sole caller
+// rejected the request first. Personal accounts have no org id, so that
+// fallback would have become reachable the moment they could register — and
+// possession of a token string would have been enough to silence anyone's
+// phone. Pruning tokens FCM has declared dead is a different operation with
+// no owner to check: it goes through deleteDeviceTokens.
+async function deleteDeviceToken(token, owner = {}) {
   if (!pool) return 0;
-  const { rowCount } = orgId
-    ? await pool.query(`DELETE FROM device_tokens WHERE token = $1 AND org_id = $2`, [token, orgId])
-    : await pool.query(`DELETE FROM device_tokens WHERE token = $1`, [token]);
-  return rowCount;
+  const { orgId = null, userId = null } = owner;
+  if (userId) {
+    const { rowCount } = await pool.query(
+      `DELETE FROM device_tokens WHERE token = $1 AND user_id = $2`, [token, userId],
+    );
+    return rowCount;
+  }
+  if (orgId) {
+    const { rowCount } = await pool.query(
+      `DELETE FROM device_tokens WHERE token = $1 AND org_id = $2 AND user_id IS NULL`, [token, orgId],
+    );
+    return rowCount;
+  }
+  return 0;
+}
+
+/** Every phone registered to one person. The personal counterpart of listDeviceTokens. */
+async function listDeviceTokensForUser(userId) {
+  if (!pool || !userId) return [];
+  const { rows } = await pool.query(
+    `SELECT token, platform FROM device_tokens WHERE user_id = $1`,
+    [userId],
+  );
+  return rows;
 }
 
 /** Drop tokens the push service has told us are dead, in one round trip. */
@@ -1738,6 +1795,7 @@ module.exports = {
   mailQueueStats,
   saveDeviceToken,
   listDeviceTokens,
+  listDeviceTokensForUser,
   deleteDeviceToken,
   deleteDeviceTokens,
   countDeviceTokens,

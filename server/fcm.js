@@ -199,7 +199,29 @@ function errorCodeOf(body) {
  */
 async function notifyOrg(orgId, payload) {
   if (!enabled()) return { sent: 0, pruned: 0, failed: 0, skipped: disabledReason };
-  const tokens = await db.listDeviceTokens(orgId);
+  return sendToTokens(await db.listDeviceTokens(orgId), payload);
+}
+
+/**
+ * The same delivery, to one person's own handsets.
+ *
+ * A personal account has no organisation, and must never be reached through
+ * notifyOrg(null) — that resolves to "every token with no org", which is a
+ * single shared room containing every unrelated individual. Their tokens are
+ * therefore held under a user id and read back by it, so one person's SOS
+ * reaches one person's devices. Multiple devices for one account are the
+ * normal case, not an edge case: a phone and a tablet both get the alert.
+ */
+async function notifyUser(userId, payload) {
+  if (!enabled()) return { sent: 0, pruned: 0, failed: 0, skipped: disabledReason };
+  if (!userId) return { sent: 0, pruned: 0, failed: 0 };
+  return sendToTokens(await db.listDeviceTokensForUser(userId), payload);
+}
+
+// Deliver one payload to a resolved token list. Callers decide WHOSE tokens
+// these are; by the time they arrive here that question is already settled,
+// which is what keeps the org and personal paths from drifting apart.
+async function sendToTokens(tokens, payload) {
   if (tokens.length === 0) return { sent: 0, pruned: 0, failed: 0 };
 
   let bearer;
@@ -239,4 +261,4 @@ async function notifyOrg(orgId, payload) {
   return { sent, pruned: dead.length, failed };
 }
 
-module.exports = { init, enabled, status, notifyOrg, accessToken, buildMessage, loadAccount, _dead: DEAD };
+module.exports = { init, enabled, status, notifyOrg, notifyUser, sendToTokens, accessToken, buildMessage, loadAccount, _dead: DEAD };

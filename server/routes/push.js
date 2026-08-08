@@ -7,7 +7,7 @@ const db = require('../db');
 const push = require('../push');
 const fcm = require('../fcm');
 const { sendJson, readJson } = require('../http');
-const { orgIdFromRequest } = require('../guards');
+const { orgIdFromRequest, deviceOwnerFromRequest } = require('../guards');
 
 async function handle({ req, res, path }) {
   // --- Web push ---
@@ -65,13 +65,20 @@ async function handle({ req, res, path }) {
     // credentials are added — dropping them would mean every device had to
     // reopen the app before push started working.
     if (!db.enabled()) { sendJson(res, 501, { error: 'device registration requires a database' }); return true; }
-    const orgId = await orgIdFromRequest(req, body);
-    if (!orgId) { sendJson(res, 401, { error: 'org credentials required' }); return true; }
+    // Either owner will do — a site's worker or coordinator, or a person with
+    // no organisation at all. The second was previously turned away here,
+    // which left every individual subscriber unable to receive an alert on a
+    // closed app: the whole point of registering.
+    const owner = await deviceOwnerFromRequest(req, body);
+    if (!owner) { sendJson(res, 401, { error: 'credentials required' }); return true; }
     await db.saveDeviceToken({
       token,
-      orgId,
+      orgId: owner.orgId,
+      userId: owner.userId,
       platform: String(body.platform || 'android').slice(0, 16),
-      workerId: body.workerId ? String(body.workerId).slice(0, 64) : null,
+      // A worker label belongs to a site roster. A personal registration has no
+      // roster to appear on, so these are not carried across to it.
+      workerId: owner.orgId && body.workerId ? String(body.workerId).slice(0, 64) : null,
       label: body.label ? String(body.label).slice(0, 80) : null,
     });
     sendJson(res, 201, { ok: true, delivery: fcm.enabled() ? 'active' : 'pending-credentials' });
@@ -81,9 +88,11 @@ async function handle({ req, res, path }) {
   // Same reasoning as /api/push/unsubscribe above.
   if (path === '/api/push/device/unregister' && req.method === 'POST') {
     const body = await readJson(req);
-    const orgId = await orgIdFromRequest(req, body);
-    if (!orgId) { sendJson(res, 401, { error: 'org credentials required' }); return true; }
-    if (body.token) await db.deleteDeviceToken(String(body.token), orgId);
+    const owner = await deviceOwnerFromRequest(req, body);
+    if (!owner) { sendJson(res, 401, { error: 'credentials required' }); return true; }
+    // Scoped to whichever owner proved itself, so one account cannot silence
+    // another's handset by knowing its token.
+    if (body.token) await db.deleteDeviceToken(String(body.token), owner);
     sendJson(res, 200, { ok: true });
     return true;
   }
