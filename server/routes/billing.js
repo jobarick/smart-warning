@@ -166,6 +166,30 @@ async function handle({ req, res, url, path }) {
     return true;
   }
 
+  // Ask this deployment whether its own mobile money credentials actually
+  // work. /api/health reports only that the variables are SET; a wrong or
+  // quoted key looks identical there, and on Render's free plan there is no
+  // shell to run tools/clickpesa-check.js in. This closes that gap.
+  //
+  // Authenticated, and rate limited with the webhook limiter, because it calls
+  // out to the gateway — it must not become an unauthenticated way to drive
+  // traffic at ClickPesa on this merchant's behalf. It sends no USSD prompt,
+  // moves no money, and returns no secret: only whether each value is present,
+  // its length, and whether it arrived quoted or padded.
+  if (path === '/api/payments/diagnostics' && req.method === 'GET') {
+    const ctx = await requireAuth(req);
+    if (!ctx) { sendJson(res, 401, { error: 'not authenticated' }); return true; }
+    if (!allowWebhook(req)) { sendJson(res, 429, { error: 'slow down' }); return true; }
+    // Optional. Supplied, it also asks which wallets could take a charge for
+    // this number — still without prompting the handset.
+    const phoneNumber = String(url.searchParams.get('phone') || '').trim() || null;
+    const amount = String(url.searchParams.get('amount') || '1000').trim();
+    sendJson(res, 200, {
+      mobileMoney: await payments.diagnoseMobileMoney({ phoneNumber, amount }),
+    });
+    return true;
+  }
+
   if (path === '/api/billing/cancel' && req.method === 'POST') {
     const ctx = await guardOrg(req, res);
     if (ctx === false) return true;
