@@ -44,6 +44,32 @@ function enabled() {
   return clickpesa.enabled() || stripe.enabled();
 }
 
+/**
+ * Does mobile money actually work on this deployment?
+ *
+ * status() answers "are the variables set", which a wrong key satisfies just
+ * as well as a right one. This answers "does the gateway accept them", which
+ * is the question somebody is really asking before their first real payment.
+ *
+ * The number is normalised and checked for a wallet here rather than being
+ * passed straight through, so "that network has no mobile money product" comes
+ * back as its own answer instead of an opaque gateway error.
+ */
+async function diagnoseMobileMoney({ phoneNumber = null, amount = '1000', currency = 'TZS' } = {}) {
+  let msisdn = null;
+  if (phoneNumber) {
+    msisdn = phone.normalize(phoneNumber);
+    if (!msisdn) {
+      return { ...clickpesa.status(), ok: false, checks: [{ name: 'phone', ok: false, detail: 'not a valid Tanzanian mobile number' }] };
+    }
+    if (!phone.isCollectable(msisdn)) {
+      const label = phone.operatorMeta(phone.operatorOf(msisdn))?.label ?? 'that network';
+      return { ...clickpesa.status(), ok: false, checks: [{ name: 'phone', ok: false, detail: `${label} has no mobile money product — collection is not possible` }] };
+    }
+  }
+  return clickpesa.diagnose({ phoneNumber: msisdn, amount, currency });
+}
+
 class PaymentError extends Error {
   constructor(message, statusCode = 400, extra = {}) {
     super(message);
@@ -621,6 +647,7 @@ async function cancelSubscription(orgId) {
 module.exports = {
   status,
   enabled,
+  diagnoseMobileMoney,
   initiateMobileMoney,
   initiateCard,
   getPaymentStatus,

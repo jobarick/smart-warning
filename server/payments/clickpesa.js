@@ -295,6 +295,106 @@ function normalizePayment(raw) {
   };
 }
 
+// --- Diagnostics -----------------------------------------------------------
+
+// Describe a configured value without revealing it. Length and shape are
+// enough to spot the mistakes that actually happen — a value that was never
+// pasted, or one that arrived with quotes or whitespace still attached — and
+// none of it is a secret.
+function describeSecret(raw) {
+  if (!raw) return { set: false };
+  const trimmed = raw.trim();
+  return {
+    set: true,
+    length: trimmed.length,
+    padded: trimmed !== raw,
+    quoted: /^["'].*["']$/.test(trimmed),
+  };
+}
+
+/**
+ * Prove the credentials this process is holding actually work.
+ *
+ * The same three checks as tools/clickpesa-check.js, callable in-process so a
+ * deployment can be asked about itself. That matters because the CLI can only
+ * ever test the credentials on the machine running it: on Render's free plan
+ * there is no shell, so until now there was no way to tell "the keys are set"
+ * apart from "the keys are accepted" on the deployment that actually collects
+ * the money. /api/health answers the first question only.
+ *
+ * Never sends a USSD prompt and never moves money — `preview` asks which
+ * wallets could take a charge, and is skipped entirely unless a number is
+ * supplied. Returns no secret in any branch.
+ */
+async function diagnose({ phoneNumber = null, amount = '1000', currency = 'TZS' } = {}) {
+  const checks = [];
+  const out = {
+    provider: 'clickpesa',
+    baseUrl: BASE_URL,
+    checksum: checksumConfigured(),
+    credentials: {
+      clientId: describeSecret(CLIENT_ID),
+      apiKey: describeSecret(API_KEY),
+      checksumKey: describeSecret(CHECKSUM_KEY),
+    },
+    checks,
+    ok: false,
+  };
+
+  if (!enabled()) {
+    checks.push({ name: 'credentials', ok: false, detail: 'CLICKPESA_CLIENT_ID and CLICKPESA_API_KEY must both be set' });
+    return out;
+  }
+  checks.push({ name: 'credentials', ok: true, detail: 'both values are present' });
+
+  // Forced, so a cached token from an earlier good credential cannot make a
+  // broken one look healthy.
+  try {
+    await getToken({ force: true });
+    checks.push({ name: 'authentication', ok: true, detail: 'the gateway accepted these credentials' });
+  } catch (e) {
+    const status = e instanceof ClickPesaError ? e.status : 0;
+    // A transport fault and a rejection are different problems with different
+    // fixes, and blaming the credentials for a DNS failure sends somebody
+    // looking in the wrong place.
+    const detail = !status
+      ? 'the gateway could not be reached at all — a network problem, not a credential one'
+      : status === 403
+        ? '403 — the gateway rejected these credentials, or the application lacks Collection API access'
+        : status === 401
+          ? '401 — one of the two headers did not arrive; check for quotes or whitespace'
+          : `the gateway refused with HTTP ${status}`;
+    checks.push({ name: 'authentication', ok: false, detail });
+    return out;
+  }
+
+  if (phoneNumber) {
+    try {
+      const preview = await previewFor({ amount, currency, phoneNumber });
+      const available = preview.activeMethods.filter((m) => String(m.status).toUpperCase() === 'AVAILABLE');
+      checks.push({
+        name: 'collection',
+        ok: available.length > 0,
+        detail: available.length > 0
+          ? `${available.length} wallet(s) can take a charge for ${currency} ${amount}`
+          : 'the gateway reported no available collection method — usually the Collection API is not enabled yet',
+        methods: preview.activeMethods.map((m) => ({ name: m.name, status: m.status })),
+      });
+    } catch (e) {
+      checks.push({ name: 'collection', ok: false, detail: `preview failed: ${e.message}` });
+    }
+  }
+
+  out.ok = checks.every((c) => c.ok);
+  return out;
+}
+
+// Small indirection so diagnose() reads the same whether or not a number was
+// given, without building an order reference it will not use.
+async function previewFor({ amount, currency, phoneNumber }) {
+  return preview({ amount, currency, orderReference: makeOrderReference('SWDIAG'), phoneNumber });
+}
+
 // Their references must be alphanumeric and unique. Prefixing keeps ours
 // recognisable in their dashboard next to other merchants' traffic.
 function makeOrderReference(prefix = 'SW') {
@@ -307,6 +407,7 @@ module.exports = {
   enabled,
   checksumConfigured,
   status,
+  diagnose,
   preview,
   initiateUssdPush,
   queryByOrderReference,

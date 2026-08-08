@@ -25,16 +25,60 @@ Prices live in one place: [`server/billing/plans.js`](../server/billing/plans.js
 | Plan | TZS / month | USD / month | Seats |
 |---|---|---|---|
 | Free | 0 | 0 | 1 |
-| Personal Pro | 8,000 | $3 | 1 |
-| Team | 80,000 | $30 | 50 |
-| Business | 260,000 | $100 | 51–250 |
-| Enterprise | custom | $1–3 / user | custom |
+| Personal | 2,500 | $1 | 1 |
+| Team | 2,500 | $1 | 50 |
+| Business | 125,000 | $50 | 51–250 |
+| Enterprise | 250,000 | $100 | custom |
 
-Annual billing is charged at ten months (two free). Enterprise is `contactOnly`
-and cannot be bought online — an attempt to check out returns a 400.
+Personal and Team cost the same on purpose. Nothing about a site costs more to
+serve yet, and a price difference would have to be justified to a customer
+rather than assumed — both read from one configured value.
 
-To change a price, edit `plans.js`. Nothing else stores an amount; the Stripe
-line item is built from this catalogue at checkout time so the two cannot drift.
+Enterprise has a published price and can be bought online. Its **seat count**
+is still custom; the price no longer is.
+
+Every new account gets **30 days** of the paid experience. A person gets
+Personal, an organisation gets Team — a coordinator evaluating this needs the
+dashboard to evaluate it at all. When a trial lapses the account falls to
+`free`, which still raises alarms, still calls emergency numbers and still
+receives alerts.
+
+Multi-month terms are sold on the two entry plans, priced explicitly rather
+than by arithmetic:
+
+| Term | TZS | USD |
+|---|---|---|
+| Monthly | 2,500 | $1 |
+| Quarterly | 6,500 | $2.60 |
+| Half-year | 12,000 | $4.80 |
+| Annual | 22,000 | $8.80 |
+
+These matter more here than anywhere else in the catalogue: collecting by
+mobile money costs a gateway fee and a USSD prompt the customer has to complete
+*every month*, and at this price the monthly cycle barely pays for itself.
+Prepaid airtime has already taught this market to buy time in blocks.
+
+Plans without their own bundle prices fall back to ten months for an annual
+term (two free).
+
+To change a price, edit `plans.js` — or override any of them per-deployment
+without a code change:
+
+```
+MONTHLY_PRICE_USD    MONTHLY_PRICE_TZS
+BUSINESS_PRICE_USD   BUSINESS_PRICE_TZS
+ENTERPRISE_PRICE_USD ENTERPRISE_PRICE_TZS
+QUARTERLY_PRICE_USD  QUARTERLY_PRICE_TZS
+HALF_YEAR_PRICE_USD  HALF_YEAR_PRICE_TZS
+ANNUAL_PRICE_USD     ANNUAL_PRICE_TZS
+```
+
+Nothing else stores an amount; the Stripe line item is built from this
+catalogue at checkout time so the two cannot drift.
+
+Prices are held per currency rather than converted at runtime. A shilling price
+that drifts with an exchange rate is a support ticket every month, and 2,500 TZS
+is a number a customer recognises on a USSD prompt in a way 2,483 TZS is not.
 
 ---
 

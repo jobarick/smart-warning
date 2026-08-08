@@ -741,6 +741,10 @@ export default function App() {
           <AboutPanel
             token={token}
             orgName={org?.name}
+            // Only a personal account can delete itself here; a member of
+            // someone else's organization gets the contact-us copy instead,
+            // because their records are part of that organization's history.
+            personalEmail={personal && session?.kind === 'supervisor' ? session.user.email : undefined}
             onBack={() => setShowAbout(false)}
             onDeleted={() => { setShowAbout(false); signOut(); }}
           />
