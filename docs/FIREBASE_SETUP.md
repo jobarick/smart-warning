@@ -76,7 +76,31 @@ inside the JSON; base64 avoids the problem entirely.
 base64 -w0 service-account.json
 ```
 
+On Windows there is no `base64`. Use PowerShell, and note that it must read the
+file as **raw bytes** — anything that re-encodes the text on the way through can
+add a UTF-8 BOM, which survives base64 and is invisible in the panel:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("service-account.json")) | Set-Clipboard
+```
+
 Set the output as `FIREBASE_SERVICE_ACCOUNT`.
+
+Check the value before trusting it — this decodes whatever you are about to
+paste and prints the project id, without printing the key:
+
+```powershell
+$v="<paste the value>"; ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($v)) | ConvertFrom-Json).project_id
+```
+
+If that prints your project id, the value is good. If it errors, or prints
+nothing, the value is not base64 of the service account file — re-encode it with
+the command above rather than pasting it again.
+
+`certutil -encode` is **not** a substitute: it wraps the output in
+`-----BEGIN CERTIFICATE-----` lines. Those characters are outside the base64
+alphabet, and since Node's decoder discards such characters instead of
+rejecting them, the value decodes to binary noise rather than failing cleanly.
 
 **Option B — raw JSON.** Paste the file contents as `FIREBASE_SERVICE_ACCOUNT`.
 If the panel collapses newlines into a literal `\n`, that is handled — the

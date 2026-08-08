@@ -34,26 +34,53 @@ let disabledReason = 'no Firebase credentials configured';
  * paste: raw JSON, base64-encoded JSON (Render's multiline handling is easier
  * with this), or a path to a file on disk.
  */
+// A UTF-8 byte order mark survives a base64 round-trip and every panel paste,
+// and JSON.parse rejects it as an unexpected token. Windows editors and
+// PowerShell's `Out-File -Encoding utf8` write one without saying so, so strip
+// it rather than failing on a character nobody can see.
+function stripBom(text) {
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+}
+
 function loadAccount(env = process.env) {
-  const raw = env.FIREBASE_SERVICE_ACCOUNT || '';
+  const raw = stripBom((env.FIREBASE_SERVICE_ACCOUNT || '').trim());
   const path = env.GOOGLE_APPLICATION_CREDENTIALS || '';
 
   let text = '';
-  if (raw.trim().startsWith('{')) {
+  let source = '';
+  if (raw.startsWith('{')) {
     text = raw;
-  } else if (raw.trim()) {
-    try {
-      text = Buffer.from(raw.trim(), 'base64').toString('utf8');
-    } catch {
-      throw new Error('FIREBASE_SERVICE_ACCOUNT is neither JSON nor valid base64');
+    source = 'FIREBASE_SERVICE_ACCOUNT (raw JSON)';
+  } else if (raw) {
+    // Buffer.from(_, 'base64') never throws. It silently discards every
+    // character outside the alphabet and decodes whatever survives, so a value
+    // that is not really base64 arrives as binary noise instead of an error —
+    // which meant the catch that used to sit here could never fire, and the
+    // operator saw a JSON.parse complaint about an unprintable byte rather than
+    // being told what was actually wrong. Check the decode produced JSON.
+    text = stripBom(Buffer.from(raw, 'base64').toString('utf8').trim());
+    source = 'FIREBASE_SERVICE_ACCOUNT (base64)';
+    if (!text.startsWith('{')) {
+      throw new Error(
+        'FIREBASE_SERVICE_ACCOUNT is set but is neither raw JSON nor valid base64 of '
+        + 'the service account file — it decoded to binary noise. Re-encode the JSON '
+        + 'from Firebase (Project settings -> Service accounts), reading it as raw '
+        + 'bytes so that no BOM or re-encoding is introduced. See docs/FIREBASE_SETUP.md.'
+      );
     }
   } else if (path) {
-    text = fs.readFileSync(path, 'utf8');
+    text = stripBom(fs.readFileSync(path, 'utf8'));
+    source = `GOOGLE_APPLICATION_CREDENTIALS (${path})`;
   } else {
     return null;
   }
 
-  const parsed = JSON.parse(text);
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch (e) {
+    throw new Error(`${source} is not valid JSON: ${e.message}`);
+  }
   for (const field of ['client_email', 'private_key', 'project_id']) {
     if (!parsed[field]) throw new Error(`service account is missing ${field}`);
   }
