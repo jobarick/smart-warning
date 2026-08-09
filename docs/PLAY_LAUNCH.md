@@ -19,17 +19,27 @@ what Play needs around it.
 | Terms URL | ✅ `/legal/terms.html` |
 | Account deletion URL | ✅ `/legal/delete.html` |
 | Backup of the session token | ✅ disabled (`allowBackup=false` + `data_extraction_rules.xml`) |
-| Signing key | ❌ **does not exist yet — you must create it** |
+| Signing key | ✅ **created and verified 2026-08-09** — `bundleRelease`/`assembleRelease` sign with `smart-warning`, confirmed via `apksigner verify` |
+| Firebase push (`google-services.json` + backend credential) | ✅ **live** — `/api/health` reports native push enabled |
+| SMTP email | ✅ **live** — `/api/health` reports `mail: true`, provider `smtp` |
 | Play Console account | ❌ not created |
 | Demo credentials for the reviewer | ❌ **not prepared — this will fail review without it** |
 | Store listing & screenshots | ❌ not prepared |
 | Data safety form | ❌ not submitted (answers drafted below) |
 
-The three ❌ items in bold are the ones that actually stop a submission.
+Signing, push and email were the code-side blockers; all three closed as of
+2026-08-09. What's left is account setup and content only you can produce —
+the Play Console account and the demo reviewer credentials are what actually
+stop a submission now.
 
 ---
 
 ## Blocker 1 — the upload key (you must do this, not me)
+
+✅ **Done as of 2026-08-09.** `client/android/smart-warning-upload.jks` and
+`keystore.properties` both exist, and a release build was verified to sign
+with them. Left in place below for reference — e.g. if the key ever needs to
+be recreated on another machine.
 
 I will not create or handle a keystore: it needs a password, and passwords are
 yours to hold. Run this yourself, from `client/android/`:
@@ -250,17 +260,14 @@ answer before the payment screens exist inside the app.
 
 ## Still open, and worth clearing before step 6
 
-- **`SMTP_URL` on Render.** Without it, password-reset emails queue and never
-  send — a reviewer who tries "Forgot password?" sees a message saying delivery
-  is not configured.
-- **`APP_URL` on Render**, so reset links point at your chosen domain.
-- **`google-services.json` + `FIREBASE_SERVICE_ACCOUNT`.** Without them native
-  push is inert, so an alert only reaches a device with the app open. The app
-  is honest about this in `/api/health`, but it is the single biggest gap
-  between what the listing implies and what a phone will do.
+- ~~`SMTP_URL` on Render~~ — **done**, `/api/health` confirms `mail: true`.
+- ~~`google-services.json` + `FIREBASE_SERVICE_ACCOUNT`~~ — **done**,
+  `/api/health` confirms native push is enabled.
 - **A custom domain.** `smart-warning.vercel.app` in a privacy policy URL is
   fine, but a domain you own reads as more permanent and survives a hosting
   change.
+- **Confirm `APP_URL` on Render** points at whatever domain you settle on, so
+  password-reset links resolve correctly.
 
 ## Related
 
