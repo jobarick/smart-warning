@@ -12,7 +12,13 @@
 # works: without client/dist the server simply runs API-only.
 databases:
   - name: smart-warning-db
-    plan: free
+    # "starter" is a legacy Postgres plan Render no longer provisions fresh —
+    # basic-256mb is the current smallest paid tier as of this writing. Verify
+    # against your actual dashboard before syncing: Render may offer a direct
+    # free→paid upgrade path for this existing database under a different name,
+    # and pricing/plan slugs are Render's to confirm, not something to trust
+    # blindly from a config comment.
+    plan: basic-256mb
     databaseName: smartwarning
     user: smartwarning
 
@@ -20,7 +26,7 @@ services:
   - type: web
     name: smart-warning-relay
     runtime: node
-    plan: free
+    plan: starter
     buildCommand: cd client && npm ci && npm run build && cd ../server && npm ci
     startCommand: node server/index.js
     healthCheckPath: /api/health
