@@ -260,7 +260,16 @@
 }
 .mc-map-body svg { flex: 1; min-height: 0; width: 100%; }
 /* Positions ease to their new place instead of teleporting on each roster tick. */
-.mc-pin { transition: transform 0.6s ease; }
+.mc-pin { transition: transform 0.6s ease, opacity 0.3s ease; }
+/* A pin is a claim about where someone is right now — recent and stale fade
+   so a coordinator's eye is not drawn to a position as if it were current. */
+.mc-pin-recent { opacity: 0.75; }
+.mc-pin-stale, .mc-pin-unknown { opacity: 0.45; }
+.mc-pin-stale-ring {
+  stroke: var(--cmd-warn);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 2;
+}
 .mc-tray { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .mc-tray-lbl {
   font-family: var(--mono);

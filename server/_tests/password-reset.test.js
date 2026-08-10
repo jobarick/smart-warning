@@ -46,6 +46,12 @@ const post = (route, body) => fetch(`${BASE}${route}`, {
 before(async () => {
   process.env.PORT = String(PORT);
   process.env.APP_URL = 'https://smart-warning.example';
+  // This file legitimately requests more than one link for the same address
+  // in quick succession (see "a second outstanding link is retired…" below),
+  // which a real 60s per-address cooldown would break in a test that takes
+  // milliseconds. The cooldown itself is unit-tested in isolation, against
+  // guards.js directly, in units.test.js.
+  process.env.PASSWORD_RESET_COOLDOWN_MS = '1';
 
   stub('db.js', {
     enabled: () => true,

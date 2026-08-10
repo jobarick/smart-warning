@@ -147,11 +147,39 @@ const allowWebhook = rateLimiter({ windowMs: 60 * 1000, max: 240, name: 'payment
 // It is also not the control that stops token guessing — a reset token is 32
 // random bytes, so guessing is hopeless at any rate. What this actually
 // contains is bulk abuse: somebody scripting thousands of requests to grow the
-// mail queue. Mail-bombing ONE address is better answered by a per-address
-// cooldown, which is worth adding next.
+// mail queue.
 const allowPasswordReset = rateLimiter({ windowMs: 15 * 60 * 1000, max: 30, name: 'password-reset' });
+
+// Mail-bombing ONE address, which the IP limiter above cannot stop on its own
+// — an attacker rotating IPs is still hitting a single mailbox. Keyed by the
+// address itself rather than the requester, so it applies identically whether
+// or not that address belongs to a real account: the response must not
+// differ, or the endpoint becomes a way to learn who has signed up.
+//
+// A cooldown, not a counter — one request per address per window is the
+// entire point, not "a few requests, then blocked". Bounded like the IP
+// limiter so a burst of distinct addresses cannot grow this map forever.
+const PASSWORD_RESET_COOLDOWN_MS = Number(process.env.PASSWORD_RESET_COOLDOWN_MS) > 0
+  ? Number(process.env.PASSWORD_RESET_COOLDOWN_MS)
+  : 60 * 1000;
+const passwordResetCooldown = new Map(); // normalised email → last request at
+
+function allowPasswordResetForAddress(email) {
+  const key = String(email || '').trim().toLowerCase();
+  if (!key) return true; // nothing to key on; the IP limiter above still applies
+  const now = Date.now();
+  const last = passwordResetCooldown.get(key);
+  if (last !== undefined && now - last < PASSWORD_RESET_COOLDOWN_MS) return false;
+  passwordResetCooldown.set(key, now);
+  if (passwordResetCooldown.size > 5000) {
+    for (const [k, t] of passwordResetCooldown) {
+      if (now - t >= PASSWORD_RESET_COOLDOWN_MS) passwordResetCooldown.delete(k);
+    }
+  }
+  return true;
+}
 
 module.exports = {
   requireAuth, guardOrg, orgContext, orgIdFromRequest, deviceOwnerFromRequest, allowFeature,
-  allowReport, allowPlaces, allowWebhook, allowPasswordReset,
+  allowReport, allowPlaces, allowWebhook, allowPasswordReset, allowPasswordResetForAddress,
 };

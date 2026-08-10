@@ -4,7 +4,7 @@ const auth = require('../auth');
 const db = require('../db');
 const { ORGS } = require('../config');
 const { sendJson, readJson } = require('../http');
-const { requireAuth, allowPasswordReset } = require('../guards');
+const { requireAuth, allowPasswordReset, allowPasswordResetForAddress } = require('../guards');
 
 async function handle({ req, res, path }) {
   if (path === '/api/auth/signup' && req.method === 'POST') {
@@ -36,6 +36,13 @@ async function handle({ req, res, path }) {
     if (!ORGS) { sendJson(res, 501, { error: 'accounts require a database (DATABASE_URL)' }); return true; }
     if (!allowPasswordReset(req)) { sendJson(res, 429, { error: 'too many attempts — please wait a few minutes' }); return true; }
     const body = await readJson(req);
+    // Same response either way, checked before touching auth.js at all: this
+    // must read identically whether the address is over its own cooldown or
+    // simply not a real account, or the endpoint becomes a way to learn which.
+    if (!allowPasswordResetForAddress(body.email)) {
+      sendJson(res, 429, { error: 'too many attempts — please wait a few minutes' });
+      return true;
+    }
     sendJson(res, 200, await auth.requestPasswordReset({ email: body.email }));
     return true;
   }

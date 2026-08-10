@@ -25,6 +25,34 @@ const enabled = () => pool !== null;
 
 const numOrNull = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
+// --- Liveness ----------------------------------------------------------
+//
+// `enabled()` answers "was a DATABASE_URL configured", which stays true for
+// as long as the process has been running even if Postgres itself is
+// unreachable right now — a wrong answer to give a health check during an
+// actual outage. This tracks whether the last real query succeeded, and
+// when, so /api/health can tell "configured" from "actually working".
+//
+// A cached result rather than a query-per-request on purpose: a health
+// endpoint that itself does a database round trip on every hit is one more
+// way for the database to be the reason the health check is slow.
+let liveness = { ok: null, at: null, error: null };
+
+async function checkLiveness() {
+  if (!pool) { liveness = { ok: false, at: Date.now(), error: 'no database configured' }; return liveness; }
+  try {
+    await pool.query('SELECT 1');
+    liveness = { ok: true, at: Date.now(), error: null };
+  } catch (e) {
+    liveness = { ok: false, at: Date.now(), error: e.message };
+  }
+  return liveness;
+}
+
+function livenessStatus() {
+  return { ...liveness };
+}
+
 // Create/upgrade the schema on boot. Idempotent — safe on every deploy, and
 // migrates an existing incidents table (from before orgs) by adding org_id.
 async function init() {
@@ -193,6 +221,9 @@ async function init() {
     );
     CREATE INDEX IF NOT EXISTS location_pings_incident_idx ON location_pings (incident_id, at);
     CREATE INDEX IF NOT EXISTS location_pings_org_at_idx   ON location_pings (org_id, at DESC);
+    -- What the retention purge scans: every row is a candidate by age alone,
+    -- with no org or incident in the WHERE clause to lean on.
+    CREATE INDEX IF NOT EXISTS location_pings_at_idx ON location_pings (at);
 
     -- Supervisor feedback. Stored first and delivered second, so a submission is
     -- never lost because mail was misconfigured.
@@ -1384,6 +1415,31 @@ async function listPings({ incidentId, orgId, workerId = null, limit = 1000 } = 
   return rows;
 }
 
+/**
+ * Delete movement history past its retention window — precise GPS traces of
+ * named people have no reason to live forever on a database.
+ *
+ * A ping tied to an incident that is still `active` is kept regardless of
+ * age: a genuinely long-running incident's own record must not be thinned out
+ * from underneath it. This is expected to protect almost nothing in practice
+ * — pings are only recorded between an alert and its all-clear, so a normal
+ * incident's trail is already short-lived — but the one case it exists for
+ * (an incident stuck open far past retention) is exactly the case where
+ * losing the record would be worst.
+ */
+async function purgeOldPings({ olderThanMs }) {
+  if (!pool) return 0;
+  const { rowCount } = await pool.query(
+    `DELETE FROM location_pings p
+      WHERE p.at < now() - ($1 || ' milliseconds')::interval
+        AND NOT EXISTS (
+          SELECT 1 FROM incidents i WHERE i.id = p.incident_id AND i.status = 'active'
+        )`,
+    [String(olderThanMs)],
+  );
+  return rowCount;
+}
+
 // --- Feedback --------------------------------------------------------------
 
 async function createFeedback({ orgId, userId, authorName, authorEmail, kind = 'suggestion', subject, message }) {
@@ -1974,6 +2030,8 @@ async function close() {
 module.exports = {
   enabled,
   init,
+  checkLiveness,
+  livenessStatus,
   queueMail,
   claimDueMail,
   markMailSent,
@@ -1996,6 +2054,7 @@ module.exports = {
   deleteDestination,
   recordPing,
   listPings,
+  purgeOldPings,
   createFeedback,
   listFeedback,
   markFeedbackDelivered,

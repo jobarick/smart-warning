@@ -49,6 +49,30 @@ setInterval(() => {
   escalation.sweep().catch((e) => console.error('[escalation] sweep failed:', e.message));
 }, 30_000).unref?.();
 
+// Retention for movement history: precise GPS traces of named people have no
+// reason to live on the database forever. Not urgent like the sweeps above —
+// every six hours is plenty for data hygiene — so this deliberately does not
+// run at boot; the first natural tick is soon enough, and a server that never
+// stays up six hours has bigger problems than an overdue purge.
+const LOCATION_RETENTION_MS = (Number(process.env.LOCATION_RETENTION_DAYS) > 0
+  ? Number(process.env.LOCATION_RETENTION_DAYS)
+  : 90) * 24 * 60 * 60 * 1000;
+setInterval(() => {
+  db.purgeOldPings({ olderThanMs: LOCATION_RETENTION_MS })
+    .then((n) => { if (n > 0) console.log(`[db] retention: purged ${n} location ping(s) past ${LOCATION_RETENTION_MS / 86_400_000}d`); })
+    .catch((e) => console.error('[db] retention purge failed:', e.message));
+}, 6 * 60 * 60 * 1000).unref?.();
+
+// A real "is Postgres answering right now", cached for /api/health to read —
+// see db.js's checkLiveness for why this is not a query-per-health-check.
+// Logged only server-side on failure: the raw driver error can name a host or
+// a username, and /api/health is public and unauthenticated.
+setInterval(() => {
+  db.checkLiveness?.().then((r) => {
+    if (!r.ok) console.error(`[db] liveness check failed: ${r.error}`);
+  }).catch(() => {});
+}, 20_000).unref?.();
+
 // ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
@@ -62,6 +86,7 @@ async function start() {
     console.log(ready
       ? '[db] connected — persistence + orgs ON'
       : '[db] no DATABASE_URL — persistence OFF (in-memory single-room relay)');
+    if (ready) db.checkLiveness?.().catch(() => {});
   } catch (err) {
     // A DB hiccup must never keep the life-safety relay from starting.
     console.error('[db] init failed, continuing without persistence:', err.message);

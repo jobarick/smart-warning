@@ -69,6 +69,8 @@ already joined keep relaying.
 | `FEEDBACK_TO` | Where feedback is mailed. Defaults to `jobarick@gmail.com`. |
 | `SMTP_FROM` | From address for feedback mail. |
 | `OVERPASS_URL` / `OVERPASS_TIMEOUT_MS` | Nearby-facility lookups. Defaults to the public Overpass API with a 7s timeout. |
+| `ESCALATE_AFTER_MS` / `ESCALATE_MAX` | How long an incident may sit unacknowledged before re-notifying the org, and how many times. Defaults to 5 minutes, 5 times (~25 min). |
+| `LOCATION_RETENTION_DAYS` | How long `location_pings` (GPS traces recorded during an incident) are kept before automatic deletion. Default `90`. A ping tied to a still-`active` incident is never purged regardless of age. |
 
 ## REST API
 

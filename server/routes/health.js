@@ -19,6 +19,13 @@ function health() {
     service: 'alert-backend',
     clients: relay.clientCount(),
     persistence: db.enabled(),
+    // `persistence` above only says a DATABASE_URL was configured — it stays
+    // true through an actual outage. `database` is whether the last real
+    // query, checked on a short interval, actually succeeded. The raw driver
+    // error (if any) stays server-side — logged at the check, not exposed
+    // here, since this endpoint is public and unauthenticated and a
+    // connection error can name a host or a username.
+    database: (() => { const { ok, at } = db.livenessStatus?.() ?? {}; return { ok: ok ?? null, at: at ?? null }; })(),
     orgs: ORGS,
     client: staticFiles.enabled(),
     channels: {

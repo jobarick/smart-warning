@@ -82,6 +82,21 @@ function lastSeen(updatedAt: number, now: number): string {
 }
 
 /**
+ * A pin on the map is a claim about where someone is *right now*. Without
+ * this, a device that lost signal five minutes ago still shows as a solid
+ * dot next to someone whose position just arrived — visually identical, and
+ * a coordinator has no way to tell which one to actually trust.
+ */
+type Freshness = 'live' | 'recent' | 'stale' | 'unknown';
+function freshnessOf(updatedAt: number | null | undefined, now: number): Freshness {
+  if (updatedAt == null) return 'unknown';
+  const s = (now - updatedAt) / 1000;
+  if (s < 15) return 'live';
+  if (s < 60) return 'recent';
+  return 'stale';
+}
+
+/**
  * Places located workers — and, during an incident, the trail behind them —
  * inside the SVG by normalising lat/lng bounds.
  *
@@ -529,13 +544,18 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
                 {points.length === 0 ? (
                   <text x="380" y="190" textAnchor="middle" className="cmd-map-empty">No devices are sharing location yet</text>
                 ) : (
-                  points.map(({ worker, x, y }) => (
-                    <g key={worker.id} transform={`translate(${x.toFixed(1)},${y.toFixed(1)})`} className="mc-pin">
-                      {worker.status === 'sos' && <circle className="cmd-ring" r="10" fill="none" stroke="var(--cmd-crit)" strokeWidth="2" />}
-                      <circle r="7" fill={STATUS_COLOR[worker.status] ?? 'var(--cmd-nosig)'} />
-                      <text y="22" textAnchor="middle" className="cmd-map-name">{worker.name}</text>
-                    </g>
-                  ))
+                  points.map(({ worker, x, y }) => {
+                    const fresh = freshnessOf(worker.updatedAt, now);
+                    return (
+                      <g key={worker.id} transform={`translate(${x.toFixed(1)},${y.toFixed(1)})`} className={`mc-pin mc-pin-${fresh}`}>
+                        <title>{worker.name} — {fresh === 'unknown' ? 'no position reported' : `updated ${lastSeen(worker.updatedAt, now)} ago`}</title>
+                        {worker.status === 'sos' && <circle className="cmd-ring" r="10" fill="none" stroke="var(--cmd-crit)" strokeWidth="2" />}
+                        <circle r="7" fill={STATUS_COLOR[worker.status] ?? 'var(--cmd-nosig)'} />
+                        {fresh === 'stale' && <circle r="7" className="mc-pin-stale-ring" fill="none" />}
+                        <text y="22" textAnchor="middle" className="cmd-map-name">{worker.name}</text>
+                      </g>
+                    );
+                  })
                 )}
               </svg>
               {unlocated.length > 0 && (
