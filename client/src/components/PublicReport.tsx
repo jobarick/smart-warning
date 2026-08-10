@@ -9,6 +9,20 @@ interface Props {
 type Phase = 'loading' | 'unknown-site' | 'form' | 'sending' | 'sent';
 
 /**
+ * This page is mounted standalone (see main.tsx) with no shared header to
+ * inherit a back control from, and the browser's own back button may just
+ * lead to whatever page linked here (a poster has no "back"). Send people
+ * somewhere real instead of leaving them stranded on an unfamiliar page.
+ */
+function BackLink() {
+  return (
+    <a className="pub-back" href="/">
+      <Icon name="arrow-left" /> Back to Smart Warning
+    </a>
+  );
+}
+
+/**
  * The unauthenticated reporting page, reached from a site's public code —
  * a poster, a QR code by a door, a link in a visitor pack.
  *
@@ -53,13 +67,14 @@ export function PublicReport({ publicCode }: Props) {
   };
 
   if (phase === 'loading') {
-    return <div className="pub"><div className="pub-card"><p className="pub-muted">Checking site code…</p></div></div>;
+    return <div className="pub"><div className="pub-card"><BackLink /><p className="pub-muted">Checking site code…</p></div></div>;
   }
 
   if (phase === 'unknown-site') {
     return (
       <div className="pub">
         <div className="pub-card">
+          <BackLink />
           <h1>Site not found</h1>
           <p className="pub-muted">
             The code <b>{publicCode}</b> doesn’t match any site. Check the link or poster you used.
@@ -74,6 +89,7 @@ export function PublicReport({ publicCode }: Props) {
     return (
       <div className="pub">
         <div className="pub-card">
+          <BackLink />
           <div className="pub-done"><Icon name="check-circle" /></div>
           <h1>Report submitted</h1>
           <p className="pub-muted">
@@ -96,13 +112,14 @@ export function PublicReport({ publicCode }: Props) {
   return (
     <div className="pub">
       <div className="pub-card">
+        <BackLink />
         <span className="pub-site">{siteName}</span>
         <h1>Report a concern</h1>
         <p className="pub-muted">
           This goes to the site’s Safety Coordinators for review. It does <b>not</b> sound an alarm.
         </p>
 
-        <label className="pub-label" htmlFor="pub-msg">What is happening?</label>
+        <label className="pub-label" htmlFor="pub-msg">What is happening? (required)</label>
         <textarea
           id="pub-msg"
           className="pub-input"

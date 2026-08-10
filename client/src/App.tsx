@@ -29,6 +29,7 @@ import { SystemStatusBar } from './components/SystemStatusBar';
 import { SystemFooter } from './components/SystemFooter';
 import { TabBar, type UserTab } from './components/TabBar';
 import { SafetyPanel } from './components/SafetyPanel';
+import { ProfilePanel } from './components/ProfilePanel';
 import { TrialBanner } from './components/TrialBanner';
 import { Icon } from './components/Icon';
 import { Logo } from './components/Logo';
@@ -423,8 +424,16 @@ export default function App() {
     );
   }, [joinRejected]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Persisted incident history for the supervisor view (only polled while it's open).
-  const history = useIncidentHistory(view === 'command', incidentTick, token);
+  const org = session?.kind === 'supervisor' ? session.user.org : undefined;
+  const workerCode = session?.kind === 'worker' ? session.orgCode : undefined;
+  // A personal account: signed in, but with no organisation and no team code.
+  const personal = session?.kind === 'supervisor' && session.user.kind === 'individual';
+
+  // Persisted incident history for the supervisor view, and reused by the
+  // Profile tab's occurrence history — but only for an org account. A personal
+  // account has no org to scope a history query to (the server refuses it
+  // outright, see guardOrg), and a worker has no bearer token at all.
+  const history = useIncidentHistory(view === 'command' || (tab === 'profile' && !!org), incidentTick, token);
 
   // Public reports awaiting review. Only supervisors can see or act on them,
   // and the relay pokes us (reportTick) whenever the queue changes.
@@ -655,11 +664,6 @@ export default function App() {
     return <ConsentGate onAccept={acceptTerms} />;
   }
 
-  const org = session?.kind === 'supervisor' ? session.user.org : undefined;
-  const workerCode = session?.kind === 'worker' ? session.orgCode : undefined;
-  // A personal account: signed in, but with no organisation and no team code.
-  const personal = session?.kind === 'supervisor' && session.user.kind === 'individual';
-
   // An active alarm outranks anything a supervisor set by hand.
   const statusLevel: SystemStatusLevel = alarm.alert ? 'emergency' : standing.level;
 
@@ -852,7 +856,12 @@ export default function App() {
                 <MapPanel
                   userLat={telemetry.lat}
                   userLng={telemetry.lng}
+                  userUpdatedAt={telemetry.updatedAt}
+                  now={now}
                   assembly={{ lat: settings.assemblyLat, lng: settings.assemblyLng, label: settings.assemblyLabel }}
+                  alertType={alarm.alert?.type ?? null}
+                  creds={joinCreds ?? {}}
+                  operatorId={sessionId.current}
                 />
               </Suspense>
             </>
@@ -863,17 +872,21 @@ export default function App() {
           {tab === 'alerts' && <AlertLog entries={log} />}
 
           {tab === 'profile' && (
-            <div className="worker-tools">
-              <button className="btn settings-link" onClick={() => setShowAbout(true)}>
-                About &amp; legal
-              </button>
-              <button className="btn settings-link" onClick={() => setShowSettings(true)}>
-                <Icon name="settings" /> Settings
-              </button>
-              <button className="btn settings-link" onClick={() => setShowSupport(true)}>
-                <Icon name="help" /> Support
-              </button>
-            </div>
+            <ProfilePanel
+              session={session}
+              org={org}
+              workerCode={workerCode}
+              personal={personal}
+              deviceName={settings.deviceName}
+              profile={profile}
+              incidents={history.incidents}
+              persistence={history.persistence}
+              historyLoading={history.loading}
+              historyError={history.error}
+              onAbout={() => setShowAbout(true)}
+              onSettings={() => setShowSettings(true)}
+              onSupport={() => setShowSupport(true)}
+            />
           )}
         </main>
       )}

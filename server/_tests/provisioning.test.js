@@ -357,6 +357,32 @@ test('a transport failure leaves the payment open rather than declaring it dead'
   assert.strictEqual(tx.status, 'pending');
 });
 
+test('a non-retryable gateway rejection reverts the org and reports cleanly, not as an internal error', async (t) => {
+  t.after(reset);
+  const db = makeDb();
+  // No `retryable` flag — e.g. the gateway rejected the push outright (bad
+  // credentials, wallet not enabled). This is the branch that used to reference
+  // an undefined `orgId` and crash with a ReferenceError instead of reaching
+  // the PaymentError below.
+  const err = Object.assign(new Error('Invalid client details'), { retryable: false });
+  const payments = loadPayments({ db, clickpesa: makeClickpesa({ pushError: err }) });
+
+  await assert.rejects(
+    () => payments.initiateMobileMoney({ orgId: 'org1', planId: 'team', phoneNumber: '0713455454' }),
+    (e) => e instanceof payments.PaymentError && e.statusCode === 400 && e.retryable === false,
+  );
+
+  const [tx] = await db.listTransactions();
+  assert.strictEqual(tx.status, 'failed');
+  assert.strictEqual(tx.message, 'Invalid client details');
+
+  // The org must be back at what it had before the attempt, not stuck
+  // pending_payment forever.
+  const sub = await db.getSubscription('org1');
+  assert.strictEqual(sub.status, 'active');
+  assert.strictEqual(sub.tier, 'free');
+});
+
 test('provisioning failure releases the claim so it can be retried', async (t) => {
   t.after(reset);
   const db = makeDb();

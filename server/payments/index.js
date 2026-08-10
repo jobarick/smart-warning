@@ -271,7 +271,7 @@ async function initiateMobileMoney(input) {
       await db.updateTransactionStatus({
         orderReference, status: 'failed', message: e.message?.slice(0, 500) ?? null,
       });
-      await revertPending(orgId);
+      await revertPending(subject);
     }
     console.error(`[payments] ussd push failed for ${phone.mask(msisdn)}: ${e.message}`);
     throw new PaymentError(

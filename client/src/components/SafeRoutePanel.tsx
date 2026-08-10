@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
 import type { AlertType } from '../types';
-import { fetchSafeRoute, type OrgCreds, type SafePlace, type SafeRoute } from '../lib/api';
+import type { OrgCreds, SafePlace } from '../lib/api';
 import { formatDistance } from '../lib/geo';
+import { useSafeRoute } from '../hooks/useSafeRoute';
 import { useNavigationRoute, formatEta } from '../hooks/useNavigationRoute';
 import { Icon } from './Icon';
 
@@ -36,9 +36,7 @@ function travelLine(place: SafePlace): string {
 }
 
 export function SafeRoutePanel({ alertType, lat, lng, creds, operatorId }: Props) {
-  const [route, setRoute] = useState<SafeRoute | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { route, loading, error } = useSafeRoute(alertType, lat, lng, creds, operatorId);
   const dest = route?.destination ?? null;
 
   // A walked road route to wherever the engine chose, refreshed as the person
@@ -50,26 +48,6 @@ export function SafeRoutePanel({ alertType, lat, lng, creds, operatorId }: Props
     creds,
     { profile: 'walking', active: Boolean(alertType && dest && lat != null && lng != null) },
   );
-
-  useEffect(() => {
-    // Only ask when there is actually an emergency to route for.
-    if (!alertType) { setRoute(null); setError(null); return; }
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    fetchSafeRoute({ type: alertType, lat, lng, operatorId }, creds)
-      .then((r) => { if (!cancelled) setRoute(r); })
-      .catch(() => {
-        // Whatever went wrong, the person reading this is in an emergency and a
-        // raw fetch error tells them nothing. Point them at what still works:
-        // their own procedure, and the call pocket directly below.
-        if (!cancelled) setError('Can’t reach the server. Follow your site’s procedure — emergency numbers are below.');
-      })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-    // Position is deliberately coarse here: re-routing on every GPS jitter would
-    // make the destination flicker while someone is trying to read it.
-  }, [alertType, lat == null ? null : Math.round(lat * 100), lng == null ? null : Math.round(lng * 100), operatorId, creds.token, creds.orgCode]);
 
   if (!alertType) return null;
 

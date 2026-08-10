@@ -1302,6 +1302,60 @@ body {
 }
 .map-empty { padding: 0 16px 16px; color: var(--muted); font-size: 0.88rem; }
 
+.mapcard-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mapcard-tag {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 20px;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.mapcard-tag-public { color: var(--cmd-info); }
+.mapcard-tag-muted { color: var(--faint); }
+.mapcard-expand {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.mapcard-expand:hover { color: var(--text); }
+.mapcard-expand svg { width: 16px; height: 16px; color: inherit; }
+
+/* Near-fullscreen: an emergency map is a tool to read while moving, not a
+   decorative thumbnail. Stays well under the alarm overlay's z-index (1000)
+   so an alarm always wins the screen regardless of what was open. */
+.mapcard-expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+}
+.mapcard-expanded .map-el { flex: 1; height: auto; }
+.mapcard-close {
+  padding: 14px 16px;
+  min-height: 48px;
+  border: none;
+  border-top: 1px solid var(--panel-border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 /* SOS hero — the always-visible primary action */
 .sos-title { font-size: 1.05rem; font-weight: 700; text-align: center; letter-spacing: 0.01em; }
 .sos-hero {
@@ -1338,13 +1392,19 @@ body {
   100% { transform: scale(1.16); opacity: 0; }
 }
 
-.worker-tools { display: flex; justify-content: center; }
+.worker-tools { display: flex; flex-direction: column; gap: 16px; }
+.profile-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; }
 .settings-link {
   background: transparent;
   border: 1px solid var(--panel-border);
   color: var(--muted);
 }
 .settings-link:hover { color: var(--text); }
+
+.profile-id-name { display: flex; align-items: center; gap: 8px; font-size: 1.05rem; margin-bottom: 6px; }
+.profile-id-name svg { color: var(--muted); }
+.profile-id-line { display: block; font-size: 0.85rem; color: var(--text); }
+.profile-id-line.profile-id-muted { color: var(--muted); margin-top: 2px; }
 .back-btn {
   align-self: flex-start;
   background: var(--panel-2);
@@ -1703,6 +1763,20 @@ body {
   border: 1px solid var(--panel-border);
   border-radius: 16px;
   box-shadow: var(--shadow);
+}
+
+.pub-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+
+.pub-back:hover {
+  color: var(--text);
 }
 
 .pub-site {

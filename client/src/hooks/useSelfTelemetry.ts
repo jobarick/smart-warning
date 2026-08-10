@@ -7,6 +7,9 @@ export interface Telemetry {
   lng: number | null;
   accuracy: number | null; // metres
   locationError: string | null;
+  /** When this fix arrived — lets a viewer judge live vs stale, rather than
+   *  taking a position on trust just because one is on screen. */
+  updatedAt: number | null;
 }
 
 interface BatteryLike extends EventTarget {
@@ -24,6 +27,7 @@ export function useSelfTelemetry(shareLocation: boolean): Telemetry {
   const [charging, setCharging] = useState(false);
   const [pos, setPos] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
 
   useEffect(() => {
     const getBattery = (navigator as unknown as { getBattery?: () => Promise<BatteryLike> }).getBattery;
@@ -53,6 +57,7 @@ export function useSelfTelemetry(shareLocation: boolean): Telemetry {
     if (!shareLocation) {
       setPos(null);
       setLocationError(null);
+      setUpdatedAt(null);
       return;
     }
     if (!('geolocation' in navigator)) {
@@ -63,6 +68,9 @@ export function useSelfTelemetry(shareLocation: boolean): Telemetry {
       (p) => {
         setPos({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy });
         setLocationError(null);
+        // The fix's own timestamp, not when the callback ran — a cached fix
+        // handed back immediately (maximumAge above) is not a fresh one.
+        setUpdatedAt(p.timestamp);
       },
       (err) => setLocationError(err.code === err.PERMISSION_DENIED ? 'Location permission denied' : 'Location unavailable'),
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 },
@@ -77,5 +85,6 @@ export function useSelfTelemetry(shareLocation: boolean): Telemetry {
     lng: pos?.lng ?? null,
     accuracy: pos?.accuracy ?? null,
     locationError,
+    updatedAt,
   };
 }
