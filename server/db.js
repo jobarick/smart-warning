@@ -83,9 +83,48 @@ async function init() {
     -- genuinely do not know which they were, and inventing a value for them
     -- would be worse than admitting it.
     ALTER TABLE incidents ADD COLUMN IF NOT EXISTS resolution TEXT;
+    -- A supervisor's formal "I have seen this" — distinct from the per-device
+    -- siren mute (which never touches the server at all). Nullable and set
+    -- exactly once: the UPDATE that sets it only ever matches an incident
+    -- that doesn't have it yet, so two supervisors racing to acknowledge the
+    -- same alarm produce one acknowledgement, not two, and the loser's tap
+    -- still reads back the truth instead of silently overwriting it.
+    ALTER TABLE incidents ADD COLUMN IF NOT EXISTS acknowledged_at TIMESTAMPTZ;
+    ALTER TABLE incidents ADD COLUMN IF NOT EXISTS acknowledged_by TEXT;
+    -- How many times this incident has been re-notified for going
+    -- unacknowledged, and when the last one fired — what the escalation sweep
+    -- reads to decide whether it is due, so a restart loses no more than the
+    -- gap until the next sweep tick, never the fact that escalation happened.
+    ALTER TABLE incidents ADD COLUMN IF NOT EXISTS escalation_level INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE incidents ADD COLUMN IF NOT EXISTS last_escalated_at TIMESTAMPTZ;
     CREATE INDEX IF NOT EXISTS incidents_raised_at_idx ON incidents (raised_at DESC);
     CREATE INDEX IF NOT EXISTS incidents_status_idx ON incidents (status);
     CREATE INDEX IF NOT EXISTS incidents_org_idx ON incidents (org_id);
+    -- What the escalation sweep scans every tick: active, unacknowledged incidents.
+    CREATE INDEX IF NOT EXISTS incidents_unacked_idx ON incidents (raised_at) WHERE status = 'active' AND acknowledged_at IS NULL;
+
+    -- The append-only history of one incident: what happened and when, so a
+    -- supervisor's dashboard — and an auditor afterwards — can reconstruct the
+    -- whole thing rather than trust a single mutable "status" field.
+    --
+    -- Deliberately NOT where "who is currently responding" lives — that stays
+    -- in relay.js's in-memory orgResponding map on purpose (see the comment
+    -- there): a live claim must vanish on restart rather than survive as a
+    -- stale "help is on the way". An event row never makes that claim — it
+    -- only records that a message of that kind arrived at that moment, which
+    -- stays true forever and is exactly what is safe to persist.
+    CREATE TABLE IF NOT EXISTS incident_events (
+      id          BIGSERIAL PRIMARY KEY,
+      incident_id TEXT NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+      org_id      UUID,
+      kind        TEXT NOT NULL, -- raised | responding | acknowledged | escalated | resolved
+      actor_name  TEXT,
+      actor_role  TEXT,          -- worker | supervisor | system
+      detail      JSONB,
+      at          TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS incident_events_incident_idx ON incident_events (incident_id, at);
+    CREATE INDEX IF NOT EXISTS incident_events_org_idx      ON incident_events (org_id, at DESC);
 
     -- Unauthenticated reports from the public page. These are NOT alerts: they
     -- sit here until a supervisor escalates one, which is what makes a public
@@ -472,6 +511,11 @@ const ORG_FOREIGN_KEYS = [
   { table: 'feedback', constraint: 'feedback_org_fk' },
   { table: 'outbound_mail', constraint: 'outbound_mail_org_fk' },
   { table: 'device_tokens', constraint: 'device_tokens_org_fk' },
+  // incident_events.incident_id already cascades through incidents, so this is
+  // belt-and-braces rather than load-bearing — but org_id is the column every
+  // other table in this list constrains, and an event's actor_name/detail is
+  // personal data same as the rest.
+  { table: 'incident_events', constraint: 'incident_events_org_fk' },
 ];
 
 async function linkOrphanTables() {
@@ -931,6 +975,92 @@ async function getIncident(id, orgId) {
   const { rows } = await pool.query(
     `SELECT * FROM incidents WHERE id = $1 AND org_id IS NOT DISTINCT FROM $2`,
     [String(id), orgId || null],
+  );
+  return rows[0] || null;
+}
+
+// --- Incident lifecycle: audit trail, acknowledgement, escalation ----------
+
+/**
+ * Append one fact to an incident's history. Never fails the caller: every
+ * call site is a side effect of something that already happened (an alert
+ * went out, a supervisor tapped acknowledge), so a write error here must not
+ * unwind whatever real action just occurred. Callers still get the error via
+ * the rejected promise if they want to log it.
+ */
+async function recordIncidentEvent({ incidentId, orgId = null, kind, actorName = null, actorRole = null, detail = null }) {
+  if (!pool) return null;
+  const { rows } = await pool.query(
+    `INSERT INTO incident_events (incident_id, org_id, kind, actor_name, actor_role, detail)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [String(incidentId), orgId || null, String(kind), actorName, actorRole, detail ? JSON.stringify(detail) : null],
+  );
+  return rows[0] || null;
+}
+
+async function listIncidentEvents(incidentId, orgId) {
+  if (!pool) return [];
+  const { rows } = await pool.query(
+    `SELECT e.* FROM incident_events e
+     JOIN incidents i ON i.id = e.incident_id
+     WHERE e.incident_id = $1 AND i.org_id IS NOT DISTINCT FROM $2
+     ORDER BY e.at ASC`,
+    [String(incidentId), orgId || null],
+  );
+  return rows;
+}
+
+/**
+ * A supervisor's formal acknowledgement. Returns the updated row on success,
+ * or null when there was nothing to claim — already acknowledged, already
+ * resolved, or no such incident in this org. The `WHERE` clause is the whole
+ * safety property: it matches only a row that is still open and unclaimed, so
+ * two supervisors tapping at once produce exactly one acknowledgement, and the
+ * one who loses the race reads back the truth (who actually got there first)
+ * instead of silently overwriting it.
+ */
+async function acknowledgeIncident({ id, orgId, by }) {
+  if (!pool) return null;
+  const { rows } = await pool.query(
+    `UPDATE incidents
+        SET acknowledged_at = now(), acknowledged_by = $3
+      WHERE id = $1 AND org_id IS NOT DISTINCT FROM $2
+        AND status = 'active' AND acknowledged_at IS NULL
+      RETURNING *`,
+    [String(id), orgId || null, by || null],
+  );
+  return rows[0] || null;
+}
+
+/**
+ * What the escalation sweep acts on: active incidents nobody has acknowledged
+ * yet, old enough for the next escalation and not escalated past the cap.
+ * Driven entirely by timestamps already on the row, so a server restart loses
+ * at most the wait until the next sweep tick — never the fact that an
+ * incident is overdue, which is exactly the property this feature exists for.
+ */
+async function listEscalationDue({ afterMs, maxLevel }) {
+  if (!pool) return [];
+  const { rows } = await pool.query(
+    `SELECT * FROM incidents
+      WHERE status = 'active' AND acknowledged_at IS NULL
+        AND escalation_level < $2
+        AND COALESCE(last_escalated_at, raised_at) < now() - ($1 || ' milliseconds')::interval
+      ORDER BY raised_at ASC
+      LIMIT 200`,
+    [String(afterMs), maxLevel],
+  );
+  return rows;
+}
+
+async function bumpEscalation(id) {
+  if (!pool) return null;
+  const { rows } = await pool.query(
+    `UPDATE incidents
+        SET escalation_level = escalation_level + 1, last_escalated_at = now()
+      WHERE id = $1
+      RETURNING *`,
+    [String(id)],
   );
   return rows[0] || null;
 }
@@ -1915,6 +2045,11 @@ module.exports = {
   resolveActive,
   listIncidents,
   getIncident,
+  recordIncidentEvent,
+  listIncidentEvents,
+  acknowledgeIncident,
+  listEscalationDue,
+  bumpEscalation,
   stats,
   createPushSubscription,
   listPushSubscriptions,

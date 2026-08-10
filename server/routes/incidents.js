@@ -42,6 +42,54 @@ async function handle({ req, res, url, path }) {
     return true;
   }
 
+  // --- Incident timeline: the append-only "what happened, when" record ---
+  const eventsMatch = path.match(/^\/api\/incidents\/([^/]+)\/events$/);
+  if (eventsMatch && req.method === 'GET') {
+    const ctx = await guardOrg(req, res);
+    if (ctx === false) return true;
+    if (!(await allowFeature(res, ctx, plans.FEATURES.INCIDENT_REPORTS))) return true;
+    const incidentId = decodeURIComponent(eventsMatch[1]);
+    const incident = await db.getIncident(incidentId, ctx?.orgId);
+    if (!incident) { sendJson(res, 404, { error: 'not found' }); return true; }
+    sendJson(res, 200, { events: await db.listIncidentEvents(incidentId, ctx?.orgId) });
+    return true;
+  }
+
+  // --- Acknowledgement ---
+  //
+  // A supervisor's formal "I have seen this" — distinct from the per-device
+  // siren mute, which never touches the server. Unlike everything else in
+  // this file, this is never gated by allowFeature: acknowledging is part of
+  // responding to a live emergency, not a reporting feature, and a site that
+  // has lapsed on billing must still be able to say it has seen an alert.
+  const ackMatch = path.match(/^\/api\/incidents\/([^/]+)\/acknowledge$/);
+  if (ackMatch && req.method === 'POST') {
+    const ctx = await guardOrg(req, res);
+    if (ctx === false) return true;
+    if (!ctx) { sendJson(res, 501, { error: 'incidents require a database' }); return true; }
+    const incidentId = decodeURIComponent(ackMatch[1]);
+    const by = ctx.user?.name || 'Safety Coordinator';
+
+    const incident = await db.acknowledgeIncident({ id: incidentId, orgId: ctx.orgId, by });
+    if (!incident) {
+      // Say which of the three reasons this is, rather than one generic
+      // failure — a supervisor tapping a button they can see wants to know
+      // whether they were too late, not just that nothing happened.
+      const existing = await db.getIncident(incidentId, ctx.orgId);
+      if (!existing) { sendJson(res, 404, { error: 'not found' }); return true; }
+      if (existing.acknowledged_at) { sendJson(res, 200, { incident: existing, alreadyAcknowledged: true }); return true; }
+      sendJson(res, 409, { error: 'this incident is no longer active' });
+      return true;
+    }
+
+    await db.recordIncidentEvent({
+      incidentId, orgId: ctx.orgId, kind: 'acknowledged', actorName: by, actorRole: 'supervisor',
+    }).catch((e) => console.error('[db] recordIncidentEvent(acknowledged):', e.message));
+
+    sendJson(res, 200, { incident });
+    return true;
+  }
+
   const incMatch = path.match(/^\/api\/incidents\/([^/]+)$/);
   if (incMatch && req.method === 'GET') {
     const ctx = await guardOrg(req, res);

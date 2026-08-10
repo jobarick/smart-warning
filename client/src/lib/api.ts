@@ -16,6 +16,20 @@ export interface Incident {
   resolved_at: string | null;
   resolved_by: string | null;
   status: 'active' | 'resolved';
+  acknowledged_at: string | null;
+  acknowledged_by: string | null;
+  escalation_level: number;
+  last_escalated_at: string | null;
+}
+
+export interface IncidentEvent {
+  id: number;
+  incident_id: string;
+  kind: 'raised' | 'responding' | 'acknowledged' | 'escalated' | 'resolved' | 'false_alarm';
+  actor_name: string | null;
+  actor_role: 'worker' | 'supervisor' | 'system' | null;
+  detail: Record<string, unknown> | null;
+  at: string; // ISO timestamp
 }
 
 export interface Stats {
@@ -120,6 +134,31 @@ export async function fetchIncidents(
   if (opts.status) params.set('status', opts.status);
   const res = await fetch(`${API_BASE}/api/incidents?${params.toString()}`, { headers: authHeaders(opts.token) });
   if (!res.ok) throw new Error(`incidents request failed (${res.status})`);
+  return res.json();
+}
+
+/**
+ * A supervisor's formal "I have seen this" — separate from the per-device
+ * siren mute, which never leaves the device. `alreadyAcknowledged: true`
+ * means someone else got there first; that is success, not an error, so it
+ * does not throw.
+ */
+export async function acknowledgeIncident(
+  id: string, token?: string,
+): Promise<{ incident: Incident; alreadyAcknowledged?: boolean }> {
+  const res = await fetch(`${API_BASE}/api/incidents/${encodeURIComponent(id)}/acknowledge`, {
+    method: 'POST',
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not acknowledge this incident'));
+  return res.json();
+}
+
+export async function fetchIncidentEvents(id: string, token?: string): Promise<{ events: IncidentEvent[] }> {
+  const res = await fetch(`${API_BASE}/api/incidents/${encodeURIComponent(id)}/events`, {
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not load the incident timeline'));
   return res.json();
 }
 

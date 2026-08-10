@@ -21,6 +21,7 @@ const push = require('./push');
 const fcm = require('./fcm');
 const mailer = require('./mailer');
 const payments = require('./payments');
+const escalation = require('./escalation');
 const staticFiles = require('./static');
 const relay = require('./relay');
 const routes = require('./routes');
@@ -39,6 +40,14 @@ const wss = relay.attach(server);
 setInterval(() => {
   payments.reconcile().catch((e) => console.error('[payments] reconcile failed:', e.message));
 }, 60_000).unref?.();
+
+// Re-notify an org about an alert nobody has acknowledged. More frequent than
+// the payments sweep on purpose — a supervisor who missed the first push
+// should not wait a full minute past the escalation threshold to be asked
+// again. Idempotent and restart-safe for the same reason: see escalation.js.
+setInterval(() => {
+  escalation.sweep().catch((e) => console.error('[escalation] sweep failed:', e.message));
+}, 30_000).unref?.();
 
 // ---------------------------------------------------------------------------
 // Boot

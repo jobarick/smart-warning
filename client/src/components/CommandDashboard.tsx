@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AlarmState } from '../hooks/useAlarmState';
 import type { SocketStatus } from '../hooks/useAlertSocket';
 import type { AlertType, LogEntry, Severity, SystemStatusLevel, WorkerInfo } from '../types';
 import { ALERT_META, SEVERITY_META } from '../types';
 import { alertLabel, alertProtocol, type IndustryProfile } from '../lib/profiles';
 import type { Incident, Report, Stats, TrackPoint } from '../lib/api';
+import { acknowledgeIncident } from '../lib/api';
 import { PendingReports } from './PendingReports';
 import { useIncidentTrack } from '../hooks/useIncidentTrack';
 import { assess, accountedFor, unaccountedFor, musterPopulation } from '../lib/advisor';
@@ -171,6 +172,41 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
   }, []);
 
   const alert = alarm.alert;
+
+  // The formal, persisted "a Safety Coordinator has seen this" — distinct
+  // from `alarm.acknowledged` below, which only ever silences this one
+  // device's siren and never reaches the server. Held locally so the button
+  // reflects the tap immediately, but reconciled against `history` (which
+  // polls independently) so a colleague acknowledging it first is picked up
+  // too, not just overwritten on the next render.
+  const [ackLocal, setAckLocal] = useState<{ incidentId: string; at: string; by: string } | null>(null);
+  const [ackBusy, setAckBusy] = useState(false);
+  const [ackError, setAckError] = useState<string | null>(null);
+  useEffect(() => { setAckLocal(null); setAckError(null); }, [alert?.id]);
+
+  const persistedIncident = alert ? history.find((h) => h.id === alert.id) : undefined;
+  const localAck = alert && ackLocal?.incidentId === alert.id ? ackLocal : null;
+  const acknowledgedAt = localAck?.at ?? persistedIncident?.acknowledged_at ?? null;
+  const acknowledgedBy = localAck?.by ?? persistedIncident?.acknowledged_by ?? null;
+
+  const handleAcknowledgeIncident = useCallback(async () => {
+    if (!alert || !token) return;
+    setAckBusy(true);
+    setAckError(null);
+    try {
+      const res = await acknowledgeIncident(alert.id, token);
+      setAckLocal({
+        incidentId: alert.id,
+        at: res.incident.acknowledged_at || new Date().toISOString(),
+        by: res.incident.acknowledged_by || 'a Safety Coordinator',
+      });
+    } catch (e) {
+      setAckError(e instanceof Error ? e.message : 'could not acknowledge this incident');
+    } finally {
+      setAckBusy(false);
+    }
+  }, [alert, token]);
+
   const sos = roster.filter((w) => w.status === 'sos');
   const lowBattery = roster.filter((w) => w.battery !== null && w.battery < 0.2);
   const located = roster.filter((w) => w.lat !== null && w.lng !== null);
@@ -311,6 +347,27 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
                   </div>
                   <div><dt>Battery</dt><dd>{sender ? batteryLabel(sender.battery) : '—'}</dd></div>
                 </dl>
+
+                {/* The formal record that someone has seen this — separate
+                    from the per-device siren mute in Controls below, which
+                    never leaves this device and answers a different
+                    question ("is it quiet in this room"), not "does the
+                    site know". Hidden with no database: there is nothing to
+                    persist an acknowledgement into. */}
+                {persistence && token && (
+                  <div className="mc-ack">
+                    {acknowledgedAt ? (
+                      <span className="mc-ack-done">
+                        Acknowledged by {acknowledgedBy || 'a Safety Coordinator'} · {durationBetween(acknowledgedAt, new Date(now).toISOString())} ago
+                      </span>
+                    ) : (
+                      <button className="mc-btn mc-ack-btn" onClick={() => void handleAcknowledgeIncident()} disabled={ackBusy}>
+                        {ackBusy ? 'Acknowledging…' : 'Acknowledge incident'}
+                      </button>
+                    )}
+                    {ackError && <span className="mc-ack-error">{ackError}</span>}
+                  </div>
+                )}
 
                 {/* Navigation to the person. Only appears once both ends are
                     sharing a position — an ETA to an unknown place would be
@@ -541,7 +598,7 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
                         </div>
                         <span className={`mc-tag${inc.status === 'active' ? ' on' : ''}`}>
                           {inc.status === 'active'
-                            ? 'active'
+                            ? (inc.acknowledged_at ? 'active' : 'unacknowledged')
                             : inc.resolved_at ? durationBetween(inc.raised_at, inc.resolved_at) : 'resolved'}
                         </span>
                       </div>

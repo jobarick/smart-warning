@@ -95,7 +95,7 @@ async function handle({ req, res, url, path }) {
       sender: `${by} · public report`,
       timestamp: Date.now(),
     };
-    await relay.raiseAlert(ctx.orgId, alert, null, `public report ${reportId}`);
+    await relay.raiseAlert(ctx.orgId, alert, null, `public report ${reportId}`, 'supervisor');
     relay.broadcast(ctx.orgId, { kind: 'reports', pending: await db.countPendingReports(ctx.orgId) });
     sendJson(res, 200, { ok: true, report: row, alert });
     return true;

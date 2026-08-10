@@ -210,7 +210,7 @@ function trackPosition(ws) {
 // Everything that makes an alert real: stored, pushed to closed apps, and sent
 // to every device in the org. Shared so an escalated report is indistinguishable
 // from one raised on a device.
-async function raiseAlert(orgId, alert, worker = null, origin = 'unknown') {
+async function raiseAlert(orgId, alert, worker = null, origin = 'unknown', actorRole = null) {
   // Logged here rather than at each call site so every alert is recorded once,
   // however it was raised — an escalated public report most of all.
   console.log(`[!] ALERT ${alert.type}/${alert.severity} from ${origin} "${alert.sender}" (org ${orgId ?? 'global'})${alert.replayed ? ' [replayed]' : ''}: ${alert.message || '(no message)'}`);
@@ -252,6 +252,12 @@ async function raiseAlert(orgId, alert, worker = null, origin = 'unknown') {
     console.log(`[=] ${alert.id} is already on record — replay accepted, not re-notifying`);
     return;
   }
+
+  db.recordIncidentEvent?.({
+    incidentId: alert.id, orgId, kind: 'raised',
+    actorName: alert.sender || null, actorRole: actorRole,
+    detail: { type: alert.type, severity: alert.severity, origin },
+  }).catch((e) => console.error('[db] recordIncidentEvent(raised):', e.message));
 
   // Two independent channels, deliberately not chained: browsers get Web Push,
   // the Android app gets FCM, and one being unconfigured or failing must never
@@ -405,7 +411,7 @@ function attach(server) {
             await fileStaleReplay(ws, msg, age);
             return;
           }
-          await raiseAlert(ws.orgId, msg, ws.worker, `#${ws.connId}`);
+          await raiseAlert(ws.orgId, msg, ws.worker, `#${ws.connId}`, ws.supervisor ? 'supervisor' : 'worker');
           return; // raiseAlert already broadcast it
         } else {
           // Normalised here rather than trusted: anything unrecognised is a
@@ -414,10 +420,18 @@ function attach(server) {
           msg.reason = msg.reason === 'false-alarm' ? 'false-alarm' : 'resolved';
           const retracted = msg.reason === 'false-alarm';
           console.log(`[.] ${retracted ? 'FALSE ALARM retracted' : 'all-clear'} from #${ws.connId} "${msg.sender}" (org ${ws.orgId ?? 'global'})`);
+          // Read before deleting: this is the incident the all-clear closes.
+          const closingIncidentId = activeIncident.get(ws.orgId ?? null);
           // Close the tracking window: position recording stops here.
           activeIncident.delete(ws.orgId ?? null);
           clearResponding(ws.orgId);
           db.resolveActive(msg, ws.orgId).catch((e) => console.error('[db] resolveActive:', e.message));
+          if (closingIncidentId) {
+            db.recordIncidentEvent?.({
+              incidentId: closingIncidentId, orgId: ws.orgId, kind: msg.reason === 'false-alarm' ? 'false_alarm' : 'resolved',
+              actorName: msg.sender || null, actorRole: ws.supervisor ? 'supervisor' : 'worker',
+            }).catch((e) => console.error('[db] recordIncidentEvent(resolved):', e.message));
+          }
           // Phones that were woken by the alarm are told which of the two things
           // happened, so nobody is left believing an emergency ran its course
           // when it was withdrawn seconds later.
@@ -491,6 +505,17 @@ function attach(server) {
         };
         setResponding(ws.orgId, out);
         broadcast(ws.orgId, out);
+        // A record that this was said, not a claim still in force — the live
+        // "who is responding now" stays in orgResponding above, exactly as
+        // before. Skipped for a cancellation: "I am no longer coming" is not
+        // itself worth a line in the incident's history.
+        if (!out.cancelled) {
+          db.recordIncidentEvent?.({
+            incidentId, orgId: ws.orgId, kind: 'responding',
+            actorName: out.supervisor, actorRole: 'supervisor',
+            detail: { etaS: out.etaS, distanceM: out.distanceM },
+          }).catch((e) => console.error('[db] recordIncidentEvent(responding):', e.message));
+        }
         return;
       }
 

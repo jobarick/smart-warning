@@ -159,6 +159,26 @@
 }
 .mc-facts dd { font-size: 0.82rem; }
 
+/* ---------- acknowledgement ---------- */
+.mc-ack {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 10px;
+  margin-top: 4px;
+  border-top: 1px solid var(--panel-border);
+}
+.mc-ack-btn {
+  flex: none;
+  background: var(--cmd-warn);
+  border-color: var(--cmd-warn);
+  color: #111;
+}
+.mc-ack-btn:hover:not(:disabled) { background: var(--cmd-warn); color: #111; filter: brightness(1.08); }
+.mc-ack-done { font-size: 0.78rem; color: var(--cmd-safe); }
+.mc-ack-error { font-size: 0.72rem; color: var(--cmd-crit); }
+
 .mc-proto {
   list-style: none;
   display: flex;
