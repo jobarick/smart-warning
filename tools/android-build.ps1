@@ -37,8 +37,17 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$clientDir  = Join-Path (Split-Path $PSScriptRoot -Parent) 'client'
+$projectRoot = Split-Path $PSScriptRoot -Parent
+$clientDir  = Join-Path $projectRoot 'client'
 $androidDir = Join-Path $clientDir 'android'
+
+# Conflict resolution: some environments have multiple contradictory paths for
+# Android preferences. We use the project root to ensure a clean, isolated
+# build that Gradle has write access to.
+$env:ANDROID_USER_HOME = Join-Path $projectRoot '.android'
+$env:GRADLE_USER_HOME  = Join-Path $projectRoot '.gradle_home'
+$env:ANDROID_PREFS_ROOT = ""
+$env:ANDROID_SDK_HOME   = ""
 
 # Gradle 8.14.x runs on JDK 17 through 24. Anything newer fails as above;
 # anything older is below what AGP requires.

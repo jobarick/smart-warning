@@ -35,3 +35,8 @@ npm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+
+# Build system caches and temporary files
+.android/
+.gradle_home/
+*.bat

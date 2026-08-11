@@ -10,6 +10,10 @@ const config: CapacitorConfig = {
   appId: 'com.smartwarning.app',
   appName: 'Smart Warning',
   webDir: 'dist',
+  server: {
+    url: 'http://192.168.1.42:5300',
+    cleartext: true
+  }
 };
 
 export default config;

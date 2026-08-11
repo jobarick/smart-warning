@@ -2,7 +2,7 @@
 
 A web app (PWA) for instant emergency alerts across all connected devices — desktop and mobile. When an alert fires, every device shows a bright warning border around the screen, optional high-intensity flashing, a synthesized siren, and vibration on phones.
 
-📋 **[Product vision & technical roadmap](docs/VISION.md)** — where this is going, and what is shipped, partial or planned against each goal.
+📋 **[Product vision & technical roadmap](docs/VISION.md)** — where this is going, and what is shipped, partially shipped, or planned against each goal.
 
 **Setup guides** — [Deployment](docs/DEPLOYMENT.md) · [Firebase / Android push](docs/FIREBASE_SETUP.md) · [Email](docs/SMTP_SETUP.md). Both channels are built and inert; supplying credentials turns them on with no code change.
 
@@ -96,18 +96,45 @@ In orgs mode the history/roster endpoints require a supervisor bearer token
 | --- | --- |
 | `GET /api/health` | Health: `{ service, clients, persistence, orgs, client, channels, uptime }` — `channels` reports which of web push, native push and mail are actually configured. |
 | `POST /api/auth/signup` | Create an org + first supervisor `{ orgName, name, email, password }` → `{ token, user }`. |
+| `POST /api/auth/signup/personal` | Create a personal account `{ name, email, password }` → `{ token, user }`. |
 | `POST /api/auth/login` | `{ email, password }` → `{ token, user }`. |
-| `GET /api/auth/me` | The current supervisor + org (bearer token). |
+| `POST /api/auth/forgot` | Request a password reset link `{ email }`. |
+| `POST /api/auth/reset` | Reset password using a token `{ token, password }`. |
+| `GET /api/auth/me` | The current supervisor/individual + org (bearer token). |
 | `GET /api/incidents?limit=&status=` | Recent incidents, newest first. `status` = `active` \| `resolved`; `limit` ≤ 500 (default 50). |
 | `GET /api/incidents/:id` | A single incident by its alert id, or `404`. |
 | `GET /api/stats` | Totals: `{ total, active, last24h, avgResolveSeconds }`. |
 | `GET /api/roster` | The live connected-device roster (from memory, not persisted). |
 | `GET /api/push/vapid` | `{ enabled, publicKey }` — the VAPID key a device needs to subscribe. |
-| `POST /api/push/subscribe` | Register a Web Push subscription (bearer token or `{ orgCode }`). |
+| `POST /api/push/subscribe` | Register a Web Push subscription (bearer token or `{ subscription, orgCode }`). |
 | `POST /api/push/unsubscribe` | Remove a subscription by `{ endpoint }`. |
 | `GET /api/push/device` | Native push status: `{ enabled, project, reason }`. |
-| `POST /api/push/device` | Register an Android FCM token (bearer token or `{ orgCode }`). Accepted before Firebase is configured; replies `{ delivery: 'pending-credentials' }`. |
+| `POST /api/push/device` | Register an Android FCM token (bearer token or `{ token, orgCode }`). Accepted before Firebase is configured; replies `{ delivery: 'pending-credentials' }`. |
 | `POST /api/push/device/unregister` | Remove a device token. |
+| `GET /api/public/site/:code` | Get site name by its public code. |
+| `POST /api/public/reports` | File a public report `{ publicCode, message, location }`. |
+| `GET /api/reports` | List pending/dismissed reports (supervisor). |
+| `POST /api/reports/:id/escalate` | Turn a report into an alarm `{ type, severity }` (supervisor). |
+| `POST /api/reports/:id/dismiss` | Dismiss a report (supervisor). |
+| `PATCH /api/org` | Update organization profile `{ name, publicCode }` (supervisor). |
+| `GET /api/destinations` | List safe destinations/assembly points. |
+| `POST /api/destinations` | Create a destination `{ label, lat, lng, kind, ... }` (supervisor). |
+| `DELETE /api/destinations/:id` | Remove a destination (supervisor). |
+| `GET /api/emergency/directory` | Get local emergency numbers by `{ lat, lng }` or `{ country }`. |
+| `GET /api/emergency/nearby` | Find nearby hospitals/police `{ lat, lng, kind }`. |
+| `GET /api/route` | Get a walking/driving route between `{ fromLat, fromLng }` and `{ toLat, toLng }`. |
+| `GET /api/safe-route` | Recommended destination and route for an emergency `{ lat, lng, type }`. |
+| `POST /api/feedback` | Submit supervisor feedback `{ subject, message, kind }`. |
+| `GET /api/incidents/:id/track` | The movement history (pings) for an incident. |
+| `GET /api/contacts` | List personal emergency contacts. |
+| `POST /api/contacts` | Add an emergency contact `{ name, relation, phone, email, ... }`. |
+| `PATCH /api/contacts/:id` | Update an emergency contact. |
+| `DELETE /api/contacts/:id` | Remove an emergency contact. |
+| `GET /api/billing/plans` | The pricing catalogue `{ TZS, USD }`. |
+| `GET /api/billing/subscription` | Current tier, seat usage and transaction history. |
+| `POST /api/payments/mobile-money/initiate` | Start a USSD push payment `{ planId, phoneNumber, cycle }`. |
+| `POST /api/payments/card/checkout` | Get a Stripe Checkout session `{ planId, cycle }`. |
+| `GET /api/payments/status` | Poll the status of a pending transaction `{ reference }`. |
 
 An **incident** is created when an alert is raised (enriched with the sender's
 last-known zone + coordinates from the roster) and marked `resolved` when an

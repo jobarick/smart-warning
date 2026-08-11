@@ -29,6 +29,7 @@ def hasSigningConfig =
 android {
     namespace = "com.smartwarning.app"
     compileSdk = rootProject.ext.compileSdkVersion
+    ndkVersion = "26.1.10909125"
     defaultConfig {
         applicationId "com.smartwarning.app"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -65,9 +66,15 @@ android {
             // on-device test of the release variant, which cannot be done from
             // the build alone. The app is ~6 MB; size is not the constraint.
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             if (hasSigningConfig) {
                 signingConfig signingConfigs.release
+            }
+            ndk {
+                debugSymbolLevel 'FULL'
+            }
+            packagingOptions {
+                doNotStrip "**/*.so"
             }
         }
     }
