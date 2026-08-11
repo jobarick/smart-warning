@@ -57,14 +57,25 @@ android {
 
     buildTypes {
         release {
-            // Deliberately left off. R8 strips classes it cannot see being
-            // used, and Capacitor resolves plugins reflectively — a wrong keep
-            // rule produces an app that builds, installs, and then fails to
-            // register push or geolocation at the moment of an emergency.
-            // Turning this on is worth doing, but only together with an
-            // on-device test of the release variant, which cannot be done from
-            // the build alone. The app is ~6 MB; size is not the constraint.
-            minifyEnabled false
+            // Capacitor's own consumer ProGuard rules (bundled in the
+            // capacitor-android module and pulled in automatically via
+            // consumerProguardFiles) keep every class extending
+            // com.getcapacitor.Plugin and every @PluginMethod — that covers
+            // the bridge's reflective dispatch. Firebase's messaging SDK
+            // ships its own consumer rules too.
+            //
+            // Enabled 2026-08-11. Verified on this exact release variant, on
+            // device: the app runs clean with no reflection-related
+            // exceptions in logcat, and the live geolocation permission flow
+            // (Capacitor's Permission-callback reflection path) works.
+            // PushNotificationsPlugin's presence in mapping.txt was confirmed
+            // kept unrenamed (identity mapping) — a live push-registration
+            // round trip was NOT exercised, since that needs a signed-in
+            // session this check deliberately didn't create against
+            // production. Re-verify the same way (build, install, check
+            // mapping.txt + an on-device run) after a Capacitor or plugin
+            // version bump — see docs/ANDROID_RELEASE.md.
+            minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
             if (hasSigningConfig) {
                 signingConfig signingConfigs.release
