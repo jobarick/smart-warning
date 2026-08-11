@@ -96,9 +96,32 @@ export function useAlertSocket(
     let flushTimer = 0;
     setJoinRejected(false);
 
+    const resetConnectionState = () => {
+      setStatus('closed');
+      setDeviceCount(0);
+      setRoster([]);
+    };
+    const scheduleRetry = () => {
+      if (!disposed) timer = window.setTimeout(connect, Math.min(1000 * 2 ** retries++, 10000));
+    };
+
     const connect = () => {
       setStatus('connecting');
-      const ws = new WebSocket(relayUrl());
+      let ws: WebSocket;
+      try {
+        ws = new WebSocket(relayUrl());
+      } catch (err) {
+        // Unlike every other failure here, a bad URL or a browser security
+        // restriction (e.g. an insecure ws:// endpoint from a page loaded over
+        // https) throws synchronously out of the constructor instead of
+        // failing async via onerror/onclose. Uncaught, that took the whole
+        // app down through render instead of just this connection attempt.
+        console.error('[socket] failed to open WebSocket:', err);
+        wsRef.current = null;
+        resetConnectionState();
+        scheduleRetry();
+        return;
+      }
       wsRef.current = ws;
 
       /**
@@ -175,15 +198,13 @@ export function useAlertSocket(
         clearInterval(beat);
         clearInterval(flushTimer);
         if (disposed) return;
-        setStatus('closed');
-        setDeviceCount(0);
-        setRoster([]);
+        resetConnectionState();
         // 4001 = credentials rejected. Reconnecting won't help — surface it.
         if (e.code === 4001) {
           setJoinRejected(true);
           return;
         }
-        timer = window.setTimeout(connect, Math.min(1000 * 2 ** retries++, 10000));
+        scheduleRetry();
       };
       ws.onerror = () => ws.close();
     };
