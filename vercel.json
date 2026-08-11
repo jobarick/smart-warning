@@ -3,5 +3,6 @@
   "framework": null,
   "installCommand": "cd client && npm ci",
   "buildCommand": "cd client && npm run build",
-  "outputDirectory": "client/dist"
+  "outputDirectory": "client/dist",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }

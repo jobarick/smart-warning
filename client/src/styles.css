@@ -2605,4 +2605,49 @@ body {
 .trial-after { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
 .trial-after b { color: var(--text); }
 .trial-local { opacity: 0.85; }
+
+/* ---------- desktop / wide-viewport adaptation ----------
+   Everything above is tuned for a phone held in one hand — a narrow column,
+   a bottom tab bar, one viewport of height. That is correct there and stays
+   exactly as it is below this breakpoint (including inside the Android app,
+   which never reaches these widths). On a desktop browser the same markup
+   gets more breathing room instead of sitting in a phone-width column with
+   the rest of a wide monitor going unused. */
+@media (min-width: 900px) {
+  .worker,
+  :root .worker {
+    max-width: 900px;
+    padding: 24px 32px;
+  }
+  .tabbar {
+    max-width: 900px;
+    margin: 0 auto;
+    border-left: 1px solid var(--panel-border);
+    border-right: 1px solid var(--panel-border);
+  }
+}
+
+@media (min-width: 1280px) {
+  .worker,
+  :root .worker {
+    max-width: 1040px;
+    padding: 28px 40px;
+  }
+  .tabbar { max-width: 1040px; }
+}
+
+/* A phone or small tablet turned sideways has very little vertical room —
+   the fixed one-viewport shell used in portrait would clip content instead
+   of letting it scroll. Let the page scroll normally in that case; the tab
+   bar becomes the last thing on the page rather than pinned to the bottom. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .app-tabbed {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+  .app-tabbed .worker-tabbed {
+    overflow-y: visible;
+  }
+}
 .trial-cta { margin-top: 8px; align-self: flex-start; }

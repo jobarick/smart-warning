@@ -16,6 +16,7 @@ import { loadSettings, saveSettings, makeOperatorId } from './lib/settings';
 import { startVibration, stopVibration } from './lib/haptics';
 import { useAlertSocket } from './hooks/useAlertSocket';
 import { useAlarmState } from './hooks/useAlarmState';
+import { useRoute } from './hooks/useRoute';
 import { useSiren } from './hooks/useSiren';
 import { useSelfTelemetry } from './hooks/useSelfTelemetry';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
@@ -90,7 +91,52 @@ import {
 const VIEW_KEY = 'alert-system-view';
 const SAFE_FOR_KEY = 'sw-safe-for-v1';
 
+// ---------------------------------------------------------------------------
+// Routing
+// ---------------------------------------------------------------------------
+// Every screen that is meaningfully its own destination (reachable directly,
+// bookmarkable, survives a refresh) gets a real path. Things that are just a
+// visual toggle on the current screen — the sound-arm prompt, the theme
+// switch — stay as plain state. See useRoute for the History API plumbing.
+
+const TAB_PATHS: Record<UserTab, string> = {
+  home: '/',
+  emergency: '/emergency',
+  safety: '/safety',
+  alerts: '/alerts',
+  profile: '/profile',
+};
+
+/** Paths that map straight to a worker tab. '/' is handled on its own below,
+ *  because unlike these it must not force `view` — it is also the landing
+ *  path used while nothing has been asked for yet, worker or command. */
+const TAB_ROUTES: Record<string, UserTab> = {
+  '/emergency': 'emergency',
+  '/safety': 'safety',
+  '/alerts': 'alerts',
+  '/profile': 'profile',
+};
+
+const OVERLAY_ROUTES = new Set(['/settings', '/about', '/support', '/billing', '/setup']);
+
+const KNOWN_ROUTES = new Set(['/', '/dashboard', ...Object.keys(TAB_ROUTES), ...OVERLAY_ROUTES]);
+
+const ROUTE_TITLE: Record<string, string> = {
+  '/': 'Smart Warning',
+  '/dashboard': 'Command Centre — Smart Warning',
+  '/emergency': 'Emergency — Smart Warning',
+  '/safety': 'Safety — Smart Warning',
+  '/alerts': 'Alerts — Smart Warning',
+  '/profile': 'Profile — Smart Warning',
+  '/settings': 'Settings — Smart Warning',
+  '/about': 'About — Smart Warning',
+  '/support': 'Support — Smart Warning',
+  '/billing': 'Plans & Billing — Smart Warning',
+  '/setup': 'Setup — Smart Warning',
+};
+
 export default function App() {
+  const { path, navigate, replace } = useRoute();
   const [settings, setSettings] = useState(loadSettings);
   const [alarm, dispatch] = useAlarmState();
   const [log, setLog] = useState<LogEntry[]>([]);
@@ -101,7 +147,7 @@ export default function App() {
   const [standing, setStanding] = useState<{ level: SystemStatusLevel; note: string }>({ level: 'clear', note: '' });
   // Read once at mount: this device has already accepted the current terms.
   const [consented, setConsented] = useState(() => hasAcceptedCurrentTerms());
-  const [showAbout, setShowAbout] = useState(false);
+  const [showAbout, setShowAbout] = useState(() => window.location.pathname === '/about');
   const [responder, setResponder] = useState<RespondingMessage | null>(null);
   const [lastAlert, setLastAlert] = useState<number | null>(null);
   const [lastSync, setLastSync] = useState<number | null>(null);
@@ -119,19 +165,27 @@ export default function App() {
     if (id) localStorage.setItem(SAFE_FOR_KEY, id);
     else localStorage.removeItem(SAFE_FOR_KEY);
   }, []);
-  const [view, setView] = useState<AppView>(() => (localStorage.getItem(VIEW_KEY) === 'command' ? 'command' : 'worker'));
-  const [showSettings, setShowSettings] = useState(false);
-  // Which of the user's four screens is open. Not persisted: the app should
-  // open on Home, where the SOS button is, however it was last left.
-  const [tab, setTab] = useState<UserTab>('home');
-  const [showSupport, setShowSupport] = useState(false);
+  // Derived from the URL the app booted with, so a direct link or a refresh
+  // lands on the right screen instead of always resetting to worker Home.
+  const [view, setView] = useState<AppView>(() => {
+    const p = window.location.pathname;
+    if (p === '/dashboard' || p === '/setup') return 'command';
+    if (p in TAB_ROUTES) return 'worker';
+    return localStorage.getItem(VIEW_KEY) === 'command' ? 'command' : 'worker';
+  });
+  const [showSettings, setShowSettings] = useState(() => window.location.pathname === '/settings');
+  // Which of the user's four screens is open. Not persisted across visits:
+  // the app should open on Home, where the SOS button is, however it was
+  // last left — but a direct link to another tab still opens that tab.
+  const [tab, setTab] = useState<UserTab>(() => TAB_ROUTES[window.location.pathname] ?? 'home');
+  const [showSupport, setShowSupport] = useState(() => window.location.pathname === '/support');
   // Plans & billing. Supervisors only — it needs an account token, and it is
   // administrative by definition. Nothing here can reach the alert path.
-  const [showBilling, setShowBilling] = useState(false);
+  const [showBilling, setShowBilling] = useState(() => window.location.pathname === '/billing');
   // Supervisor configuration (destinations, feedback). Rendered instead of the
   // dashboard rather than beside it — the command centre is viewport-locked and
   // a sibling section would break its no-scroll layout.
-  const [showTools, setShowTools] = useState(false);
+  const [showTools, setShowTools] = useState(() => window.location.pathname === '/setup');
   // Multi-tenant auth. orgsMode: null = still checking the backend, true =
   // accounts required, false = legacy single-room (no login).
   const [orgsMode, setOrgsMode] = useState<boolean | null>(null);
@@ -166,6 +220,63 @@ export default function App() {
 
   useEffect(() => saveSettings(settings), [settings]);
   useEffect(() => localStorage.setItem(VIEW_KEY, view), [view]);
+
+  // Runs once, against the URL the app booted with. An unrecognized path
+  // (a stale bookmark, a typo) is sent back to '/' without leaving a history
+  // entry to back out of.
+  //
+  // A recognized "overlay" path (settings, about, support, billing, setup)
+  // needs a screen behind it for back (in-app or browser) to land on. If this
+  // entry carries our own history marker, it was reached by navigate() before
+  // a reload — the real chain behind it (e.g. '/' → '/profile' → '/settings')
+  // is still intact, so it must be left alone. Only a marker-less entry — a
+  // fresh tab opened on a bookmark or a shared link, with nothing of ours
+  // behind it — gets a parent synthesized.
+  useEffect(() => {
+    const p = window.location.pathname;
+    if (!KNOWN_ROUTES.has(p)) {
+      replace('/');
+      return;
+    }
+    const arrivedViaApp = (window.history.state as { sw?: boolean } | null)?.sw === true;
+    if (OVERLAY_ROUTES.has(p) && !arrivedViaApp) {
+      const parent = view === 'command' ? '/dashboard' : '/';
+      window.history.replaceState({ sw: true }, '', parent);
+      window.history.pushState({ sw: true }, '', p);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Single source of truth for "what does this path mean": every navigate()
+  // call and every browser back/forward funnels through here.
+  useEffect(() => {
+    const tabForPath = TAB_ROUTES[path];
+    if (path === '/dashboard') {
+      setView('command');
+      setShowSettings(false); setShowAbout(false); setShowSupport(false); setShowBilling(false); setShowTools(false);
+    } else if (path === '/setup') {
+      setView('command'); setShowTools(true);
+      setShowSettings(false); setShowAbout(false); setShowSupport(false); setShowBilling(false);
+    } else if (path === '/settings') {
+      setShowSettings(true); setShowAbout(false); setShowSupport(false); setShowBilling(false); setShowTools(false);
+    } else if (path === '/about') {
+      setShowAbout(true); setShowSettings(false); setShowSupport(false); setShowBilling(false); setShowTools(false);
+    } else if (path === '/support') {
+      setShowSupport(true); setShowSettings(false); setShowAbout(false); setShowBilling(false); setShowTools(false);
+    } else if (path === '/billing') {
+      setShowBilling(true); setShowSettings(false); setShowAbout(false); setShowSupport(false); setShowTools(false);
+    } else if (tabForPath) {
+      setView('worker'); setTab(tabForPath);
+      setShowSettings(false); setShowAbout(false); setShowSupport(false); setShowBilling(false); setShowTools(false);
+    } else if (path === '/') {
+      setShowSettings(false); setShowAbout(false); setShowSupport(false); setShowBilling(false); setShowTools(false);
+      setTab('home');
+    }
+  }, [path]);
+
+  useEffect(() => {
+    document.title = ROUTE_TITLE[path] ?? 'Smart Warning';
+  }, [path]);
 
   // Black or white background — applied to the document root so tokens flip.
   useEffect(() => {
@@ -209,8 +320,8 @@ export default function App() {
     // An individual has an account and a token but no site to coordinate, so
     // they belong in the personal view — the command centre would be empty and
     // would imply they are watching over people who do not exist.
-    setView(s.kind === 'supervisor' && s.user.kind !== 'individual' ? 'command' : 'worker');
-  }, []);
+    navigate(s.kind === 'supervisor' && s.user.kind !== 'individual' ? '/dashboard' : '/');
+  }, [navigate]);
 
   // Accepting the terms must never depend on the network.
   //
@@ -244,8 +355,8 @@ export default function App() {
     void unregisterFromPush(creds); // and the same for the Android app's FCM token
     clearSession();
     setSession(null);
-    setView('worker');
-  }, [session]);
+    navigate('/');
+  }, [session, navigate]);
 
   // Keep the device identity in sync with the active session.
   useEffect(() => {
@@ -416,7 +527,7 @@ export default function App() {
     if (!joinRejected) return;
     clearSession();
     setSession(null);
-    setView('worker');
+    navigate('/');
     setAuthNotice(
       session?.kind === 'worker'
         ? "That team code wasn't recognized. Check it and try again."
@@ -686,7 +797,7 @@ export default function App() {
         audioArmed={armed}
         onArmAudio={() => void arm()}
         view={view}
-        onViewChange={setView}
+        onViewChange={(v) => navigate(v === 'command' ? '/dashboard' : '/')}
         userName={settings.deviceName}
         theme={settings.theme}
         onToggleTheme={() => patchSettings({ theme: settings.theme === 'dark' ? 'light' : 'dark' })}
@@ -718,16 +829,16 @@ export default function App() {
           )}
           {joinCreds && <PushToggle creds={joinCreds} />}
           {org && !showTools && !showSupport && (
-            <button className="org-tools" onClick={() => setShowTools(true)} title="Safe destinations and feedback">
+            <button className="org-tools" onClick={() => navigate('/setup')} title="Safe destinations and feedback">
               <Icon name="map-pin" /> Setup
             </button>
           )}
           {org && token && (
-            <button className="org-tools" onClick={() => setShowBilling((v) => !v)} title="Plans, payment and invoices">
+            <button className="org-tools" onClick={() => (showBilling ? window.history.back() : navigate('/billing'))} title="Plans, payment and invoices">
               <Icon name="check-circle" /> {showBilling ? 'Close' : 'Plans'}
             </button>
           )}
-          <button className="org-support" onClick={() => setShowSupport((v) => !v)}>
+          <button className="org-support" onClick={() => (showSupport ? window.history.back() : navigate('/support'))}>
             <Icon name="help" /> {showSupport ? 'Close' : 'Support'}
           </button>
           <button className="org-signout" onClick={signOut}>
@@ -738,7 +849,7 @@ export default function App() {
 
       {showSupport ? (
         <main className="worker">
-          <ContactSupport onBack={() => setShowSupport(false)} />
+          <ContactSupport onBack={() => window.history.back()} />
         </main>
       ) : showAbout ? (
         <main className="worker">
@@ -749,19 +860,19 @@ export default function App() {
             // someone else's organization gets the contact-us copy instead,
             // because their records are part of that organization's history.
             personalEmail={personal && session?.kind === 'supervisor' ? session.user.email : undefined}
-            onBack={() => setShowAbout(false)}
-            onDeleted={() => { setShowAbout(false); signOut(); }}
+            onBack={() => window.history.back()}
+            onDeleted={() => signOut()}
           />
         </main>
       ) : showBilling && token ? (
         <main className="worker">
           <Suspense fallback={<PanelFallback label="plans" />}>
-            <BillingPanel token={token} onBack={() => setShowBilling(false)} />
+            <BillingPanel token={token} onBack={() => window.history.back()} />
           </Suspense>
         </main>
       ) : view === 'command' && showTools ? (
         <main className="worker">
-          <button className="btn back-btn" onClick={() => setShowTools(false)}>
+          <button className="btn back-btn" onClick={() => window.history.back()}>
             <Icon name="arrow-left" /> Back to command centre
           </button>
           <Suspense fallback={<PanelFallback label="tools" />}>
@@ -797,7 +908,7 @@ export default function App() {
         </Suspense>
       ) : showSettings ? (
         <main className="worker">
-          <button className="btn back-btn" onClick={() => setShowSettings(false)}>
+          <button className="btn back-btn" onClick={() => window.history.back()}>
             <Icon name="arrow-left" /> Back to SOS
           </button>
           <SettingsPanel
@@ -821,7 +932,7 @@ export default function App() {
                   thing on this screen and must never push the button that
                   matters further down. Renders nothing unless there is
                   something true to say. */}
-              {token && <TrialBanner token={token} onUpgrade={() => setShowBilling(true)} />}
+              {token && <TrialBanner token={token} onUpgrade={() => navigate('/billing')} />}
               <OperatorStatus
                 name={settings.deviceName}
                 operatorId={settings.operatorId}
@@ -883,9 +994,9 @@ export default function App() {
               persistence={history.persistence}
               historyLoading={history.loading}
               historyError={history.error}
-              onAbout={() => setShowAbout(true)}
-              onSettings={() => setShowSettings(true)}
-              onSupport={() => setShowSupport(true)}
+              onAbout={() => navigate('/about')}
+              onSettings={() => navigate('/settings')}
+              onSupport={() => navigate('/support')}
             />
           )}
         </main>
@@ -893,7 +1004,7 @@ export default function App() {
 
       {/* Hidden whenever a full-screen panel is open, so those keep their own
           Back button as the single way out rather than competing with it. */}
-      {tabbed && <TabBar tab={tab} onChange={setTab} alertCount={log.length} active={alarmActive} />}
+      {tabbed && <TabBar tab={tab} onChange={(t) => navigate(TAB_PATHS[t])} alertCount={log.length} active={alarmActive} />}
 
       {view === 'worker' && alarm.alert && (
         <AlertOverlay
