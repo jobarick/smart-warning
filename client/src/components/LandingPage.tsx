@@ -267,6 +267,12 @@ function PricingSection({ billing, onGetStarted }: { billing: ReturnType<typeof 
                 ? <b>Free</b>
                 : <><b>{formatMoney(plan.price, plan.currency)}</b> <small>/ month</small></>}
             </p>
+            {/* What you are buying, in the unit the price is per. Two plans
+                priced differently for 1 seat and 50 needs the 1 and the 50 on
+                screen next to the numbers, or the difference reads as arbitrary. */}
+            <p className="lp-plan-seats">
+              {plan.seats === 1 ? 'One person' : plan.seats ? `Up to ${plan.seats} people` : 'Any number of people'}
+            </p>
             <p className="lp-plan-tagline">{plan.tagline}</p>
             <ul className="lp-plan-includes">
               {plan.includes.map((line, i) => <li key={i}>{line}</li>)}

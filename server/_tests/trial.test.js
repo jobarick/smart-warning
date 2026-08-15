@@ -124,11 +124,30 @@ test('the catalogue tells a pricing screen which terms exist', () => {
   assert.deepEqual(personal.cycles.map((c) => c.cycle), ['monthly', 'quarterly', 'half_year', 'annual']);
   assert.equal(personal.trialDays, 30);
 
-  // The organisation plan on sale is priced and bundled exactly like the
-  // personal one — same configured value, same terms.
+  // The organisation plan sells the same terms at its own price. It used to
+  // cost exactly what a personal account cost; fifty seats priced identically
+  // to one reads as a mistake on a pricing page, and left nobody a reason to
+  // choose Personal.
   const team = plans.catalogue('TZS').find((p) => p.id === 'team');
   assert.deepEqual(team.cycles.map((c) => c.cycle), ['monthly', 'quarterly', 'half_year', 'annual']);
-  assert.equal(team.price, personal.price, 'a site and a person cost the same at this stage');
+  assert.ok(team.price > personal.price, 'a site costs more than a single person');
+
+  // Every bundle must beat the monthly rate over the same span and still cost
+  // more than one month, or the ladder is telling a customer to buy the cheaper
+  // thing twice. Team carrying Personal's bundle prices after its monthly price
+  // moved would have made a quarter cheaper than a single month.
+  const months = { monthly: 1, quarterly: 3, half_year: 6, annual: 12 };
+  for (const p of plans.catalogue('TZS')) {
+    const monthly = p.cycles.find((c) => c.cycle === 'monthly');
+    if (!monthly?.price) continue;
+    for (const c of p.cycles) {
+      assert.ok(
+        c.price <= monthly.price * months[c.cycle],
+        `${p.id} ${c.cycle} (${c.price}) costs more than ${months[c.cycle]} months at the monthly rate`,
+      );
+      assert.ok(c.price >= monthly.price, `${p.id} ${c.cycle} (${c.price}) is cheaper than a single month`);
+    }
+  }
 
   // Business has no bundle prices, so only the terms it actually sells.
   const business = plans.catalogue('TZS').find((p) => p.id === 'business');

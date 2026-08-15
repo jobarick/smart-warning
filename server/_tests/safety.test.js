@@ -199,6 +199,8 @@ test('the billing plan catalogue stays public and honest', async () => {
   assert.strictEqual(res.status, 200);
   const body = await res.json();
   const team = body.plans.find((p) => p.id === 'team');
-  assert.strictEqual(team.price, 2500);
+  // What matters here is that the route answers unauthenticated with a real
+  // price, not which price it is — _tests/units.test.js pins the rate card.
+  assert.strictEqual(team.price, require('../billing/plans').priceFor('team', 'TZS'));
   assert.strictEqual(body.enforcement, true);
 });

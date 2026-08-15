@@ -46,13 +46,32 @@ const TRIAL_TIER = { individual: 'personal', org: 'team' };
  * recognise on a USSD prompt in a way 2,483 TZS is not. When the rate moves
  * far enough to matter, someone changes the configured local price on purpose.
  *
- * Both plans on sale today — a person and a site — cost the same. That is a
- * deliberate stage, not an oversight: nothing about a site costs more to serve
- * yet, and a price difference would have to be justified to a customer.
+ * This is the price of a PERSONAL account — one person, one seat.
  */
 const MONTHLY_PRICE = {
   USD: Number(process.env.MONTHLY_PRICE_USD ?? 1),
   TZS: Number(process.env.MONTHLY_PRICE_TZS ?? 2500),
+};
+
+/**
+ * The Team price, now its own number.
+ *
+ * It used to *be* MONTHLY_PRICE — one site cost exactly what one person cost.
+ * The reasoning at the time was that nothing about a site costs more to serve,
+ * so a difference would have to be justified rather than assumed. What that
+ * missed is the other direction: a plan for fifty people priced identically to a
+ * plan for one reads, on a pricing page, as a mistake — and it puts the whole
+ * individual tier in an awkward light, since a customer who spots it has no
+ * reason left to pick Personal.
+ *
+ * Serving cost is not what is being charged for here. A Safety Coordinator gets
+ * the command centre, the roll call and the incident record; those are worth
+ * more than a personal panic button to the person buying them, whatever they
+ * cost to run.
+ */
+const TEAM_MONTHLY_PRICE = {
+  USD: Number(process.env.TEAM_PRICE_USD ?? 4),
+  TZS: Number(process.env.TEAM_PRICE_TZS ?? 10000),
 };
 
 // The larger tiers, configured the same way and for the same reason: the local
@@ -80,6 +99,29 @@ const BUNDLE_PRICE = {
     half_year: Number(process.env.HALF_YEAR_PRICE_TZS ?? 12000),
     annual: Number(process.env.ANNUAL_PRICE_TZS ?? 22000),
   },
+};
+
+/**
+ * The same multi-month discount curve, applied to the Team price.
+ *
+ * Held as multipliers of the monthly figure rather than as twelve more
+ * environment variables, because the ladder is a policy — pay for 2.6 months
+ * and get 3 — and it should not be possible to change Team's monthly price and
+ * leave a quarterly price behind that costs less than a single month. That was
+ * the state this fixes: Team's monthly moved to 10,000 while its bundles were
+ * still Personal's, so a quarter was cheaper than a month.
+ *
+ * Rounded to the nearest 500 TZS: these numbers get read off a USSD prompt.
+ */
+const BUNDLE_MONTHS = { monthly: 1, quarterly: 2.6, half_year: 4.8, annual: 8.8 };
+
+const TEAM_BUNDLE_PRICE = {
+  USD: Object.fromEntries(
+    Object.entries(BUNDLE_MONTHS).map(([cycle, n]) => [cycle, Math.round(TEAM_MONTHLY_PRICE.USD * n * 100) / 100]),
+  ),
+  TZS: Object.fromEntries(
+    Object.entries(BUNDLE_MONTHS).map(([cycle, n]) => [cycle, Math.round((TEAM_MONTHLY_PRICE.TZS * n) / 500) * 500]),
+  ),
 };
 
 // Ordered cheapest → richest. `rank` lets an upgrade/downgrade be compared
@@ -122,11 +164,8 @@ const PLANS = [
     audience: 'business',
     tagline: 'A supervisor watching over a single site.',
     seats: 50,
-    // The same price as a personal account, on purpose. Nothing about a site
-    // costs more to serve yet, and a difference would have to be justified to
-    // a customer rather than assumed. Both come from one configured value.
-    price: MONTHLY_PRICE,
-    bundles: BUNDLE_PRICE,
+    price: TEAM_MONTHLY_PRICE,
+    bundles: TEAM_BUNDLE_PRICE,
     features: [
       F.UNLIMITED_CONTACTS, F.FAMILY_LOCATION, F.SAFETY_ASSISTANT,
       F.SUPERVISOR_DASHBOARD, F.INCIDENT_REPORTS,

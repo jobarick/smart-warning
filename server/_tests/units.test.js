@@ -63,10 +63,12 @@ test('prices match the published rate card', () => {
   // The individual tier was Personal Pro at 8,000 TZS / $3. It is now Personal
   // at 2,500 TZS / $1, sold with multi-month bundles — see _tests/trial.test.js.
   assert.strictEqual(plans.priceFor('personal', 'TZS'), 2500);
-  assert.strictEqual(plans.priceFor('team', 'TZS'), 2500);
+  // Team was 2,500 too — the same configured value as one person, for fifty
+  // seats. It now has its own price.
+  assert.strictEqual(plans.priceFor('team', 'TZS'), 10000);
   assert.strictEqual(plans.priceFor('business', 'TZS'), 125000);
   assert.strictEqual(plans.priceFor('personal', 'USD'), 1);
-  assert.strictEqual(plans.priceFor('team', 'USD'), 1);
+  assert.strictEqual(plans.priceFor('team', 'USD'), 4);
   assert.strictEqual(plans.priceFor('business', 'USD'), 50);
 });
 

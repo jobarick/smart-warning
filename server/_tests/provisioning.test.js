@@ -169,7 +169,10 @@ test('initiating holds the customer at their existing tier until they pay', asyn
 
   assert.strictEqual(out.status, 'pending');
   assert.strictEqual(out.operator, 'mixx_by_yas');
-  assert.strictEqual(out.amount, 2500);
+  // Read from the catalogue rather than pinned here: this test is about the
+  // customer being held at their old tier until the money lands, not about what
+  // Team costs. _tests/units.test.js is the one place the rate card is asserted.
+  assert.strictEqual(out.amount, require('../billing/plans').priceFor('team', 'TZS'));
   assert.strictEqual(out.currency, 'TZS');
   assert.strictEqual(out.phoneNumber, '+255 713 455 454');
 
@@ -181,7 +184,7 @@ test('initiating holds the customer at their existing tier until they pay', asyn
 
   const tx = await db.getTransactionByReference(out.orderReference);
   assert.strictEqual(tx.status, 'pending');
-  assert.strictEqual(tx.amount, 2500);
+  assert.strictEqual(tx.amount, out.amount, 'the transaction records what the customer was asked for');
   assert.strictEqual(tx.provider, 'mixx_by_yas');
 });
 
