@@ -39,6 +39,7 @@ import { useIncidentHistory } from './hooks/useIncidentHistory';
 import { AuthGate } from './components/AuthGate';
 import { LandingPage } from './components/LandingPage';
 import { isNativeApp } from './lib/platform';
+import { SPA_PATHS } from './lib/routes';
 import { ConsentGate } from './components/ConsentGate';
 import { AboutPanel } from './components/AboutPanel';
 import { hasAcceptedCurrentTerms, saveConsent } from './lib/consent';
@@ -126,7 +127,10 @@ const OVERLAY_ROUTES = new Set(['/settings', '/about', '/support', '/billing', '
  *  and is corrected to '/' on arrival. */
 const AUTH_ROUTE = '/get-started';
 
-const KNOWN_ROUTES = new Set(['/', '/dashboard', AUTH_ROUTE, ...Object.keys(TAB_ROUTES), ...OVERLAY_ROUTES]);
+/** Built from the shared list rather than assembled here, so the service
+ *  worker's navigation allowlist and the app's idea of a real destination stay
+ *  the same set — see lib/routes.ts. */
+const KNOWN_ROUTES = new Set<string>(SPA_PATHS);
 
 const ROUTE_TITLE: Record<string, string> = {
   '/': 'Smart Warning',

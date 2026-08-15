@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { spaNavigationRoutes } from './src/lib/routes';
 
 // Surfaced in the About screen. Google Play support requests and bug reports
 // are close to useless without knowing which build someone is running, and
@@ -17,15 +18,18 @@ export default defineConfig({
       includeAssets: ['icon.svg', 'logo.svg', 'apple-touch-icon.png', 'push-sw.js'],
       // Pull our push / notificationclick handlers into the generated SW.
       //
-      // The denylist matters more than it looks. The generated SW answers every
-      // navigation with index.html, so once it is installed a visit to
-      // /legal/privacy.html renders the app shell instead of the policy — and
-      // those pages exist precisely to be readable without installing anything,
-      // including by a Play reviewer following the listing's Privacy Policy URL.
-      // They are real files; let the network serve them.
+      // The allowlist matters more than it looks. Left to itself the generated
+      // SW answers EVERY navigation with index.html, so once installed it
+      // shadowed the hosted legal pages in public/legal/ — real files, and the
+      // URLs a Play reviewer opens from the listing — with the app shell.
+      //
+      // An allowlist rather than a denylist of /legal/: a denylist has to
+      // predict every static path that will ever exist, while an allowlist only
+      // has to know the app's own routes, which are enumerated in one place and
+      // imported here so the two cannot drift.
       workbox: {
         importScripts: ['push-sw.js'],
-        navigateFallbackDenylist: [/^\/legal\//],
+        navigateFallbackAllowlist: spaNavigationRoutes(),
       },
       devOptions: { enabled: true },
       manifest: {
