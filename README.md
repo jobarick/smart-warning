@@ -40,10 +40,17 @@ The repo is set up to deploy the client to **Vercel** and the relay to any
 always-on host. Two parts, because Vercel is static/serverless and can't run a
 persistent WebSocket server.
 
-**1. Client → Vercel.** `vercel.json` (repo root) builds the app in `client/`.
-Import the repo on Vercel and keep the Root Directory as the repo root — the
-config runs `cd client && npm run build` and serves `client/dist`. No settings
-to fiddle with.
+**1. Client → Vercel.** Import the repo and set the **Vercel Project Root =
+`client/`**. The one and only config is [`client/vercel.json`](client/vercel.json):
+it builds with Vite, serves `dist`, rewrites unknown paths to the SPA, and
+redirects the bare `/legal`, `/privacy`, `/terms` and `/delete` to the hosted
+legal pages.
+
+> There used to be a second `vercel.json` at the repo root telling you to keep
+> the Root Directory *at* the root. It was inert — the project has been building
+> from `client/` — and edits made to it silently did nothing, which cost a
+> debugging session. It is deleted. **If you ever see deploy config that appears
+> to be ignored, check the Root Directory setting before anything else.**
 
 **2. Backend → an always-on host.** The backend reads `process.env.PORT` and
 exposes a `/` health check, so it runs as-is on Render, Railway, Fly.io, etc.

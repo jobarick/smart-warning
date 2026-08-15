@@ -5,64 +5,62 @@ Two hosts, one repository, one branch (`main`).
 | Host | Serves | Trigger | Status |
 |---|---|---|---|
 | **Render** | Client **and** API **and** WebSocket relay | Auto-deploys on push | Working |
-| **Vercel** | Client only (a second, redundant frontend) | GitHub Actions | Needs three secrets — see below |
+| **Vercel** | Client only (a second, redundant frontend) | Auto-deploys on push (its own Git integration) | Working |
 
 Render is the one that matters. It serves the built client, the REST API and
 the relay from a single service, which is why there is no CORS configuration
 and no cross-host environment variable to keep in sync. Vercel is a redundant
 second frontend, not a requirement — **if you ever want to stop maintaining it,
-deleting the workflow and the project costs the product nothing.**
+deleting the project costs the product nothing.**
 
 ---
 
-## Vercel: what went wrong, and why CI now does it
+## Vercel: the configuration that actually applies
 
-Vercel's Git integration stopped triggering on this repository.
+**Vercel Project Root = `client/`.** The only deploy config is
+[`client/vercel.json`](../client/vercel.json). Nothing at the repository root is
+read — there used to be a second `vercel.json` there, it was inert, and it has
+been deleted.
 
-The evidence, gathered over several days:
+`client/vercel.json` does four things:
 
-- Five consecutive pushes: Render rebuilt each commit within minutes; Vercel
-  served the same bundle throughout.
-- The `Age:` response header climbed continuously (past 38 hours at one point),
-  proving no new deployment — not merely a cached response.
-- A fresh clone built cleanly with the exact commands from `vercel.json`
-  (`cd client && npm ci`, `cd client && npm run build`), on Linux with Node 22.
-- So the repository was provably buildable and the pushes provably landed.
+- builds with Vite (`npm ci`, `npm run build`, output `dist`)
+- rewrites every unmatched path to `/index.html` so the SPA can route it
+- redirects the bare `/legal`, `/privacy`, `/terms` and `/delete` to the hosted
+  legal pages in `client/public/legal/`
+- everything else is Vercel's defaults
 
-**The failure was a deployment that never started.** That is the hardest kind
-to diagnose, because a build that never runs produces no log to read. Every
-other hypothesis — output directory, stale cache, Node version, root directory —
-was checked and eliminated; each would have produced a *failed build*, and there
-were no builds at all.
+The Git integration deploys every push to `main` on its own, in seconds. There
+is no GitHub Actions workflow and none is needed.
 
-Rather than keep guessing at a dashboard setting, deployment now runs from
-[`.github/workflows/deploy-vercel.yml`](../.github/workflows/deploy-vercel.yml).
-Every attempt is visible in the Actions tab, failures are loud, and the workflow
-ends by fetching the production URL and comparing its asset hash against what it
-just built — so "deployed successfully but the alias didn't move" fails the run
-instead of passing silently.
+### Two failure modes that have each cost a session
 
-### The three secrets you need to add
+**1. A stale production alias is usually an Instant Rollback, not a broken
+integration.** If Render serves a new bundle and Vercel serves an old one, open
+the Vercel project **Overview** *first*. A rollback pins the production domain
+against all newer deployments and says so on that page, with an `Undo Rollback`
+button. Comparing bundle hashes only proves staleness, never why. An earlier
+version of this document diagnosed exactly this symptom as "the Git integration
+stopped triggering" and built a CI workflow around the wrong cause; the
+integration was fine the whole time.
 
-Repository → **Settings → Secrets and variables → Actions → New repository secret**.
+**2. Config that seems to be ignored is config in the wrong file.** Redirects
+added to the root `vercel.json` did nothing, because the project builds from
+`client/`. Check the Root Directory setting before theorising.
 
-| Secret | Where to get it |
-|---|---|
-| `VERCEL_TOKEN` | <https://vercel.com/account/tokens> → **Create Token**. Scope it to the team that owns the project. Copy it immediately; it is shown once. |
-| `VERCEL_ORG_ID` | Vercel project → **Settings → General**, or run `vercel link` locally and read `.vercel/project.json` → `orgId`. |
-| `VERCEL_PROJECT_ID` | Same place → `projectId`. |
+### Verifying a Vercel deploy
 
-The project is **`idesign1/smart-warning`** (<https://vercel.com/idesign1/smart-warning>).
+```bash
+# the built bundle, and that the meta tags shipped
+curl -s https://smart-warning.vercel.app/ | grep -oE 'assets/index-[A-Za-z0-9_-]+\.js|og:image'
 
-Once the secrets exist, push anything to `main` — or run the workflow manually
-from the Actions tab via **Run workflow** — and it deploys.
+# the redirects (expect 307 → the real page)
+curl -sI https://smart-warning.vercel.app/privacy | grep -iE 'HTTP/|location'
+```
 
-### Turn off the old integration
-
-If the dashboard Git integration ever starts working again, you would get two
-deployments per push racing each other. Under the Vercel project's
-**Settings → Git**, disconnect the repository (or set **Ignored Build Step** to
-`exit 0`) so CI is the only thing that deploys.
+⚠️ **`curl` and a browser can legitimately disagree here.** The service worker
+answers navigations from its own cache, so test hosted static pages both ways —
+see "Service worker" below.
 
 ---
 
