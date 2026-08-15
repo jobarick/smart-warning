@@ -1494,16 +1494,23 @@ body {
   min-height: 100dvh; display: flex; align-items: center; justify-content: center;
   padding: 24px; background: radial-gradient(1200px 600px at 50% -10%, var(--bg-2), var(--bg));
 }
+/* The choice screen is the one card tall enough to matter, and it has always
+   fitted a phone without scrolling. Buying back the gutter keeps that true now
+   that it also carries the scope disclaimer and the legal links — a first
+   screen you have to scroll to finish reading is one people finish by guessing. */
+@media (max-width: 480px) {
+  .auth { padding: 16px 14px; }
+}
 .auth-card {
   width: 100%; max-width: 420px;
   background: linear-gradient(180deg, var(--panel-2), var(--panel));
   border: 1px solid var(--panel-border); border-radius: 18px;
-  box-shadow: var(--shadow); padding: 28px 26px 30px;
+  box-shadow: var(--shadow); padding: 24px 22px 26px;
 }
 .auth-brand { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.01em; }
 .auth-brand .auth-logo { width: auto; height: 22px; color: var(--accent); flex: none; }
-.auth-title { margin: 18px 0 6px; font-size: 1.5rem; font-weight: 700; color: var(--text); }
-.auth-sub { color: var(--muted); font-size: 0.9rem; line-height: 1.45; margin-bottom: 18px; }
+.auth-title { margin: 14px 0 6px; font-size: 1.5rem; font-weight: 700; color: var(--text); }
+.auth-sub { color: var(--muted); font-size: 0.9rem; line-height: 1.45; margin-bottom: 14px; }
 .auth-notice { margin-top: 14px; padding: 10px 12px; border-radius: 10px; font-size: 0.84rem;
   color: var(--cmd-warn); background: color-mix(in srgb, var(--cmd-warn) 14%, transparent); }
 .auth-error { margin-top: 14px; padding: 10px 12px; border-radius: 10px; font-size: 0.84rem;
@@ -1511,7 +1518,7 @@ body {
 
 .auth-choice {
   display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
-  margin-top: 12px; padding: 16px; cursor: pointer;
+  margin-top: 10px; padding: 14px 16px; cursor: pointer;
   background: var(--panel); border: 1px solid var(--panel-border); border-radius: 13px;
   color: var(--text); transition: border-color 0.15s, background 0.15s;
 }
@@ -1562,6 +1569,32 @@ body {
 .auth-submit:disabled { opacity: 0.6; cursor: default; }
 .auth-alt { margin-top: 16px; text-align: center; color: var(--muted); font-size: 0.84rem; }
 .auth-alt button { background: none; border: none; color: var(--accent); font-size: inherit; cursor: pointer; font-weight: 600; }
+
+/* Defines "Safety Coordinator" once, on the only screen reached before the term
+   starts being used as though it were already understood. */
+.auth-glossary {
+  margin-top: 14px; font-size: 0.79rem; line-height: 1.45; color: var(--faint);
+}
+.auth-glossary b { color: var(--muted); font-weight: 650; }
+
+/* The scope disclaimer on the entry gate. Warning-coloured rather than alarm
+   red: red is what a live emergency looks like in this product, and a standing
+   notice must not borrow that meaning. */
+.auth-disclaimer {
+  margin-top: 14px; padding: 10px 12px; border-radius: 11px;
+  font-size: 0.82rem; line-height: 1.45; color: var(--muted);
+  background: color-mix(in srgb, var(--cmd-warn) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cmd-warn) 24%, transparent);
+}
+.auth-disclaimer b { color: var(--text); font-weight: 650; }
+
+.auth-legal {
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+  margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--panel-border);
+  font-size: 0.78rem; color: var(--faint);
+}
+.auth-legal a { color: var(--muted); text-decoration: none; }
+.auth-legal a:hover { color: var(--text); text-decoration: underline; }
 
 /* --- Org bar (signed-in banner) --- */
 .org-bar {

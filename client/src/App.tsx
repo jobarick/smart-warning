@@ -37,6 +37,8 @@ import { Logo } from './components/Logo';
 import { getProfile, alertLabel } from './lib/profiles';
 import { useIncidentHistory } from './hooks/useIncidentHistory';
 import { AuthGate } from './components/AuthGate';
+import { LandingPage } from './components/LandingPage';
+import { isNativeApp } from './lib/platform';
 import { ConsentGate } from './components/ConsentGate';
 import { AboutPanel } from './components/AboutPanel';
 import { hasAcceptedCurrentTerms, saveConsent } from './lib/consent';
@@ -119,10 +121,16 @@ const TAB_ROUTES: Record<string, UserTab> = {
 
 const OVERLAY_ROUTES = new Set(['/settings', '/about', '/support', '/billing', '/setup']);
 
-const KNOWN_ROUTES = new Set(['/', '/dashboard', ...Object.keys(TAB_ROUTES), ...OVERLAY_ROUTES]);
+/** The entry gate's own path. Signed out on the web '/' is the public landing
+ *  page and this is where its calls to action lead; signed in it means nothing,
+ *  and is corrected to '/' on arrival. */
+const AUTH_ROUTE = '/get-started';
+
+const KNOWN_ROUTES = new Set(['/', '/dashboard', AUTH_ROUTE, ...Object.keys(TAB_ROUTES), ...OVERLAY_ROUTES]);
 
 const ROUTE_TITLE: Record<string, string> = {
   '/': 'Smart Warning',
+  [AUTH_ROUTE]: 'Get started — Smart Warning',
   '/dashboard': 'Command Centre — Smart Warning',
   '/emergency': 'Emergency — Smart Warning',
   '/safety': 'Safety — Smart Warning',
@@ -235,6 +243,13 @@ export default function App() {
   useEffect(() => {
     const p = window.location.pathname;
     if (!KNOWN_ROUTES.has(p)) {
+      replace('/');
+      return;
+    }
+    // Somebody already signed in has no use for the entry gate — a stale
+    // bookmark of it should land them in the app, not on a sign-in form they
+    // would have to escape from.
+    if (p === AUTH_ROUTE && session) {
       replace('/');
       return;
     }
@@ -760,9 +775,19 @@ export default function App() {
     );
   }
 
-  // Accounts required but not signed in → the entry gate.
+  // Accounts required but not signed in → the public front door, then the gate.
+  //
+  // A stranger who opens the root URL on the web is asked to trust an emergency
+  // product with their location and their money; the landing page is where that
+  // case gets made, and the entry gate now sits one deliberate click behind it.
+  // The native shell skips it — somebody who installed the APK has already
+  // decided, and a marketing page inside an installed app is just a screen
+  // between them and the alarm.
   if (orgsMode && !session) {
-    return <AuthGate onAuthed={onAuthed} notice={authNotice} />;
+    if (isNativeApp() || path === AUTH_ROUTE) {
+      return <AuthGate onAuthed={onAuthed} notice={authNotice} />;
+    }
+    return <LandingPage onGetStarted={() => navigate(AUTH_ROUTE)} />;
   }
 
   // Terms & Conditions, once per device, after joining or signing in.

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { login, signup, signupPersonal, requestPasswordReset, resetPassword } from '../lib/api';
+import { fetchPlans, formatMoney, type Plan } from '../lib/billing';
 import type { Session } from '../lib/session';
 import { Icon } from './Icon';
 import { Logo } from './Logo';
@@ -34,7 +35,57 @@ function clearResetFromUrl() {
   } catch { /* history is not available in every embedding — harmless */ }
 }
 
+/**
+ * What the individual plan costs, in the server's own words.
+ *
+ * This screen used to state the price as a literal. A number typed into a
+ * sign-up form is a second source of truth for money: it goes stale the day
+ * pricing changes, and the first person to notice is a customer who was quoted
+ * one figure and charged another. Null until known, and null forever if the
+ * request fails — the copy around it drops the figure rather than inventing one.
+ */
+function usePersonalPrice(): string | null {
+  const [price, setPrice] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPlans('TZS', 'monthly')
+      .then(({ plans }) => {
+        if (cancelled) return;
+        const personal = plans.find(
+          (p: Plan) => p.audience === 'individual' && p.chargeable && p.price != null,
+        );
+        if (personal?.price != null) setPrice(formatMoney(personal.price, personal.currency));
+      })
+      .catch(() => { /* silent: this is a sign-up screen, not a billing screen */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  return price;
+}
+
+/**
+ * Terms, privacy and support, on every step of the gate.
+ *
+ * These pages are generated from lib/terms.ts and served statically, so they
+ * are readable without an account — but until this footer existed nothing in
+ * the app linked to them, which made "publicly available" true and useless at
+ * the same time.
+ */
+function AuthLegalFooter() {
+  return (
+    <p className="auth-legal">
+      <a href="/legal/terms.html">Terms</a>
+      <span aria-hidden="true">·</span>
+      <a href="/legal/privacy.html">Privacy</a>
+      <span aria-hidden="true">·</span>
+      <a href="/legal/">Legal &amp; data</a>
+    </p>
+  );
+}
+
 export function AuthGate({ onAuthed, notice }: Props) {
+  const price = usePersonalPrice();
   const [linkToken] = useState(resetTokenFromUrl);
   const [step, setStep] = useState<Step>(() => (resetTokenFromUrl() ? 'reset' : 'choose'));
   const [busy, setBusy] = useState(false);
@@ -158,16 +209,21 @@ export function AuthGate({ onAuthed, notice }: Props) {
         {step === 'choose' && (
           <>
             <h1 className="auth-title">Get started</h1>
-            <p className="auth-sub">Use Smart Warning on your own, or with a team. You can change your mind later.</p>
-            {/* First, because it is the only option that needs nothing from
-                anybody else — no code, no employer, no site. */}
+            <p className="auth-sub">Which one sounds like you? You can change your mind later.</p>
+            {/* Labelled by what the person came to do, in their own words,
+                rather than by which record gets written. "Create an
+                organization account" describes our data model; "I'm setting
+                this up for my workplace" describes the visitor, and only one
+                of those can be answered by somebody who has never been here.
+                The distinguishing fact goes in the sub-line, because that is
+                what someone hesitating between two of these needs. */}
             <button className="auth-choice" onClick={() => go('personal')}>
               <Icon name="user" />
-              <span><b>Create a personal account</b><small>For you, on your own. Free for 30 days</small></span>
+              <span><b>Start my free trial</b><small>Just me, looking after myself. 30 days free, no card</small></span>
             </button>
             <button className="auth-choice" onClick={() => go('worker')}>
               <Icon name="check-circle" />
-              <span><b>Join an existing team</b><small>You have a team code from your Safety Coordinator</small></span>
+              <span><b>Join my team</b><small>Someone gave me a team code. No account needed</small></span>
             </button>
             {/* Creating a team used to be reachable only by opening the sign-in
                 screen and then noticing "New here?" underneath a login form.
@@ -176,12 +232,28 @@ export function AuthGate({ onAuthed, notice }: Props) {
                 screen now says it outright. */}
             <button className="auth-choice" onClick={() => go('signup')}>
               <Icon name="siren" />
-              <span><b>Create an organization account</b><small>For a team or site, with a Safety Coordinator</small></span>
+              <span><b>Set this up for my workplace</b><small>I'll get a code to share, and a screen showing who is on site</small></span>
             </button>
             <button className="auth-choice" onClick={() => go('login')}>
               <Icon name="lock" />
-              <span><b>Safety Coordinator sign in</b><small>You already have an account</small></span>
+              <span><b>Sign in</b><small>I already have an account</small></span>
             </button>
+            {/* The product calls this person a Safety Coordinator everywhere
+                after this screen. This is the one place that says what it
+                means, before anybody has to pick a door based on it. */}
+            <p className="auth-glossary">
+              A <b>Safety Coordinator</b> is whoever watches a site's alerts — they see who is
+              present and call the all-clear.
+            </p>
+
+            {/* The most important sentence in the product, and until now it was
+                only visible after signing up — inside the consent gate, which
+                nobody reaches without first deciding to trust this. Somebody
+                still deciding needs to read it here. */}
+            <p className="auth-disclaimer">
+              Smart Warning alerts the people around you. It cannot dispatch emergency services —
+              <b> in a life-threatening emergency, call your local emergency number first</b>.
+            </p>
           </>
         )}
 
@@ -204,7 +276,10 @@ export function AuthGate({ onAuthed, notice }: Props) {
         {step === 'login' && (
           <form onSubmit={submitLogin}>
             <button type="button" className="auth-back" onClick={() => go('choose')}><Icon name="arrow-left" /> Back</button>
-            <h1 className="auth-title">Safety Coordinator sign in</h1>
+            {/* Not "Safety Coordinator sign in" any more: individuals have
+                their own accounts now and sign in through this same form, so
+                naming one of the two roles turned the other away. */}
+            <h1 className="auth-title">Sign in</h1>
             <label className="auth-field">
               <span>Email</span>
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
@@ -288,8 +363,9 @@ export function AuthGate({ onAuthed, notice }: Props) {
             <button type="button" className="auth-back" onClick={() => go('choose')}><Icon name="arrow-left" /> Back</button>
             <h1 className="auth-title">Create a personal account</h1>
             <p className="auth-sub">
-              For one person. No team code and no organization — just you. Free for 30 days, then
-              $1 a month.
+              For one person. No team code and no organization — just you. Free for 30 days
+              {price ? <>, then <b>{price}</b> a month</> : null}. We do not ask for payment
+              details now, and we will tell you before the trial ends.
             </p>
             <label className="auth-field">
               <span>Your name</span>
@@ -372,6 +448,8 @@ export function AuthGate({ onAuthed, notice }: Props) {
             <button className="auth-submit" type="submit" disabled={busy}>{busy ? 'Creating…' : 'Create organization'}</button>
           </form>
         )}
+
+        <AuthLegalFooter />
       </div>
     </div>
   );

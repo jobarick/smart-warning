@@ -1,0 +1,208 @@
+/* Public landing page.
+ *
+ * Uses the app's own tokens so the page a visitor reads and the product they
+ * then sign into look like the same thing. The one deliberate departure is the
+ * type scale: the operator UI is compact on purpose (it is read under stress,
+ * on a phone, in a hurry), while a page that has to explain itself to a stranger
+ * needs room to breathe.
+ *
+ * Red is the alarm colour in this product, so it is spent carefully here — on
+ * the primary action and the step numerals, and nowhere decorative. */
+
+.landing {
+  min-height: 100dvh;
+  background: radial-gradient(1100px 560px at 50% -12%, var(--bg-2), var(--bg));
+  color: var(--text);
+}
+
+.landing a { color: inherit; }
+
+/* --- nav --- */
+.lp-nav {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  max-width: 62rem; margin: 0 auto; padding: 20px 24px;
+}
+.lp-brand {
+  display: inline-flex; align-items: center; gap: 9px;
+  font-size: 0.95rem; font-weight: 650; text-decoration: none; color: var(--text);
+}
+.lp-brand svg { color: var(--accent); }
+.lp-nav-links { display: flex; align-items: center; gap: 22px; font-size: 0.88rem; }
+.lp-nav-links a { color: var(--muted); text-decoration: none; }
+.lp-nav-links a:hover { color: var(--text); }
+.lp-nav-cta {
+  padding: 8px 15px; cursor: pointer; font: inherit; font-weight: 600;
+  color: var(--text); background: var(--panel); border: 1px solid var(--panel-border);
+  border-radius: 10px; transition: border-color 0.15s, background 0.15s;
+}
+.lp-nav-cta:hover { background: var(--panel-hover); border-color: color-mix(in srgb, var(--accent) 45%, var(--panel-border)); }
+
+/* --- hero --- */
+.lp-hero { max-width: 46rem; margin: 0 auto; padding: 56px 24px 8px; text-align: center; }
+.lp-hero h1 {
+  margin: 0 0 18px; font-size: clamp(2rem, 5.2vw, 3rem); line-height: 1.1;
+  font-weight: 700; letter-spacing: -0.02em;
+}
+.lp-lead { margin: 0 auto; max-width: 34rem; font-size: 1.12rem; line-height: 1.55; color: var(--muted); }
+
+.lp-cta-row { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 30px; }
+.lp-cta {
+  padding: 14px 24px; cursor: pointer; font: inherit; font-size: 1rem; font-weight: 650;
+  color: #fff; background: var(--accent); border: none; border-radius: 12px;
+  transition: filter 0.15s, transform 0.06s;
+}
+.lp-cta:hover { filter: brightness(1.08); }
+.lp-cta:active { transform: translateY(1px); }
+.lp-cta-quiet {
+  color: var(--text); background: var(--panel); border: 1px solid var(--panel-border);
+}
+.lp-cta-quiet:hover { background: var(--panel-hover); filter: none; }
+.lp-cta-note { margin: 14px 0 0; font-size: 0.85rem; color: var(--faint); }
+
+.lp-trust {
+  display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: center;
+  margin: 36px 0 0; padding: 0; list-style: none;
+  font-size: 0.84rem; color: var(--muted);
+}
+.lp-trust li { display: flex; align-items: center; gap: 8px; }
+.lp-trust li::before {
+  content: ''; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--cmd-safe); flex: none;
+}
+
+/* --- sections --- */
+.lp-section { max-width: 62rem; margin: 0 auto; padding: 56px 24px 0; }
+.lp-section > h2 {
+  margin: 0 0 26px; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; text-align: center;
+}
+
+.lp-steps {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+  margin: 0; padding: 0; list-style: none; counter-reset: none;
+}
+.lp-steps li {
+  padding: 22px 20px 24px;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--panel-border); border-radius: 16px;
+}
+.lp-step-n {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 50%;
+  font-size: 0.82rem; font-weight: 700; color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.lp-steps h3 { margin: 14px 0 7px; font-size: 1.02rem; font-weight: 650; }
+.lp-steps p { margin: 0; font-size: 0.92rem; line-height: 1.55; color: var(--muted); }
+
+.lp-section-sub {
+  max-width: 40rem; margin: -14px auto 26px; text-align: center;
+  font-size: 0.94rem; line-height: 1.55; color: var(--muted);
+}
+
+/* --- pricing --- */
+.lp-plans { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; align-items: start; }
+.lp-plan {
+  position: relative; padding: 22px 18px 24px;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--panel-border); border-radius: 16px;
+}
+/* One plan is marked, because a page of equal columns makes the visitor do work
+   the page should have done. It is the individual plan, not the dearest one. */
+.lp-plan-pick { border-color: color-mix(in srgb, var(--accent) 40%, var(--panel-border)); }
+.lp-plan-tag {
+  position: absolute; top: -10px; left: 18px; padding: 3px 9px; border-radius: 999px;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase;
+  color: #fff; background: var(--accent);
+}
+.lp-plan h3 { margin: 0 0 8px; font-size: 0.96rem; font-weight: 650; color: var(--muted); }
+.lp-plan-price { margin: 0 0 10px; font-size: 0.86rem; color: var(--muted); }
+.lp-plan-price b { font-size: 1.5rem; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
+.lp-plan-tagline { margin: 0 0 14px; font-size: 0.86rem; line-height: 1.5; color: var(--muted); }
+.lp-plan-includes { margin: 0; padding: 14px 0 0; list-style: none; border-top: 1px solid var(--panel-border); }
+.lp-plan-includes li {
+  position: relative; padding-left: 18px; margin-bottom: 7px;
+  font-size: 0.85rem; line-height: 1.45; color: var(--muted);
+}
+.lp-plan-includes li::before {
+  content: ''; position: absolute; left: 3px; top: 8px;
+  width: 5px; height: 5px; border-radius: 50%; background: var(--cmd-safe);
+}
+.lp-plan-enterprise { margin: 20px 0 0; text-align: center; font-size: 0.9rem; color: var(--muted); }
+.lp-plan-enterprise b { color: var(--text); }
+.lp-plan-enterprise a { color: var(--accent); text-decoration: none; font-weight: 600; }
+.lp-pay {
+  max-width: 42rem; margin: 18px auto 0; text-align: center;
+  font-size: 0.84rem; line-height: 1.55; color: var(--faint);
+}
+.lp-plans-cta { display: flex; justify-content: center; margin-top: 26px; }
+
+.lp-audience { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+.lp-card {
+  padding: 24px 22px;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--panel-border); border-radius: 16px;
+}
+.lp-card > svg { width: 26px; height: 26px; color: var(--muted); }
+.lp-card h3 { margin: 14px 0 8px; font-size: 1.1rem; font-weight: 650; }
+.lp-card p { margin: 0; font-size: 0.94rem; line-height: 1.55; color: var(--muted); }
+.lp-price { margin-top: 14px !important; padding-top: 14px; border-top: 1px solid var(--panel-border); font-size: 0.88rem !important; }
+.lp-price b { color: var(--text); }
+
+.lp-honest {
+  padding: 26px 24px;
+  background: color-mix(in srgb, var(--cmd-warn) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cmd-warn) 28%, transparent);
+  border-radius: 16px;
+}
+.lp-honest h2 { margin: 0 0 12px; font-size: 1.15rem; font-weight: 650; color: var(--cmd-warn); }
+.lp-honest p { margin: 0 0 10px; font-size: 0.96rem; line-height: 1.6; color: var(--text); }
+.lp-honest p:last-child { margin-bottom: 0; }
+
+.lp-privacy { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px 26px; }
+.lp-privacy h3 { margin: 0 0 7px; font-size: 0.98rem; font-weight: 650; }
+.lp-privacy p { margin: 0; font-size: 0.92rem; line-height: 1.55; color: var(--muted); }
+.lp-privacy-links {
+  display: flex; flex-wrap: wrap; gap: 8px 22px; justify-content: center;
+  margin: 26px 0 0; font-size: 0.88rem;
+}
+.lp-privacy-links a { color: var(--accent); text-decoration: none; font-weight: 600; }
+.lp-privacy-links a:hover { text-decoration: underline; }
+
+.lp-final { text-align: center; padding-bottom: 8px; }
+.lp-final p { margin: 0 0 24px; color: var(--muted); }
+
+/* --- footer --- */
+.lp-footer {
+  max-width: 62rem; margin: 64px auto 0; padding: 32px 24px 48px;
+  border-top: 1px solid var(--panel-border);
+}
+.lp-footer-about { max-width: 40rem; }
+.lp-footer-about h3 { margin: 0 0 10px; font-size: 0.98rem; font-weight: 650; }
+.lp-footer-about p { margin: 0 0 10px; font-size: 0.9rem; line-height: 1.6; color: var(--muted); }
+.lp-footer-about a { color: var(--accent); text-decoration: none; }
+.lp-footer-links { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 22px; font-size: 0.88rem; }
+.lp-footer-links a { color: var(--muted); text-decoration: none; }
+.lp-footer-links a:hover { color: var(--text); }
+.lp-copy { margin: 20px 0 0; font-size: 0.82rem; color: var(--faint); }
+
+/* --- narrow screens --- */
+@media (max-width: 980px) {
+  .lp-plans { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 720px) {
+  .lp-steps, .lp-audience, .lp-privacy, .lp-plans { grid-template-columns: 1fr; }
+  .lp-plan-tag { top: -9px; }
+  .lp-hero { padding-top: 40px; }
+  .lp-section { padding-top: 44px; }
+  .lp-cta { width: 100%; }
+  .lp-nav-links a:not(:last-of-type) { display: none; }
+  .lp-trust { gap: 8px 18px; }
+}
+
+/* Respect a reduced-motion preference: the only motion here is the CTA press,
+   and there is no reason to insist on it. */
+@media (prefers-reduced-motion: reduce) {
+  .lp-cta, .lp-nav-cta { transition: none; }
+  .lp-cta:active { transform: none; }
+}
