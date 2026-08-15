@@ -4,7 +4,15 @@
 // however the app is being served (Vercel, Render, or the Android shell).
 import { API_BASE } from './api';
 
-export type Tier = 'free' | 'personal_pro' | 'team' | 'business' | 'enterprise';
+/**
+ * `personal` is the individual plan's current id and the only one the server
+ * emits — `personal_pro` is its former name, kept here because it is still
+ * accepted on input (see LEGACY_IDS in server/billing/plans.js) and may sit in
+ * rows written before the rename. Listing only the legacy name, as this union
+ * did until now, made every comparison against the id the server actually sends
+ * a type error.
+ */
+export type Tier = 'free' | 'personal' | 'personal_pro' | 'team' | 'business' | 'enterprise';
 export type Currency = 'TZS' | 'USD';
 export type Cycle = 'monthly' | 'annual';
 export type SubscriptionStatus =
