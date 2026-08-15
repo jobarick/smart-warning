@@ -4,5 +4,11 @@
   "installCommand": "npm ci",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "redirects": [
+    { "source": "/legal", "destination": "/legal/", "permanent": false },
+    { "source": "/privacy", "destination": "/legal/privacy.html", "permanent": false },
+    { "source": "/terms", "destination": "/legal/terms.html", "permanent": false },
+    { "source": "/delete", "destination": "/legal/delete.html", "permanent": false }
+  ],
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }

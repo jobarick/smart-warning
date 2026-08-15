@@ -16,7 +16,17 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'logo.svg', 'apple-touch-icon.png', 'push-sw.js'],
       // Pull our push / notificationclick handlers into the generated SW.
-      workbox: { importScripts: ['push-sw.js'] },
+      //
+      // The denylist matters more than it looks. The generated SW answers every
+      // navigation with index.html, so once it is installed a visit to
+      // /legal/privacy.html renders the app shell instead of the policy — and
+      // those pages exist precisely to be readable without installing anything,
+      // including by a Play reviewer following the listing's Privacy Policy URL.
+      // They are real files; let the network serve them.
+      workbox: {
+        importScripts: ['push-sw.js'],
+        navigateFallbackDenylist: [/^\/legal\//],
+      },
       devOptions: { enabled: true },
       manifest: {
         name: 'Smart Warning — Emergency Alert System',
