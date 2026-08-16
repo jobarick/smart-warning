@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { track } from '../lib/analytics';
 import { login, signup, signupPersonal, requestPasswordReset, resetPassword } from '../lib/api';
 import { fetchPlans, formatMoney, type Plan } from '../lib/billing';
 import type { Session } from '../lib/session';
@@ -107,12 +108,21 @@ export function AuthGate({ onAuthed, notice }: Props) {
   const [industry, setIndustry] = useState('');
   const [address, setAddress] = useState('');
 
-  const go = (s: Step) => { setError(null); setSent(null); setStep(s); };
+  const go = (s: Step) => {
+    setError(null); setSent(null); setStep(s);
+    // The top of the funnel's second half: they picked a door. Which door is
+    // the interesting part — "personal" and "signup" are people creating an
+    // account, "worker" is somebody joining a team who never creates one, and
+    // conflating them would make the conversion rate meaningless.
+    if (s === 'personal' || s === 'signup' || s === 'worker') track('signup_start', { path: s });
+  };
 
   const submitWorker = (e: React.FormEvent) => {
     e.preventDefault();
     const teamCode = orgCode.trim().toUpperCase();
     if (!teamCode || !name.trim()) { setError('Enter your team code and your name.'); return; }
+    // No team code, no name, no organisation — the count and nothing else.
+    track('signup_complete', { path: 'worker' });
     onAuthed({ kind: 'worker', orgCode: teamCode, name: name.trim() });
   };
 
@@ -142,6 +152,7 @@ export function AuthGate({ onAuthed, notice }: Props) {
         industry: industry || undefined,
         address: address.trim() || undefined,
       });
+      track('signup_complete', { path: 'organization' });
       onAuthed({ kind: 'supervisor', token: res.token, user: res.user });
     } catch (err) {
       setError((err as Error).message);
@@ -160,6 +171,7 @@ export function AuthGate({ onAuthed, notice }: Props) {
         password,
         phone: phone.trim() || undefined,
       });
+      track('signup_complete', { path: 'personal' });
       onAuthed({ kind: 'supervisor', token: res.token, user: res.user });
     } catch (err) {
       setError((err as Error).message);
