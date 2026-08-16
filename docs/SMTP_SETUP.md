@@ -3,6 +3,54 @@
 Like Firebase, the code is finished. Supply `SMTP_URL` and the backlog delivers
 itself — no migration, no manual step, no code change.
 
+> ## ⚠️ Test the URL before you set it
+>
+> ```bash
+> node tools/smtp-check.js --probe "smtp://user:pass@smtp.example.com"
+> ```
+>
+> Parses the URL with the **same code the server uses**, connects, and says
+> which scheme/port pair works — in seconds, on a laptop, instead of minutes per
+> guess waiting for Render to restart. It only connects and authenticates: it
+> never sends a message and never prints the password.
+>
+> **The scheme and the port must agree.** This is the single most common
+> failure:
+>
+> | Scheme | Port | Meaning |
+> |---|---|---|
+> | `smtps://` | **465** | implicit TLS — encrypted from the first byte |
+> | `smtp://` | **587** | plaintext, upgraded via STARTTLS |
+>
+> Mismatched, measured against a real host:
+>
+> - `smtps://` on **587** → **ESOCKET** at `CONN`
+> - `smtp://` on **465** → **ETIMEDOUT** (and before this project set socket
+>   timeouts, an *infinite hang* that took the HTTP response with it)
+>
+> Port **25 is blocked outbound on Render** and will never connect.
+>
+> **`EAUTH` is good news** — the connection works and only the credentials are
+> wrong. For Gmail that means an App Password, not the account password.
+>
+> **Percent-encode the password** if it contains `@ : / ? #` — `p@ss/word`
+> becomes `p%40ss%2Fword`.
+>
+> ### Reading the state without a dashboard login
+>
+> `curl -s https://smart-warning-relay.onrender.com/api/health` →
+> `channels.mailQueue` = `{ pending, sent, failed, at, lastError }`
+>
+> - **`sent: 0` with `pending` climbing** — nothing has ever been delivered.
+>   `mail: true` only means a transport was *constructed*; it is not evidence of
+>   delivery, and mistaking one for the other hid a completely broken mail setup
+>   on this deployment.
+> - **`at` frozen while uptime climbs** — the drain is hanging, not failing.
+> - **`at` moving, `pending` static** — attempts are failing and retrying; read
+>   `lastError.code`.
+> - **`failed`** counts only permanent 5xx rejections. Connection-level failures
+>   stay `pending` and back off, so a badly broken queue looks quiet.
+
 ## The design in one paragraph
 
 SMTP credentials live outside the code, so the most likely state of any fresh
