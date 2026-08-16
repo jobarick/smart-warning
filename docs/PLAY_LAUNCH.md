@@ -250,7 +250,11 @@ answer before the payment screens exist inside the app.
 5. `bundleRelease -PversionCode=1 -PversionName=1.0.0`.
 6. Create the app in Console → upload to **internal testing** → install from the
    Play link on a real phone and confirm it launches, signs in, raises an alert
-   and receives one.
+   and receives one. This is the step that actually verifies native push under
+   R8/minification (on since 2026-08-11) — the build-time check only confirmed
+   `PushNotificationsPlugin` survived in `mapping.txt`, not that a push
+   actually arrives. Register the device, background or close the app, and
+   trigger an alert from another device or account before moving on.
 7. Fill App content: privacy policy URL, app access (demo credentials), data
    safety, content rating, target audience, ads = none, government app = no.
 8. Store listing: description, screenshots, feature graphic, icon.
@@ -271,6 +275,6 @@ answer before the payment screens exist inside the app.
 
 ## Related
 
-- `docs/ANDROID_RELEASE.md` — building, signing, the JDK trap, why R8 is off
+- `docs/ANDROID_RELEASE.md` — building, signing, the JDK trap, R8 status and what it still needs verified
 - `docs/FIREBASE_SETUP.md` — native push credentials
 - `docs/IMPROVEMENT_PLAN.md` — the product roadmap, including the billing question

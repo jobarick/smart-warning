@@ -40,6 +40,20 @@ $ErrorActionPreference = 'Stop'
 $clientDir  = Join-Path (Split-Path $PSScriptRoot -Parent) 'client'
 $androidDir = Join-Path $clientDir 'android'
 
+# A release build run without -VersionCode/-VersionName falls back to Gradle's
+# own default (versionCode 1, versionName "1.0" — see app/build.gradle). That
+# is silently correct for the very first Play upload and silently wrong for
+# every one after it: Play rejects a repeated versionCode, so the failure only
+# shows up later, at upload, on a build that reported BUILD SUCCESSFUL. Refuse
+# up front instead — a release bundle nobody intends to upload should use
+# bundleDebug or assembleRelease's unsigned output, not this task.
+if ($Task -match 'bundleRelease|assembleRelease') {
+    if (-not $PSBoundParameters.ContainsKey('VersionCode') -or -not $PSBoundParameters.ContainsKey('VersionName')) {
+        throw "-Task $Task builds an uploadable release artifact and requires both -VersionCode and -VersionName. " +
+              "Example: pwsh tools/android-build.ps1 -Task bundleRelease -VersionCode 7 -VersionName 1.0.7"
+    }
+}
+
 # Gradle 8.14.x runs on JDK 17 through 24. Anything newer fails as above;
 # anything older is below what AGP requires.
 $MIN_JDK = 17

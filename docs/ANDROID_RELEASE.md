@@ -14,7 +14,7 @@ will accept, and the traps that cost time when it was first done.
 | Release AAB | builds, ~4.2 MB |
 | Signing | configured, **needs your keystore** |
 | Firebase / push | code complete, **needs `google-services.json`** — see [FIREBASE_SETUP.md](FIREBASE_SETUP.md) |
-| R8 / minification | deliberately off — see below |
+| R8 / minification | **on since 2026-08-11** — see below |
 
 ## Build
 
@@ -129,21 +129,38 @@ values are overridable so CI owns them and nobody edits Gradle to ship:
 pwsh tools/android-build.ps1 -Task bundleRelease -VersionCode 7 -VersionName 1.0.7
 ```
 
-Defaults are `versionCode 1` / `versionName "1.0"` when not passed. A simple
-scheme that works: `versionCode` = the CI build number, `versionName` =
-`1.0.<build>`.
+Defaults are `versionCode 1` / `versionName "1.0"` when not passed — but
+`tools/android-build.ps1` now **refuses to run** `bundleRelease` or
+`assembleRelease` without both `-VersionCode` and `-VersionName` explicitly
+given, specifically so that trap can't produce a build that Play silently
+rejects on upload. A simple scheme that works: `versionCode` = the CI build
+number, `versionName` = `1.0.<build>`.
 
-## Why R8 / minification is off
+## R8 / minification is on
 
-`minifyEnabled false` in `app/build.gradle` is deliberate, not an oversight.
+`minifyEnabled true` in `app/build.gradle`, since 2026-08-11. It was off
+before that, deliberately: R8 removes classes it cannot see referenced, and
+Capacitor resolves plugins reflectively, so a missing keep rule produces an
+app that compiles, installs, and then silently fails to register push
+notifications or geolocation — discovered during an actual emergency.
 
-R8 removes classes it cannot see referenced, and Capacitor resolves plugins
-reflectively. A missing keep rule produces an app that compiles, installs, and
-then silently fails to register push notifications or geolocation — which is
-discovered during an actual emergency. Enabling it is worthwhile, but only
-alongside an on-device test of the *release* variant; a successful build
-proves nothing here. The app is ~4 MB as a bundle, so size is not the
-constraint that would justify the risk.
+Capacitor's own consumer ProGuard rules (bundled in the `capacitor-android`
+module) keep every class extending `com.getcapacitor.Plugin` and every
+`@PluginMethod`, which covers the bridge's reflective dispatch; Firebase
+messaging ships its own consumer rules too. No app-specific `-keep` rules
+exist in `proguard-rules.pro` beyond source-line attributes for readable
+stack traces.
+
+**What was actually verified, and what wasn't:** the 2026-08-11 change was
+checked on-device against this exact release variant — the app runs with no
+reflection-related exceptions in logcat, the live geolocation permission flow
+works, and `PushNotificationsPlugin` was confirmed present and unrenamed in
+`mapping.txt`. A **live push-registration round trip was not exercised** —
+that needs a signed-in session against production, which that check
+deliberately didn't create. Treat native push as unverified under R8 until
+someone signs in on a real signed release build, registers a device, and
+confirms an alert actually arrives while the app is backgrounded or closed.
+Re-verify the same way after any Capacitor or plugin version bump.
 
 ## Play Store checklist
 
