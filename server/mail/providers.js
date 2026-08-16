@@ -68,6 +68,63 @@ function memoryProvider() {
 }
 
 /**
+ * Timeouts for an SMTP conversation.
+ *
+ * nodemailer sets none by default: a host that accepts a connection and then
+ * stops talking holds the call open forever. That is how a hung mail server
+ * became a hung HTTP request — the feedback route awaited delivery, and
+ * delivery neither finished nor failed. Generous enough for a slow relay on a
+ * bad link, short enough that a dead host fails and gets retried.
+ */
+const SMTP_TIMEOUTS = {
+  connectionTimeout: 10_000, // TCP connect
+  greetingTimeout: 10_000,   // waiting for the server's banner
+  socketTimeout: 20_000,     // silence mid-conversation
+};
+
+/**
+ * Turn an SMTP connection URL into nodemailer transport options.
+ *
+ * Written by hand because of a trap that cost a production incident:
+ * `createTransport(url, options)` looks like it takes transport options as the
+ * second argument, and does not. Read nodemailer's own source — when the first
+ * argument is a URL string it does `options = parseConnectionUrl(url)` and
+ * builds the transport from that alone, while the second argument becomes
+ * *message* defaults. Timeouts passed that way are silently ignored, which is
+ * exactly what happened: the fix looked right, deployed, and changed nothing.
+ *
+ * Passing `{ url, ...timeouts }` does not work either — the same branch
+ * replaces the whole object with the parsed URL.
+ *
+ * So: parse it here, and keep query parameters so existing configuration like
+ * `?pool=true` still applies.
+ */
+function smtpOptions(url) {
+  const u = new URL(url);
+  const secure = u.protocol === 'smtps:';
+  const options = {
+    host: u.hostname,
+    port: Number(u.port) || (secure ? 465 : 587),
+    secure,
+    ...SMTP_TIMEOUTS,
+  };
+  if (u.username) {
+    options.auth = {
+      user: decodeURIComponent(u.username),
+      pass: decodeURIComponent(u.password || ''),
+    };
+  }
+  // `?pool=true&maxConnections=3` and friends, coerced the way a config value
+  // is meant to read rather than left as strings.
+  for (const [k, v] of u.searchParams) {
+    if (v === 'true' || v === 'false') options[k] = v === 'true';
+    else if (v !== '' && !Number.isNaN(Number(v))) options[k] = Number(v);
+    else options[k] = v;
+  }
+  return options;
+}
+
+/**
  * Production: real SMTP via nodemailer.
  *
  * `require` is deliberately inside the factory. This is a life-safety relay and
@@ -78,20 +135,7 @@ function smtpProvider(url, { from }) {
   let transport;
   try {
     const nodemailer = require('nodemailer');
-    // Timeouts, because nodemailer has none by default and an SMTP host that
-    // accepts a connection and then stops talking will otherwise hold the call
-    // open forever. That is how a hung mail server became a hung HTTP request:
-    // the feedback routes awaited delivery, and delivery never finished or
-    // failed. The routes no longer wait, but an unbounded send would still leak
-    // a socket per attempt and stall the queue drain behind it.
-    //
-    // Generous enough for a slow relay on a bad link, short enough that a dead
-    // host fails and gets retried rather than sitting there.
-    transport = nodemailer.createTransport(url, {
-      connectionTimeout: 10_000, // TCP connect
-      greetingTimeout: 10_000,   // waiting for the server's banner
-      socketTimeout: 20_000,     // silence mid-conversation
-    });
+    transport = nodemailer.createTransport(smtpOptions(url));
   } catch (e) {
     const err = new Error(`SMTP configured but nodemailer is unavailable: ${e.message}`);
     err.fatal = true;
@@ -151,4 +195,4 @@ function fromEnv(env = process.env, { from } = {}) {
   return env.NODE_ENV === 'production' ? nullProvider() : logProvider();
 }
 
-module.exports = { nullProvider, logProvider, memoryProvider, smtpProvider, fromEnv };
+module.exports = { nullProvider, logProvider, memoryProvider, smtpProvider, fromEnv, smtpOptions };
