@@ -150,6 +150,17 @@ const allowWebhook = rateLimiter({ windowMs: 60 * 1000, max: 240, name: 'payment
 // mail queue.
 const allowPasswordReset = rateLimiter({ windowMs: 15 * 60 * 1000, max: 30, name: 'password-reset' });
 
+// Feedback from somebody who has no account — a visitor on the landing page
+// answering "what almost stopped you?".
+//
+// Unauthenticated by necessity: the whole point is to hear from the people who
+// did NOT sign up, and any credential requirement selects exactly against them.
+// That makes it a write endpoint open to the internet, so it gets its own
+// bucket and a tight one. Nobody has five useful things to say about a page
+// they just met, and the cost of being wrong here is a stranger being asked to
+// come back later — not an emergency going unreported.
+const allowVisitorFeedback = rateLimiter({ windowMs: 60 * 60 * 1000, max: 5, name: 'visitor-feedback' });
+
 // Mail-bombing ONE address, which the IP limiter above cannot stop on its own
 // — an attacker rotating IPs is still hitting a single mailbox. Keyed by the
 // address itself rather than the requester, so it applies identically whether
@@ -182,4 +193,5 @@ function allowPasswordResetForAddress(email) {
 module.exports = {
   requireAuth, guardOrg, orgContext, orgIdFromRequest, deviceOwnerFromRequest, allowFeature,
   allowReport, allowPlaces, allowWebhook, allowPasswordReset, allowPasswordResetForAddress,
+  allowVisitorFeedback,
 };

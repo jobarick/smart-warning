@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { track } from '../lib/analytics';
 import { fetchPlans, formatMoney, type Plan, type PaymentMethods } from '../lib/billing';
 import { PROVIDER, SUPPORT_EMAIL } from '../lib/terms';
+import { FeedbackButton } from './FeedbackButton';
 import { Icon } from './Icon';
 import { Logo } from './Logo';
 
@@ -213,6 +214,11 @@ export function LandingPage({ onGetStarted }: Props) {
         </nav>
         <p className="lp-copy">© {new Date().getFullYear()} {PROVIDER}. Not an emergency service.</p>
       </footer>
+
+      {/* Landing page only. It asks why somebody did not sign up, which is not a
+          question to put in front of a person who is already inside the product
+          — and never anywhere near the alarm. */}
+      <FeedbackButton />
     </div>
   );
 }

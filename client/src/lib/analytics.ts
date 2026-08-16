@@ -37,7 +37,12 @@ export type AnalyticsEvent =
   | 'view_pricing'
   | 'legal_view'
   | 'signup_start'
-  | 'signup_complete';
+  | 'signup_complete'
+  // How many people open the feedback widget versus finish it. Only the counts
+  // — the answer itself goes to the feedback endpoint, never to an analytics
+  // provider.
+  | 'feedback_open'
+  | 'feedback_sent';
 
 type Params = Record<string, string | number | boolean>;
 
