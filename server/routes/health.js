@@ -33,6 +33,16 @@ function health() {
       nativePush: fcm.enabled(),
       mail: mailer.enabled(),
       mailProvider: mailer.providerName(),
+      // Counts only, never an address, and read from memory rather than the
+      // database — this endpoint is public and pollable. Refreshed on the mail
+      // drain timer, so `at` says how stale the numbers are.
+      //
+      // Here because "mail is configured" and "mail is actually leaving the
+      // building" are different facts and only the first was visible. A backlog
+      // that stops clearing is what a dead SMTP host looks like from outside,
+      // and until now the only way to find that was to send a message and wait
+      // to see whether it ever arrived.
+      mailQueue: mailer.queueSnapshot?.() ?? null,
       // Reported so "is the ETA a real road route or a straight line?" is
       // answerable without reading logs.
       routing: routing.status(),

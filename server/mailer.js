@@ -16,6 +16,7 @@ module.exports = {
   send: mail.send,
   drain: mail.drain,
   stats: mail.stats,
+  queueSnapshot: mail.queueSnapshot,
   providerName: mail.providerName,
   setProvider: mail.setProvider,
   providers: mail.providers,

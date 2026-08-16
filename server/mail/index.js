@@ -34,17 +34,52 @@ const BATCH = 20;
 let provider = providers.nullProvider();
 let drainTimer = null;
 
+/**
+ * The queue as of the last drain, held in memory.
+ *
+ * So "is mail actually going out?" is answerable from /api/health without
+ * putting a database query on a public endpoint anyone can poll, and without
+ * shell access to production — which is exactly what was missing when a hung
+ * SMTP host turned a feedback submission into a 45-second stall and there was
+ * no way afterwards to see whether the backlog was clearing.
+ *
+ * Refreshed on the drain timer, so it is at most one interval stale; `at` is
+ * how a reader knows how stale. Counts only — never an address.
+ */
+let lastQueue = { pending: 0, sent: 0, failed: 0, at: null };
+
+async function refreshQueueSnapshot() {
+  if (!db.enabled()) return;
+  try {
+    const q = await db.mailQueueStats();
+    lastQueue = { ...q, at: Date.now() };
+  } catch (e) {
+    console.error('[mail] queue stats:', e.message);
+  }
+}
+
+function queueSnapshot() {
+  return { ...lastQueue };
+}
+
 function init({ env = process.env, provider: override = null } = {}) {
   provider = override || providers.fromEnv(env, { from: FROM });
   console.log(`[mail] provider: ${provider.name} — ${provider.describe()}`);
   if (!drainTimer && db.enabled()) {
     drainTimer = setInterval(() => {
-      drain().catch((e) => console.error('[mail] drain:', e.message));
+      drain()
+        .catch((e) => console.error('[mail] drain:', e.message))
+        // After, not inside: drain() returns early when there is no provider,
+        // and a backlog piling up with mail switched off is precisely the state
+        // worth being able to see.
+        .then(refreshQueueSnapshot);
     }, DRAIN_INTERVAL_MS);
     drainTimer.unref?.();
   }
   // Deliver anything left over from a previous run before anyone asks.
-  return drain().catch((e) => console.error('[mail] initial drain:', e.message));
+  return drain()
+    .catch((e) => console.error('[mail] initial drain:', e.message))
+    .then(refreshQueueSnapshot);
 }
 
 function stop() {
@@ -174,6 +209,7 @@ module.exports = {
   send,
   drain,
   stats,
+  queueSnapshot,
   sendFeedback,
   providers,
 };
