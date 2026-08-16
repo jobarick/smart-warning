@@ -40,6 +40,7 @@ import { AuthGate } from './components/AuthGate';
 import { LandingPage } from './components/LandingPage';
 import { isNativeApp } from './lib/platform';
 import { SPA_PATHS } from './lib/routes';
+import { trackPageView } from './lib/analytics';
 import { ConsentGate } from './components/ConsentGate';
 import { AboutPanel } from './components/AboutPanel';
 import { hasAcceptedCurrentTerms, saveConsent } from './lib/consent';
@@ -206,7 +207,17 @@ export default function App() {
   const { armed, arm, siren } = useSiren();
   const profile = useMemo(() => getProfile(settings.profileId), [settings.profileId]);
   const sessionId = useRef<string>(crypto.randomUUID());
-  const telemetry = useSelfTelemetry(settings.shareLocation);
+  // Gated on being signed in, not just on the setting.
+  //
+  // Hooks run before this component decides which screen to show, so with only
+  // `settings.shareLocation` (which defaults true) the very first thing a
+  // stranger got on the public landing page was a browser prompt asking for
+  // their location — before they knew what the product was, and while the page
+  // itself promises location is only read during an alert. Lighthouse flags it
+  // as `geolocation-on-start`; it is worse than a score, it is the page
+  // contradicting its own privacy copy.
+  const signedIn = orgsMode === false || session !== null;
+  const telemetry = useSelfTelemetry(settings.shareLocation && signedIn);
   const network = useNetworkStatus();
   const telemetryRef = useRef(telemetry);
   telemetryRef.current = telemetry;
@@ -294,7 +305,12 @@ export default function App() {
   }, [path]);
 
   useEffect(() => {
-    document.title = ROUTE_TITLE[path] ?? 'Smart Warning';
+    const title = ROUTE_TITLE[path] ?? 'Smart Warning';
+    document.title = title;
+    // Reported here rather than by gtag's automatic page_view: this app changes
+    // the URL through the History API, so the automatic one would fire once on
+    // load and never again.
+    trackPageView(path, title);
   }, [path]);
 
   // Black or white background — applied to the document root so tokens flip.
@@ -771,12 +787,33 @@ export default function App() {
   }, [alarmActive, view]);
 
   // Still checking the backend — brief splash to avoid a flash of the wrong UI.
-  if (orgsMode === null) {
+  //
+  // The landing page is exempt, and that exemption matters more than it looks.
+  // It is a static marketing page that needs nothing from the backend, but it
+  // used to wait behind this splash for /api/health like every other screen —
+  // so the moment the relay was slow or restarting, the public front door was a
+  // spinner. A Lighthouse run that happened to catch a Render redeploy measured
+  // a 12.1s largest-contentful-paint against a 0.6s first paint, all of it
+  // render delay waiting on that one call. Warm it is 1.5s, which is fine and
+  // was never the point: a page that exists to introduce the product to a
+  // stranger must not be able to fail because the API is having a bad minute.
+  //
+  // Safe because it changes nothing for anyone signed in, and because a device
+  // with no stored session on a non-auth path is exactly who the landing page
+  // is for. If health comes back `orgs:false` (a LAN deployment with no
+  // accounts) the normal render takes over on the next pass.
+  const awaitingHealth = orgsMode === null;
+  const showLandingEarly = awaitingHealth && !session && !isNativeApp() && path !== AUTH_ROUTE;
+
+  if (awaitingHealth && !showLandingEarly) {
     return (
       <div className="app">
         <div className="boot-splash"><Logo size={26} className="boot-logo" decorative /> <span>Connecting…</span></div>
       </div>
     );
+  }
+  if (showLandingEarly) {
+    return <LandingPage onGetStarted={() => navigate(AUTH_ROUTE)} />;
   }
 
   // Accounts required but not signed in → the public front door, then the gate.
