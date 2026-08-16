@@ -150,6 +150,21 @@ const allowWebhook = rateLimiter({ windowMs: 60 * 1000, max: 240, name: 'payment
 // mail queue.
 const allowPasswordReset = rateLimiter({ windowMs: 15 * 60 * 1000, max: 30, name: 'password-reset' });
 
+// Credential guessing. Keyed by IP, not by the email/account being tried — a
+// per-account lockout would let an attacker who doesn't even know a password
+// lock a real supervisor out of their own account by spamming login attempts
+// against their address. bcrypt already makes each guess slow; this bounds
+// how many guesses one IP gets to make across every account, not just one.
+//
+// Generous like the password-reset limiter, for the same reason: a whole site
+// office sits behind one address, and this product's promise is being
+// reachable in an emergency, not a tight login form.
+const allowLogin = rateLimiter({ windowMs: 15 * 60 * 1000, max: 20, name: 'login' });
+
+// Bulk account creation. Shared between the org and personal signup routes —
+// both mint a new user row, so both draw from the same bucket.
+const allowSignup = rateLimiter({ windowMs: 60 * 60 * 1000, max: 10, name: 'signup' });
+
 // Feedback from somebody who has no account — a visitor on the landing page
 // answering "what almost stopped you?".
 //
@@ -193,5 +208,5 @@ function allowPasswordResetForAddress(email) {
 module.exports = {
   requireAuth, guardOrg, orgContext, orgIdFromRequest, deviceOwnerFromRequest, allowFeature,
   allowReport, allowPlaces, allowWebhook, allowPasswordReset, allowPasswordResetForAddress,
-  allowVisitorFeedback,
+  allowVisitorFeedback, allowLogin, allowSignup,
 };
