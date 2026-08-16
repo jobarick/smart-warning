@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { track } from '../lib/analytics';
 import { fetchPlans, formatMoney, type Plan, type PaymentMethods } from '../lib/billing';
 import { PROVIDER, SUPPORT_EMAIL } from '../lib/terms';
 import { Icon } from './Icon';
@@ -26,8 +27,18 @@ export function LandingPage({ onGetStarted }: Props) {
   const personal = billing?.plans.find((p) => p.audience === 'individual' && p.chargeable && p.price != null);
   const price = personal?.price != null ? formatMoney(personal.price, personal.currency) : null;
 
+  useEffect(() => { track('view_landing_page'); }, []);
+  usePricingSeen();
+
+  /** Which button sent them onward — the whole point of measuring this page. */
+  const go = (cta: string) => {
+    track('click_cta', { cta });
+    onGetStarted();
+  };
+
   return (
-    <div className="landing">
+    <div className="landing" onClick={onLegalLinkClick}>
+      <a className="lp-skip" href="#main">Skip to content</a>
       <header className="lp-nav">
         <a className="lp-brand" href="/">
           <Logo size={22} decorative />
@@ -38,11 +49,11 @@ export function LandingPage({ onGetStarted }: Props) {
           <a href="#pricing">Pricing</a>
           <a href="#privacy">Privacy</a>
           <a href="/legal/">Legal</a>
-          <button className="lp-nav-cta" onClick={onGetStarted}>Sign in</button>
+          <button className="lp-nav-cta" onClick={() => go('nav_sign_in')}>Sign in</button>
         </nav>
       </header>
 
-      <main>
+      <main id="main">
         <section className="lp-hero">
           <h1>Help arrives faster when everyone knows at once.</h1>
           <p className="lp-lead">
@@ -50,10 +61,10 @@ export function LandingPage({ onGetStarted }: Props) {
             in about a second. For one person, or a team of five hundred.
           </p>
           <div className="lp-cta-row">
-            <button className="lp-cta" onClick={onGetStarted}>
+            <button className="lp-cta" onClick={() => go('hero_get_started')}>
               Get started — free for 30 days
             </button>
-            <button className="lp-cta lp-cta-quiet" onClick={onGetStarted}>
+            <button className="lp-cta lp-cta-quiet" onClick={() => go('hero_team_code')}>
               I have a team code
             </button>
           </div>
@@ -138,7 +149,7 @@ export function LandingPage({ onGetStarted }: Props) {
           </div>
         </section>
 
-        <PricingSection billing={billing} onGetStarted={onGetStarted} />
+        <PricingSection billing={billing} onGetStarted={() => go('pricing_start')} />
 
         <section className="lp-section" id="privacy">
           <h2>Your location is yours</h2>
@@ -177,7 +188,7 @@ export function LandingPage({ onGetStarted }: Props) {
         <section className="lp-section lp-final">
           <h2>Ready when you are</h2>
           <p>Set it up before you need it. That is the whole point.</p>
-          <button className="lp-cta" onClick={onGetStarted}>Get started — free for 30 days</button>
+          <button className="lp-cta" onClick={() => go('footer_get_started')}>Get started — free for 30 days</button>
         </section>
       </main>
 
@@ -204,6 +215,50 @@ export function LandingPage({ onGetStarted }: Props) {
       </footer>
     </div>
   );
+}
+
+/**
+ * Counts a visit to a hosted legal page.
+ *
+ * By delegation rather than seven `onClick` props: there are seven such links
+ * today, the eighth would be forgotten, and what is worth knowing is that
+ * somebody went to read the terms — not which of the links they used. Reports
+ * the document, never anything about the person.
+ */
+function onLegalLinkClick(e: React.MouseEvent<HTMLDivElement>): void {
+  const link = (e.target as HTMLElement).closest?.('a');
+  const href = link?.getAttribute('href');
+  if (href?.startsWith('/legal/')) track('legal_view', { document: href });
+}
+
+/**
+ * Fires `view_pricing` once, when the pricing section is actually on screen.
+ *
+ * Scrolled-into-view rather than rendered: the section is always in the DOM, so
+ * reporting it on mount would mean every visitor "viewed pricing" and the
+ * number would answer nothing. Falls silent where IntersectionObserver is
+ * missing — an unmeasured visit is better than an invented one.
+ */
+function usePricingSeen(): void {
+  const seen = useRef(false);
+
+  useEffect(() => {
+    const el = document.getElementById('pricing');
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting || seen.current) continue;
+          seen.current = true;
+          track('view_pricing');
+          io.disconnect();
+        }
+      },
+      { threshold: 0.35 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 }
 
 /**

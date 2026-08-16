@@ -1,0 +1,26 @@
+# Smart Warning — https://smart-warning.vercel.app
+#
+# This file has to exist as a real file. Without it the SPA rewrite in
+# vercel.json answers /robots.txt with index.html, and a crawler reads
+# "<!doctype html>" as a directive — Lighthouse reported 40 parse errors
+# against a robots.txt that was never written.
+
+User-agent: *
+Allow: /
+
+# Nothing here is secret; these are simply not pages worth indexing.
+# The app's own screens are behind a sign-in and render nothing useful to a
+# crawler, and /r/ pages are per-site reporting links meant to be shared
+# directly rather than found in search results.
+Disallow: /get-started
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /billing
+Disallow: /setup
+Disallow: /profile
+Disallow: /alerts
+Disallow: /emergency
+Disallow: /safety
+Disallow: /r/
+
+Sitemap: https://smart-warning.vercel.app/sitemap.xml

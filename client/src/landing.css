@@ -48,7 +48,7 @@
 .lp-cta-row { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 30px; }
 .lp-cta {
   padding: 14px 24px; cursor: pointer; font: inherit; font-size: 1rem; font-weight: 650;
-  color: #fff; background: var(--accent); border: none; border-radius: 12px;
+  color: #fff; background: var(--accent-fill); border: none; border-radius: 12px;
   transition: filter 0.15s, transform 0.06s;
 }
 .lp-cta:hover { filter: brightness(1.08); }
@@ -112,7 +112,7 @@
 .lp-plan-tag {
   position: absolute; top: -10px; left: 18px; padding: 3px 9px; border-radius: 999px;
   font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase;
-  color: #fff; background: var(--accent);
+  color: #fff; background: var(--accent-fill);
 }
 .lp-plan h3 { margin: 0 0 8px; font-size: 0.96rem; font-weight: 650; color: var(--muted); }
 .lp-plan-price { margin: 0 0 10px; font-size: 0.86rem; color: var(--muted); }
@@ -203,6 +203,29 @@
   .lp-nav-links a:not(:last-of-type) { display: none; }
   .lp-trust { gap: 8px 18px; }
 }
+
+/* Keyboard focus.
+   The page had no focus styling at all, which meant tabbing through it was
+   invisible — the browser default outline is nearly unreadable against this
+   background. :focus-visible rather than :focus so a mouse click does not leave
+   a ring behind. --accent (not --accent-fill) on purpose: this draws on the
+   dark background, where the lighter red is the one with contrast. */
+.landing a:focus-visible,
+.landing button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+/* Skip link — first thing in the tab order, invisible until focused. Without it
+   a keyboard user walks the whole nav on every page load. */
+.lp-skip {
+  position: absolute; left: 50%; top: 8px; transform: translate(-50%, -200%);
+  z-index: 10; padding: 10px 16px; border-radius: 10px;
+  background: var(--panel-2); border: 1px solid var(--accent); color: var(--text);
+  font-size: 0.9rem; font-weight: 650; text-decoration: none;
+}
+.lp-skip:focus { transform: translate(-50%, 0); }
 
 /* Respect a reduced-motion preference: the only motion here is the CTA press,
    and there is no reason to insist on it. */

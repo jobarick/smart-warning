@@ -20,8 +20,23 @@
   --panel-hover: #141414;
   --text: #f5f5f5;
   --muted: #9a9a9a;
-  --faint: #707070;
+  /* Was #707070 — 4.04:1 on this background, under the 4.5:1 WCAG AA needs for
+     normal-size text, and every one of its uses (the CTA note, the payment
+     line, the legal footer) is normal-size text. #828282 is 5.21:1 and still
+     reads as the quietest thing on the page. */
+  --faint: #828282;
   --accent: #e53e3e;
+  /* The same red, darkened just enough to carry white text.
+     --accent on #080808 is 4.85:1, which is why it is the right colour for
+     links and icons — but WHITE ON --accent is only 4.13:1, so every filled
+     button using it (the landing CTAs, the plan badge, the auth submit) failed
+     contrast. This is 5.62:1 with white. Two tokens because the two jobs pull
+     in opposite directions: text on dark wants a lighter red, white on fill
+     wants a darker one, and one value cannot do both.
+     Deliberately NOT applied to the alarm — --cmd-crit and the SOS button keep
+     the original red, because that colour means "emergency" and is not a
+     styling decision. */
+  --accent-fill: #c62828;
   --shadow: none;
   --shadow-sm: none;
   --cmd-crit: #e53e3e;
@@ -45,8 +60,11 @@
   --panel-hover: #ededed;
   --text: #111111;
   --muted: #666666;
-  --faint: #8a8a8a;
+  /* Was #8a8a8a — only 3.34:1 against the light background, a worse failure
+     than the dark theme's. #6b6b6b is 5.15:1. */
+  --faint: #6b6b6b;
   --accent: #d32f2f;
+  --accent-fill: #c62828;
   --shadow: 0 1px 2px rgba(20, 25, 34, 0.05), 0 12px 28px rgba(20, 25, 34, 0.09);
   --shadow-sm: 0 4px 12px rgba(20, 25, 34, 0.08);
   --cmd-crit: #d32f2f;
@@ -1564,7 +1582,7 @@ body {
 .auth-submit {
   width: 100%; margin-top: 20px; padding: 13px; cursor: pointer;
   font-size: 0.98rem; font-weight: 650; color: #fff;
-  background: var(--accent); border: none; border-radius: 12px;
+  background: var(--accent-fill); border: none; border-radius: 12px;
 }
 .auth-submit:disabled { opacity: 0.6; cursor: default; }
 .auth-alt { margin-top: 16px; text-align: center; color: var(--muted); font-size: 0.84rem; }
