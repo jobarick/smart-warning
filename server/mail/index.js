@@ -58,8 +58,39 @@ async function refreshQueueSnapshot() {
   }
 }
 
+/**
+ * Why the last delivery attempt failed — as codes, never as prose.
+ *
+ * `e.message` from nodemailer routinely names the host and the username, and
+ * this is read by a public endpoint, so the message is logged and dropped. What
+ * survives is the part that actually diagnoses the problem:
+ *
+ *   EAUTH        credentials rejected
+ *   ECONNECTION  could not connect
+ *   ETIMEDOUT    connected, then silence (or never connected in time)
+ *   ESOCKET      TLS or socket-level failure — often the wrong port
+ *   EDNS         hostname does not resolve
+ *   EENVELOPE    the server refused the sender or recipient
+ *
+ * Added because the alternative was reading Render's logs, which needs a
+ * dashboard login. A deployment should be able to say why its own mail is not
+ * leaving without anybody signing in to anything.
+ */
+let lastError = null;
+
+function recordMailFailure(e) {
+  lastError = {
+    code: e?.code || null,
+    // The SMTP numeric reply, when the server got far enough to give one.
+    responseCode: Number.isFinite(Number(e?.responseCode)) ? Number(e.responseCode) : null,
+    // 'CONN', 'AUTH LOGIN', 'MAIL FROM' … which stage it died at.
+    command: typeof e?.command === 'string' ? e.command.slice(0, 24) : null,
+    at: Date.now(),
+  };
+}
+
 function queueSnapshot() {
-  return { ...lastQueue };
+  return { ...lastQueue, lastError: lastError ? { ...lastError } : null };
 }
 
 function init({ env = process.env, provider: override = null } = {}) {
@@ -116,7 +147,8 @@ async function send({ to = FEEDBACK_TO, replyTo = null, subject, body, kind = 'g
       await provider.send(message);
       return { queued: false, delivered: true };
     } catch (e) {
-      console.error(`[mail] ${kind} not delivered: ${e.message}`);
+      recordMailFailure(e);
+      console.error(`[mail] ${kind} not delivered (${e.code || 'no code'}): ${e.message}`);
       return { queued: false, delivered: false };
     }
   }
@@ -138,7 +170,8 @@ async function send({ to = FEEDBACK_TO, replyTo = null, subject, body, kind = 'g
       backoffMs: backoffFor(row.attempts),
       permanent: e.permanent === true,
     });
-    console.error(`[mail] ${kind} queued but not delivered: ${e.message}`);
+    recordMailFailure(e);
+    console.error(`[mail] ${kind} queued but not delivered (${e.code || 'no code'}): ${e.message}`);
     return { queued: true, delivered: false };
   }
 }
@@ -159,10 +192,12 @@ async function drain() {
       await db.markMailSent(row.id);
       sent++;
     } catch (e) {
+      recordMailFailure(e);
       await db.markMailFailed(row.id, e.message, {
         backoffMs: backoffFor(row.attempts),
         permanent: e.permanent === true,
       });
+      console.error(`[mail] send failed (${e.code || 'no code'}): ${e.message}`);
       failed++;
     }
   }
