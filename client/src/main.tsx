@@ -16,6 +16,7 @@ import './command-center.css';
 import './platform.css';
 import './billing.css';
 import './landing.css';
+import './demo.css';
 
 registerSW({ immediate: true });
 

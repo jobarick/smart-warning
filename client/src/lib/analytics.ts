@@ -42,7 +42,10 @@ export type AnalyticsEvent =
   // — the answer itself goes to the feedback endpoint, never to an analytics
   // provider.
   | 'feedback_open'
-  | 'feedback_sent';
+  | 'feedback_sent'
+  // The simulation — the only way to show an emergency product without one.
+  // Worth knowing how many people watch it and whether they then sign up.
+  | 'view_demo';
 
 type Params = Record<string, string | number | boolean>;
 

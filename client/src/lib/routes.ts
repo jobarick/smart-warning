@@ -19,6 +19,7 @@ export const SPA_PATHS = [
   '/',
   '/dashboard',
   '/get-started',
+  '/demo',
   // worker tabs
   '/emergency',
   '/safety',

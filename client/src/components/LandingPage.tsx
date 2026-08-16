@@ -9,6 +9,8 @@ import { Logo } from './Logo';
 interface Props {
   /** Takes a visitor to the account-choice screen. */
   onGetStarted: () => void;
+  /** Plays the twelve-second simulation. */
+  onWatchDemo: () => void;
 }
 
 /**
@@ -23,7 +25,7 @@ interface Props {
  * native shell straight to the entry gate, because somebody who has already
  * installed an APK has made the decision this page exists to inform.
  */
-export function LandingPage({ onGetStarted }: Props) {
+export function LandingPage({ onGetStarted, onWatchDemo }: Props) {
   const billing = useBilling();
   const personal = billing?.plans.find((p) => p.audience === 'individual' && p.chargeable && p.price != null);
   const price = personal?.price != null ? formatMoney(personal.price, personal.currency) : null;
@@ -69,6 +71,16 @@ export function LandingPage({ onGetStarted }: Props) {
               I have a team code
             </button>
           </div>
+          {/* An emergency product is the one thing nobody can safely try. This
+              is the only honest way to show it before somebody commits. */}
+          <button
+            className="lp-demo-link"
+            onClick={() => { track('click_cta', { cta: 'hero_demo' }); onWatchDemo(); }}
+          >
+            <span className="lp-demo-pip" aria-hidden="true" />
+            Watch it happen — 12 seconds, no signup
+          </button>
+
           <p className="lp-cta-note">No card required. Works in any phone browser.</p>
 
           {/* Four claims, each one true of the code as written. Nothing here is

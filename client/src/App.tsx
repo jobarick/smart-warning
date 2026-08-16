@@ -38,6 +38,7 @@ import { getProfile, alertLabel } from './lib/profiles';
 import { useIncidentHistory } from './hooks/useIncidentHistory';
 import { AuthGate } from './components/AuthGate';
 import { LandingPage } from './components/LandingPage';
+import { DemoAlert } from './components/DemoAlert';
 import { isNativeApp } from './lib/platform';
 import { SPA_PATHS } from './lib/routes';
 import { trackPageView } from './lib/analytics';
@@ -128,6 +129,9 @@ const OVERLAY_ROUTES = new Set(['/settings', '/about', '/support', '/billing', '
  *  and is corrected to '/' on arrival. */
 const AUTH_ROUTE = '/get-started';
 
+/** The public simulation. Reachable signed out, like the landing page. */
+const DEMO_ROUTE = '/demo';
+
 /** Built from the shared list rather than assembled here, so the service
  *  worker's navigation allowlist and the app's idea of a real destination stay
  *  the same set — see lib/routes.ts. */
@@ -136,6 +140,7 @@ const KNOWN_ROUTES = new Set<string>(SPA_PATHS);
 const ROUTE_TITLE: Record<string, string> = {
   '/': 'Smart Warning',
   [AUTH_ROUTE]: 'Get started — Smart Warning',
+  [DEMO_ROUTE]: 'See it in action — Smart Warning',
   '/dashboard': 'Command Centre — Smart Warning',
   '/emergency': 'Emergency — Smart Warning',
   '/safety': 'Safety — Smart Warning',
@@ -802,6 +807,19 @@ export default function App() {
   // with no stored session on a non-auth path is exactly who the landing page
   // is for. If health comes back `orgs:false` (a LAN deployment with no
   // accounts) the normal render takes over on the next pass.
+  // The simulation needs nothing from the backend and nothing from an account,
+  // so it renders straight away — before the health check, and whether or not
+  // somebody is signed in. Someone who followed a shared /demo link should see
+  // the demo, not a spinner and not a sign-in form.
+  if (path === DEMO_ROUTE) {
+    return (
+      <DemoAlert
+        onExit={() => navigate('/')}
+        onGetStarted={() => navigate(session ? '/' : AUTH_ROUTE)}
+      />
+    );
+  }
+
   const awaitingHealth = orgsMode === null;
   const showLandingEarly = awaitingHealth && !session && !isNativeApp() && path !== AUTH_ROUTE;
 
@@ -813,7 +831,7 @@ export default function App() {
     );
   }
   if (showLandingEarly) {
-    return <LandingPage onGetStarted={() => navigate(AUTH_ROUTE)} />;
+    return <LandingPage onGetStarted={() => navigate(AUTH_ROUTE)} onWatchDemo={() => navigate(DEMO_ROUTE)} />;
   }
 
   // Accounts required but not signed in → the public front door, then the gate.
@@ -828,7 +846,7 @@ export default function App() {
     if (isNativeApp() || path === AUTH_ROUTE) {
       return <AuthGate onAuthed={onAuthed} notice={authNotice} />;
     }
-    return <LandingPage onGetStarted={() => navigate(AUTH_ROUTE)} />;
+    return <LandingPage onGetStarted={() => navigate(AUTH_ROUTE)} onWatchDemo={() => navigate(DEMO_ROUTE)} />;
   }
 
   // Terms & Conditions, once per device, after joining or signing in.
