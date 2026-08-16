@@ -39,12 +39,23 @@ async function handle({ req, res, path }) {
       orgId: ctx.orgId, userId: ctx.user?.id, authorName: ctx.user?.name,
       authorEmail: ctx.user?.email, kind, subject, message,
     });
-    const delivered = await mailer.sendFeedback({ ...row, org_name: ctx.org?.name });
-    if (delivered) await db.markFeedbackDelivered(row.id);
-    console.log(`[*] feedback ${kind} from ${ctx.user?.email || 'supervisor'} (delivered: ${delivered})`);
+    // Not awaited, for the same reason as the visitor route below: an SMTP
+    // host that stops answering would otherwise hang this request, and the
+    // message is already stored. The queue drains on a timer.
+    //
+    // `delivered` is therefore reported as false here — it means "not yet
+    // confirmed sent", which is the truth at the moment of answering. The
+    // client already handles that: it offers a mailto: fallback when the
+    // server cannot mail.
+    void mailer
+      .sendFeedback({ ...row, org_name: ctx.org?.name })
+      .then((sent) => (sent ? db.markFeedbackDelivered(row.id) : null))
+      .catch((e) => console.error(`[mail] feedback not delivered: ${e.message}`));
+
+    console.log(`[*] feedback ${kind} from ${ctx.user?.email || 'supervisor'}`);
     sendJson(res, 201, {
       ok: true,
-      feedback: { ...publicFeedback(row), delivered },
+      feedback: { ...publicFeedback(row), delivered: false },
       // The client offers a mailto: fallback when the server cannot mail.
       mailTo: mailer.enabled() ? null : mailer.destination(),
     });
@@ -84,9 +95,25 @@ async function handle({ req, res, path }) {
       subject: 'Landing page: what almost stopped you from signing up?',
       message,
     });
-    const delivered = await mailer.sendFeedback({ ...row, org_name: null });
-    if (delivered) await db.markFeedbackDelivered(row.id);
-    console.log(`[*] visitor feedback received (delivered: ${delivered})`);
+    // Answer FIRST, mail after — and never the other way round.
+    //
+    // sendFeedback ends in nodemailer's sendMail, which has no timeout: if the
+    // SMTP host stops answering, an awaited call hangs until something else
+    // gives up. Awaiting it here put that hang on the request, so a visitor who
+    // typed one sentence sat on "Sending…" indefinitely while their answer was
+    // already safely in the database. Found by sending a real message through
+    // the deployed widget — the unit tests missed it because they stub the
+    // mailer, which is exactly the component at fault.
+    //
+    // Nothing is lost by not waiting: send() queues the row in outbound_mail
+    // before it attempts delivery, and mail/index.js drains that queue on a
+    // timer. A message that fails now goes out on the next pass.
+    void mailer
+      .sendFeedback({ ...row, org_name: null })
+      .then((delivered) => (delivered ? db.markFeedbackDelivered(row.id) : null))
+      .catch((e) => console.error(`[mail] visitor feedback not delivered: ${e.message}`));
+
+    console.log('[*] visitor feedback received');
 
     // Deliberately says nothing about whether it was stored or mailed. A
     // visitor gets thanked either way; our delivery plumbing is not their

@@ -41,15 +41,26 @@ export function FeedbackButton() {
     const body = message.trim();
     if (!body) return;
     setStage('sending');
+    // Bounded, because "Sending…" with no end is the one state this widget must
+    // never reach. It did: the server used to wait on an SMTP round trip before
+    // answering, and a hung mail host left this spinner running forever over an
+    // answer that had already been saved. The server no longer waits — this is
+    // the belt to that braces, since a phone on a bad link can stall a request
+    // just as well as a bad server can.
+    const abort = new AbortController();
+    const timer = window.setTimeout(() => abort.abort(), 8000);
     try {
       await fetch(`${API_BASE}/api/feedback/visitor`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ message: body, email: email.trim() || undefined }),
+        signal: abort.signal,
       });
       track('feedback_sent');
     } catch {
       /* see the header: the visitor is thanked either way */
+    } finally {
+      window.clearTimeout(timer);
     }
     setStage('thanks');
     setMessage('');

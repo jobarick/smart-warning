@@ -165,6 +165,36 @@ test('the burst limit closes the endpoint before it becomes a way to fill a tabl
   assert.strictEqual(written.length - before, 5, 'a refused request must not reach the database');
 });
 
+test('a mail server that never answers does not hang the visitor', async () => {
+  // The bug this pins, found by sending a real message through the deployed
+  // widget: the route awaited mailer.sendFeedback, which ends in nodemailer's
+  // sendMail with no timeout. A hung SMTP host meant a hung HTTP response — the
+  // answer was already in the database and the visitor sat on "Sending…"
+  // forever.
+  //
+  // Every other test here stubs the mailer with something that resolves
+  // instantly, which is precisely why none of them caught it. This one stubs a
+  // send that never settles, and asserts the visitor is answered anyway.
+  const mailer = require('../mailer');
+  const original = mailer.sendFeedback;
+  let called = false;
+  mailer.sendFeedback = () => { called = true; return new Promise(() => {}); };
+
+  try {
+    const started = Date.now();
+    const res = await post({ message: 'the mail server is a black hole' });
+    const elapsed = Date.now() - started;
+
+    assert.strictEqual(res.status, 201);
+    assert.ok(called, 'delivery is still attempted, just not waited on');
+    assert.ok(elapsed < 3000, `answered in ${elapsed}ms — the response must not wait on delivery`);
+    // And the answer is safe regardless: stored before the attempt.
+    assert.strictEqual(written.at(-1).message, 'the mail server is a black hole');
+  } finally {
+    mailer.sendFeedback = original;
+  }
+});
+
 test('the alerting routes are untouched by any of this', async () => {
   // The endpoint above shares a server with the alarm. A regression that took
   // the relay down with it would matter far more than lost feedback.

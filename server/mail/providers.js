@@ -78,7 +78,20 @@ function smtpProvider(url, { from }) {
   let transport;
   try {
     const nodemailer = require('nodemailer');
-    transport = nodemailer.createTransport(url);
+    // Timeouts, because nodemailer has none by default and an SMTP host that
+    // accepts a connection and then stops talking will otherwise hold the call
+    // open forever. That is how a hung mail server became a hung HTTP request:
+    // the feedback routes awaited delivery, and delivery never finished or
+    // failed. The routes no longer wait, but an unbounded send would still leak
+    // a socket per attempt and stall the queue drain behind it.
+    //
+    // Generous enough for a slow relay on a bad link, short enough that a dead
+    // host fails and gets retried rather than sitting there.
+    transport = nodemailer.createTransport(url, {
+      connectionTimeout: 10_000, // TCP connect
+      greetingTimeout: 10_000,   // waiting for the server's banner
+      socketTimeout: 20_000,     // silence mid-conversation
+    });
   } catch (e) {
     const err = new Error(`SMTP configured but nodemailer is unavailable: ${e.message}`);
     err.fatal = true;
