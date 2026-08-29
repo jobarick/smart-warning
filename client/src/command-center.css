@@ -447,7 +447,13 @@
 /* ---------- mobile ----------
    One column. The page scrolls here by necessity, but the band and the
    incident are what land in the first viewport, and the long lists keep
-   their own scroll so they cannot push everything else down. */
+   their own scroll so they cannot push everything else down.
+
+   Everything below this point is spacing and sizing only — no section is
+   reordered, hidden, or removed, and none of it touches the tablet or
+   desktop rules above. The goal is the same information in less height:
+   tighter padding, tighter dividers, and grids that add columns instead
+   of rows where the phone is wide enough to take them. */
 @media (max-width: 780px) {
   .mc {
     padding: 8px;
@@ -455,13 +461,57 @@
     grid-template-rows: auto auto;
   }
   .mc-split { grid-template-columns: 1fr; gap: 8px; }
-  .mc-col { overflow: visible; }
+  .mc-col { overflow: visible; gap: 8px; }
   .mc-two { grid-template-columns: 1fr; }
-  .mc-map { min-height: 168px; }
-  .mc-list { max-height: 208px; }
+  .mc-map { min-height: 150px; }
+  .mc-list { max-height: 192px; }
+  .mc-band { padding: 8px 12px; gap: 6px 16px; }
   .mc-band-read { gap: 12px; }
   .mc-band-sub { white-space: normal; }
   .mc-inc-type { font-size: 1.35rem; }
+
+  /* Every block loses a few px of padding and inter-child gap — repeated
+     across six-plus blocks per screen, this is most of the real saving. */
+  .mc-block { padding: 10px 12px; gap: 8px; }
+
+  /* The risk score was the one number Assessment never shrank for phones,
+     even though the incident type right above it already does. Matched to
+     the same scale so the hierarchy between them is unchanged. */
+  .mc-risk { gap: 10px; }
+  .mc-risk-n { font-size: 1.5rem; }
+
+  /* Divider rules (Acknowledge, the protocol steps, "your route") sit on
+     top of the block's own gap between children, so their own margin is
+     redundant with it — this removes only that duplication, not the line
+     itself. */
+  .mc-ack { padding-top: 8px; margin-top: 0; }
+  .mc-proto { padding-top: 8px; }
+  .mc-nav { margin-top: 0; padding-top: 8px; }
+  .mc-nav-hint { margin-top: 8px; }
+
+  /* From / Zone / Position / Battery, and the Readout stat tiles: fixed at
+     two columns before, which is two or three rows more than a phone wide
+     enough for three or four needs. auto-fit adds columns as width allows
+     instead of a breakpoint per phone model. */
+  .mc-facts { grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 6px 10px; }
+  .mc-grid { grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); }
+  .mc-metric { padding: 8px 10px; gap: 2px; }
+  .mc-metric b { font-size: 1.15rem; }
+}
+
+/* ---------- short phone ----------
+   Same rules again, tighter, for a phone that is short as well as narrow —
+   a 360x640-class device has far less vertical room than a 412x915 one at
+   the same width, and the plain width query above cannot tell them apart. */
+@media (max-width: 780px) and (max-height: 700px) {
+  .mc { padding: 6px; gap: 6px; }
+  .mc-split { gap: 6px; }
+  .mc-col { gap: 6px; }
+  .mc-block { padding: 8px 10px; gap: 6px; }
+  .mc-band { padding: 6px 10px; }
+  .mc-map { min-height: 128px; }
+  .mc-list { max-height: 150px; }
+  .mc-advice { max-height: 118px; }
 }
 
 /* The command view owns the viewport: the shell stops growing so the split can
