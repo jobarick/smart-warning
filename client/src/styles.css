@@ -1333,6 +1333,20 @@ body {
 }
 .mapcard-tag-public { color: var(--cmd-info); }
 .mapcard-tag-muted { color: var(--faint); }
+/* Someone has claimed the incident but shared no position yet, or nobody
+   has claimed it at all — both read the same to the person waiting. */
+.mapcard-tag-waiting { color: var(--cmd-warn); border-color: var(--cmd-warn); }
+/* A responder with a real, live position. */
+.mapcard-tag-responder { color: var(--cmd-crit); border-color: var(--cmd-crit); }
+/* Sits below the map itself — the on-map "Waiting for help" pill is easy to
+   miss against a busy tile layer, so the same fact repeats here as plain,
+   unmissable text for anyone who has just triggered an alarm. */
+.map-status {
+  padding: 10px 16px 14px;
+  color: var(--cmd-warn);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
 .mapcard-expand {
   flex: none;
   display: inline-flex;
@@ -2702,3 +2716,69 @@ body {
   }
 }
 .trial-cta { margin-top: 8px; align-self: flex-start; }
+
+/* ---------- device safe areas ----------
+   index.html asks for `viewport-fit=cover`, which is what lets the app paint
+   edge to edge on a phone — and is exactly why, with no insets applied, the top
+   chrome rendered *underneath* the status bar's clock, battery and network
+   icons. Before this block the whole stylesheet handled a single inset (the tab
+   bar clearing the home indicator); everything else assumed a rectangular
+   viewport.
+
+   The insets are applied once, to the app container, rather than to each bar.
+   Per-bar padding is already set at several breakpoints and by higher-specificity
+   `:root .sysbar` / `:root .status-bar` rules, so adding insets there means
+   restating those values and losing the responsive ones. Insetting the container
+   moves every child at once and survives any future change to those paddings.
+
+   Elements that escape the container because they are `position: fixed` — the
+   alert overlay, the consent gate, the expanded map — carry their own insets
+   below. All four resolve to 0px where the hardware has no cutout, so desktop
+   and phones without notches are unchanged. */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+}
+
+:root .app {
+  padding-top: var(--sat);
+  padding-right: var(--sar);
+  padding-bottom: var(--sab);
+  padding-left: var(--sal);
+}
+/* `.app-tabbed` is height-locked to the viewport; border-box keeps the inset
+   inside that height, so the scrolling tab content shrinks instead of pushing
+   the tab bar off the bottom of the screen. */
+:root .app-tabbed {
+  box-sizing: border-box;
+}
+/* The container now owns the bottom inset, so the tab bar goes back to its
+   plain padding — otherwise a gesture bar is cleared twice and leaves a gap. */
+:root .tabbar {
+  padding-bottom: 6px;
+}
+
+/* Full-screen layers sit above the chrome and own the whole window. The alert
+   overlay matters most: it is what someone reads while an alarm is sounding,
+   and its buttons must never sit under the status bar or the Android
+   navigation bar. */
+:root .overlay {
+  padding-top: calc(var(--border-w) + 16px + var(--sat));
+  padding-right: calc(var(--border-w) + 16px + var(--sar));
+  padding-bottom: calc(var(--border-w) + 16px + var(--sab));
+  padding-left: calc(var(--border-w) + 16px + var(--sal));
+}
+:root .consent {
+  padding-top: calc(16px + var(--sat));
+  padding-right: calc(16px + var(--sar));
+  padding-bottom: calc(16px + var(--sab));
+  padding-left: calc(16px + var(--sal));
+}
+:root .mapcard-expanded {
+  padding-top: var(--sat);
+  padding-right: var(--sar);
+  padding-bottom: var(--sab);
+  padding-left: var(--sal);
+}

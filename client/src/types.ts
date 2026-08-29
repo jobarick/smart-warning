@@ -169,6 +169,13 @@ export interface RespondingMessage {
   /** False when the ETA came from a straight line rather than a road route. */
   routed: boolean;
   timestamp: number;
+  /** The responder's live position, from the same device telemetry a worker's
+   *  own dot on the map already uses. Null whenever it is not known — a
+   *  supervisor who has not shared location, or has not yet moved after
+   *  claiming the incident. The person waiting must never be shown a location
+   *  that is not real, so absence here has to mean "not shown", not "guess". */
+  lat: number | null;
+  lng: number | null;
   /** Set when the supervisor stands down rather than arriving. */
   cancelled?: boolean;
 }

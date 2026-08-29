@@ -41,7 +41,7 @@ interface Props {
   /** This supervisor's own live position, when they are sharing it. */
   selfPosition?: { lat: number; lng: number } | null;
   /** Tell the site this supervisor is en route, and how far off. */
-  onRespond?: (r: { incidentId: string; etaS: number | null; distanceM: number | null; routed: boolean }) => void;
+  onRespond?: (r: { incidentId: string; etaS: number | null; distanceM: number | null; routed: boolean; lat: number | null; lng: number | null }) => void;
 }
 
 /** Human duration between two ISO timestamps, e.g. "2m 5s". */
@@ -273,7 +273,17 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
       etaS: navRoute.durationS,
       distanceM: navRoute.distanceM,
       routed: !navRoute.degraded,
+      // The route recalculates as this supervisor moves (see the hook above),
+      // so the position sent here is never more than one throttle interval old.
+      lat: selfPosition?.lat ?? null,
+      lng: selfPosition?.lng ?? null,
     });
+    // selfPosition is deliberately not a dependency: it is a new object every
+    // render (App.tsx rebuilds it from live telemetry), so depending on it would
+    // re-announce on every GPS tick and defeat the throttling above. Reading its
+    // current value when navRoute changes is exactly "send it when the route was
+    // last recalculated", which is the freshness this announcement promises.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alert, navRoute, onRespond]);
 
   // The roll call. Only people who tapped "I am safe" for THIS alert count —

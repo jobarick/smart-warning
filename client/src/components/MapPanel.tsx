@@ -3,7 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { AlertType } from '../types';
 import type { OrgCreds, SafePlace } from '../lib/api';
-import { formatDistance } from '../lib/geo';
+import { distanceMetres, formatDistance } from '../lib/geo';
 import { useSafeRoute } from '../hooks/useSafeRoute';
 import { useNavigationRoute } from '../hooks/useNavigationRoute';
 import { Icon } from './Icon';
@@ -21,6 +21,12 @@ interface Props {
   alertType: AlertType | null;
   creds: OrgCreds;
   operatorId?: string;
+  /** The Safety Coordinator who claimed this incident, and their live
+   *  position if they have shared one. `lat`/`lng` are null — never a stale
+   *  or guessed value — until a real fix arrives; the panel shows "waiting"
+   *  rather than a marker until then. Omit entirely when nobody has
+   *  responded yet. */
+  responder?: { name: string; lat: number | null; lng: number | null; updatedAt: number | null } | null;
 }
 
 function freshnessLabel(updatedAt: number | null, now: number): string | null {
@@ -39,13 +45,24 @@ function destColor(place: SafePlace | null, configuredFallback: boolean): string
   return place?.configured ? '#30d158' : '#ffb020';
 }
 
-export function MapPanel({ userLat, userLng, userUpdatedAt, now, assembly, alertType, creds, operatorId }: Props) {
+export function MapPanel({ userLat, userLng, userUpdatedAt, now, assembly, alertType, creds, operatorId, responder }: Props) {
   const elRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
   const [expanded, setExpanded] = useState(false);
 
   const hasUser = userLat !== null && userLng !== null;
+
+  // A real fix, not just a claim — someone marked as responding with no
+  // location yet must not put a pin on the map.
+  const hasResponder = responder != null && responder.lat !== null && responder.lng !== null;
+  // An emergency is live and nobody with a real position has answered it yet —
+  // covers both nobody having claimed it, and a supervisor having claimed it
+  // without yet sharing a location.
+  const awaitingResponder = Boolean(alertType) && !hasResponder;
+  const responderDistanceM = hasUser && hasResponder
+    ? distanceMetres(userLat!, userLng!, responder!.lat!, responder!.lng!)
+    : null;
 
   // The engine's chosen destination for the live emergency, if any — the same
   // computation the route panel above this map already shows as text. Falls
@@ -58,7 +75,7 @@ export function MapPanel({ userLat, userLng, userUpdatedAt, now, assembly, alert
   const destLng = usingEngine ? engineDest!.lng : assembly.lng;
   const destLabel = usingEngine ? engineDest!.name : (assembly.label || 'Assembly point');
   const hasDest = destLat !== null && destLng !== null;
-  const showMap = hasUser || hasDest;
+  const showMap = hasUser || hasDest || hasResponder;
 
   // The actual road path, not a straight guess — refreshed as the person
   // moves. Only asked for during a live emergency, matching the route panel's
@@ -135,6 +152,24 @@ export function MapPanel({ userLat, userLng, userUpdatedAt, now, assembly, alert
       }
     }
 
+    // The responder marker and the line to them are added after the
+    // route-to-destination line above, and deliberately do not feed the same
+    // `pts` array used for that line's dashed fallback — a third point
+    // there would draw a stray leg through it. They still join `pts` for
+    // bounds-fitting, so the view widens to keep everyone visible.
+    if (hasResponder) {
+      const r: L.LatLngTuple = [responder!.lat!, responder!.lng!];
+      pts.push(r);
+      const fresh = freshnessLabel(responder!.updatedAt, now);
+      const distLabel = responderDistanceM != null ? ` · ${formatDistance(responderDistanceM)} away` : '';
+      L.circleMarker(r, { radius: 9, color: '#fff', weight: 2, fillColor: '#e53e3e', fillOpacity: 1 })
+        .addTo(layer)
+        .bindTooltip(`${responder!.name}${fresh ? ` · ${fresh}` : ''}${distLabel}`);
+      if (hasUser) {
+        L.polyline([[userLat!, userLng!], r], { color: '#e53e3e', weight: 3, dashArray: '2 8' }).addTo(layer);
+      }
+    }
+
     if (pts.length === 1) map.setView(pts[0], 16);
     else if (pts.length > 1) map.fitBounds(L.latLngBounds(pts).pad(0.35));
     setTimeout(() => map.invalidateSize(), 0);
@@ -142,6 +177,7 @@ export function MapPanel({ userLat, userLng, userUpdatedAt, now, assembly, alert
     userLat, userLng, userUpdatedAt, now, hasUser,
     destLat, destLng, destLabel, hasDest, usingEngine, engineDest,
     route?.alternatives, walkRoute?.geometry,
+    hasResponder, responder, responderDistanceM,
   ]);
 
   // The container's on-screen size changes when expanding to (near) fullscreen;
@@ -181,6 +217,8 @@ export function MapPanel({ userLat, userLng, userUpdatedAt, now, assembly, alert
 
   const estimated = usingEngine && walkRoute?.degraded;
 
+  const responderFresh = hasResponder ? freshnessLabel(responder!.updatedAt, now) : null;
+
   if (!showMap) {
     return (
       <section className="mapcard">
@@ -190,6 +228,11 @@ export function MapPanel({ userLat, userLng, userUpdatedAt, now, assembly, alert
         <p className="map-empty">
           Your position and the route to safety appear here once location is on and a fix is available.
         </p>
+        {awaitingResponder && (
+          <p className="map-status" role="status" aria-live="polite">
+            Waiting for a Safety Coordinator to respond&hellip;
+          </p>
+        )}
       </section>
     );
   }
@@ -201,6 +244,14 @@ export function MapPanel({ userLat, userLng, userUpdatedAt, now, assembly, alert
         <span className="mapcard-title">{headerLabel}</span>
         {sourceTag && <span className={`mapcard-tag${sourceTag === 'Nearest public' ? ' mapcard-tag-public' : ''}`}>{sourceTag}</span>}
         {estimated && <span className="mapcard-tag mapcard-tag-muted">estimated</span>}
+        {awaitingResponder && <span className="mapcard-tag mapcard-tag-waiting">Waiting for help</span>}
+        {hasResponder && (
+          <span className="mapcard-tag mapcard-tag-responder">
+            {responder!.name}
+            {responderDistanceM != null && ` · ${formatDistance(responderDistanceM)}`}
+            {responderFresh && ` · ${responderFresh}`}
+          </span>
+        )}
         <button
           type="button"
           className="mapcard-expand"
@@ -212,6 +263,11 @@ export function MapPanel({ userLat, userLng, userUpdatedAt, now, assembly, alert
         </button>
       </div>
       <div ref={elRef} className="map-el" />
+      {awaitingResponder && (
+        <p className="map-status" role="status" aria-live="polite">
+          Waiting for a Safety Coordinator to respond&hellip;
+        </p>
+      )}
       {expanded && (
         <button type="button" className="mapcard-close" onClick={() => setExpanded(false)}>
           Close map

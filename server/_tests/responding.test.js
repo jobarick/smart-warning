@@ -117,6 +117,49 @@ test('a supervisor response reaches the room', async () => {
   worker.close(); supervisor.close();
 });
 
+test('a responding supervisor shares a live position with the person waiting', async () => {
+  const worker = await connect({ kind: 'join', orgCode: JOIN_CODE });
+  const supervisor = await connect({ kind: 'join', token: SUPERVISOR_TOKEN });
+  await raiseAlert(worker, 'inc-position');
+  worker.received.length = 0;
+
+  supervisor.send(JSON.stringify({
+    kind: 'responding', incidentId: 'inc-position',
+    supervisor: 'Ibrahim', etaS: 300, distanceM: 2000, routed: true,
+    lat: -6.7924, lng: 39.2083,
+  }));
+  await sleep(400);
+
+  const got = respondingIn(worker);
+  assert.strictEqual(got.length, 1);
+  assert.strictEqual(got[0].lat, -6.7924, 'the map cannot place a pin without this');
+  assert.strictEqual(got[0].lng, 39.2083);
+  worker.close(); supervisor.close();
+});
+
+test('a responding supervisor with no position is not given a fake one', async () => {
+  const worker = await connect({ kind: 'join', orgCode: JOIN_CODE });
+  const supervisor = await connect({ kind: 'join', token: SUPERVISOR_TOKEN });
+  await raiseAlert(worker, 'inc-no-position');
+  worker.received.length = 0;
+
+  // A location-off supervisor, and a client sending nonsense in the field —
+  // both must come out the other side as null, never as 0,0 or a string
+  // coerced into a number. A pin at null island is worse than no pin.
+  supervisor.send(JSON.stringify({
+    kind: 'responding', incidentId: 'inc-no-position',
+    supervisor: 'Ibrahim', etaS: 300, routed: true,
+    lat: 'not-a-number', lng: undefined,
+  }));
+  await sleep(400);
+
+  const got = respondingIn(worker);
+  assert.strictEqual(got.length, 1);
+  assert.strictEqual(got[0].lat, null);
+  assert.strictEqual(got[0].lng, null);
+  worker.close(); supervisor.close();
+});
+
 test('a response for a different incident is ignored', async () => {
   const worker = await connect({ kind: 'join', orgCode: JOIN_CODE });
   const supervisor = await connect({ kind: 'join', token: SUPERVISOR_TOKEN });

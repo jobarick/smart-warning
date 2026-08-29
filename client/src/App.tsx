@@ -83,18 +83,9 @@ const BillingPanel = lazy(() => import('./components/BillingPanel').then((m) => 
 function PanelFallback({ label }: { label: string }) {
   return <div className="panel-loading" role="status" aria-live="polite">Loading {label}…</div>;
 }
-import {
-  loadSession,
-  saveSession,
-  clearSession,
-  joinCredentials,
-  sessionToken,
-  sessionName,
-  type Session,
-} from './lib/session';
+import { loadSession, saveSession, joinCredentials, sessionToken, sessionName, type Session, clearUserScopedState, VIEW_KEY, SAFE_FOR_KEY } from './lib/session';
 
-const VIEW_KEY = 'alert-system-view';
-const SAFE_FOR_KEY = 'sw-safe-for-v1';
+
 
 // ---------------------------------------------------------------------------
 // Routing
@@ -304,8 +295,14 @@ export default function App() {
       setView('worker'); setTab(tabForPath);
       setShowSettings(false); setShowAbout(false); setShowSupport(false); setShowBilling(false); setShowTools(false);
     } else if (path === '/') {
+      // '/' means the user's own home, so it has to put the view back as well
+      // as the tab. Without this the view stayed wherever it was: the tab strip
+      // in ConnectionStatus calls navigate('/') to come back from the command
+      // centre, nothing reset `view`, the dashboard kept rendering, and because
+      // `view` is also persisted to VIEW_KEY the coordinator screen survived a
+      // reload too. That was the "stuck in Safety Coordinator" trap.
+      setView('worker'); setTab('home');
       setShowSettings(false); setShowAbout(false); setShowSupport(false); setShowBilling(false); setShowTools(false);
-      setTab('home');
     }
   }, [path]);
 
@@ -345,7 +342,7 @@ export default function App() {
         const user = await fetchMe(s.token);
         if (cancelled) return;
         if (user) setSession({ kind: 'supervisor', token: s.token, user });
-        else { clearSession(); setSession(null); }
+        else { clearUserScopedState(); setSession(null); }
       }
     })();
     return () => { cancelled = true; };
@@ -393,7 +390,9 @@ export default function App() {
     const creds = joinCredentials(session) ?? {};
     void unsubscribePush(creds); // stop this device receiving the old org's alerts
     void unregisterFromPush(creds); // and the same for the Android app's FCM token
-    clearSession();
+    // Not just the token: the display name, operator ID, zone, outbox, track
+    // buffer, "I'm safe" answer and last-open view all belonged to them too.
+    clearUserScopedState();
     setSession(null);
     navigate('/');
   }, [session, navigate]);
@@ -565,7 +564,7 @@ export default function App() {
   // A rejected join (bad code / expired token) sends the user back to the gate.
   useEffect(() => {
     if (!joinRejected) return;
-    clearSession();
+    clearUserScopedState();
     setSession(null);
     navigate('/');
     setAuthNotice(
@@ -689,8 +688,15 @@ export default function App() {
   // an ETA is only true for a minute or two, and replaying a stale one after a
   // reconnect would tell somebody help was two minutes away when it is not.
   const onRespond = useCallback(
-    (r: { incidentId: string; etaS: number | null; distanceM: number | null; routed: boolean }) => {
-      send({ kind: 'responding', ...r, supervisor: settings.deviceName, timestamp: Date.now() });
+    (r: { incidentId: string; etaS: number | null; distanceM: number | null; routed: boolean; lat?: number | null; lng?: number | null }) => {
+      send({
+        kind: 'responding',
+        ...r,
+        lat: r.lat ?? null,
+        lng: r.lng ?? null,
+        supervisor: settings.deviceName,
+        timestamp: Date.now(),
+      });
     },
     [send, settings.deviceName],
   );
@@ -862,6 +868,11 @@ export default function App() {
   // An active alarm outranks anything a supervisor set by hand.
   const statusLevel: SystemStatusLevel = alarm.alert ? 'emergency' : standing.level;
 
+  // The one response that answers the live alert, matched by incident id so
+  // a reply to an earlier emergency can never be shown against this one. Read
+  // by both the alert overlay's text and the map's responder marker below.
+  const activeResponder = responder && alarm.alert && responder.incidentId === alarm.alert.id ? responder : null;
+
   // The user's screens run inside a fixed shell: the chrome stays put and the
   // active tab scrolls inside it. Scoped to this view — the command centre has
   // its own carefully-fitted layout and must not inherit a scroll container.
@@ -954,6 +965,19 @@ export default function App() {
             <BillingPanel token={token} onBack={() => window.history.back()} />
           </Suspense>
         </main>
+      ) : showSettings ? (
+        <main className="worker">
+          <button className="btn back-btn" onClick={() => window.history.back()}>
+            <Icon name="arrow-left" /> Back to SOS
+          </button>
+          <SettingsPanel
+            settings={settings}
+            onChange={patchSettings}
+            onTestSiren={() => void toggleSirenTest()}
+            onTestAlarm={testAlarm}
+            sirenTesting={sirenTesting}
+          />
+        </main>
       ) : view === 'command' && showTools ? (
         <main className="worker">
           <button className="btn back-btn" onClick={() => window.history.back()}>
@@ -990,19 +1014,6 @@ export default function App() {
           onRespond={onRespond}
         />
         </Suspense>
-      ) : showSettings ? (
-        <main className="worker">
-          <button className="btn back-btn" onClick={() => window.history.back()}>
-            <Icon name="arrow-left" /> Back to SOS
-          </button>
-          <SettingsPanel
-            settings={settings}
-            onChange={patchSettings}
-            onTestSiren={() => void toggleSirenTest()}
-            onTestAlarm={testAlarm}
-            sirenTesting={sirenTesting}
-          />
-        </main>
       ) : (
         // One screen, one job. This used to be a single column with the SOS
         // button, the route panel, the call list, the telemetry tiles, the map
@@ -1057,6 +1068,12 @@ export default function App() {
                   alertType={alarm.alert?.type ?? null}
                   creds={joinCreds ?? {}}
                   operatorId={sessionId.current}
+                  responder={activeResponder ? {
+                    name: activeResponder.supervisor,
+                    lat: activeResponder.lat,
+                    lng: activeResponder.lng,
+                    updatedAt: activeResponder.timestamp,
+                  } : null}
                 />
               </Suspense>
             </>
@@ -1102,7 +1119,7 @@ export default function App() {
           onAllClear={allClear}
           // Matched by incident id at the point of use, so a response to an
           // earlier emergency can never be shown against this one.
-          responder={responder && responder.incidentId === alarm.alert.id ? responder : null}
+          responder={activeResponder}
           // Only the device that raised it may retract it as a mistake.
           // Anyone else calling it a false alarm is guessing about someone
           // else's emergency.

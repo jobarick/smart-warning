@@ -499,6 +499,13 @@ function attach(server) {
           supervisor: typeof msg.supervisor === 'string' ? msg.supervisor.slice(0, 80) : 'A Safety Coordinator',
           etaS: numOrNull(msg.etaS),
           distanceM: numOrNull(msg.distanceM),
+          // The supervisor's own live position, same as any worker's dot on
+          // the roster — but relayed to a worker here, which the roster
+          // broadcast above deliberately never is. Absent whenever it is not
+          // known, so the person waiting is never shown a location that isn't
+          // real.
+          lat: numOrNull(msg.lat),
+          lng: numOrNull(msg.lng),
           routed: msg.routed === true,
           timestamp: Date.now(),
           cancelled: msg.cancelled === true,

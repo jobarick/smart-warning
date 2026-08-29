@@ -134,6 +134,10 @@ export function parseWireMessage(raw: unknown): WireMessage | null {
         // state, and better than inventing a number.
         etaS: numOrNull(m.etaS),
         distanceM: numOrNull(m.distanceM),
+        // Same rule as etaS/distanceM: absent must stay absent, never a
+        // guessed 0,0 that would put a pin somewhere real on the map.
+        lat: numOrNull(m.lat),
+        lng: numOrNull(m.lng),
         routed: m.routed === true,
         timestamp: num(m.timestamp, Date.now()),
         cancelled: m.cancelled === true,
