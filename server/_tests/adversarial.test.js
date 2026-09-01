@@ -357,9 +357,16 @@ test('a lying clock in the callback cannot change the outcome', async (t) => {
   assert.strictEqual(sub.status, 'active');
   const end = new Date(sub.currentPeriodEnd);
   // The period is anchored to our clock, so it ends about a month from now —
-  // not in 1970 and not in the year 3000.
-  const monthFromNow = new Date();
+  // not in 1970 and not in the year 3000. Compute the expected date the same
+  // clamped way production does, so this doesn't drift on the 29th-31st when
+  // the following month is shorter (e.g. Aug 31 -> Sept 30, not Oct 1).
+  const now = new Date();
+  const monthFromNow = new Date(now);
+  monthFromNow.setDate(1);
   monthFromNow.setMonth(monthFromNow.getMonth() + 1);
+  const lastDayOfTarget = new Date(monthFromNow.getFullYear(), monthFromNow.getMonth() + 1, 0).getDate();
+  monthFromNow.setDate(Math.min(now.getDate(), lastDayOfTarget));
+  monthFromNow.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
   assert.ok(Math.abs(end - monthFromNow) < 60_000, `period end drifted to ${end.toISOString()}`);
 });
 

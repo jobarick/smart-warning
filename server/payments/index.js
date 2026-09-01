@@ -85,17 +85,27 @@ class PaymentError extends Error {
 
 // --- Period arithmetic -----------------------------------------------------
 
+// Add calendar months to a date, clamping to the last day of the target month
+// instead of overflowing into the month after (native setMonth turns Aug 31 +
+// 1 month into Oct 1, silently granting an extra month).
+function addMonths(date, months) {
+  const day = date.getDate();
+  const result = new Date(date);
+  result.setDate(1);
+  result.setMonth(result.getMonth() + months);
+  const lastDayOfTarget = new Date(result.getFullYear(), result.getMonth() + 1, 0).getDate();
+  result.setDate(Math.min(day, lastDayOfTarget));
+  result.setHours(date.getHours(), date.getMinutes(), date.getSeconds(), date.getMilliseconds());
+  return result;
+}
+
 // Extend from the end of the period already paid for when there is one, so
 // renewing early does not throw away the remainder. Otherwise from now.
 function nextPeriod(subscription, cycle, from = new Date()) {
   const existingEnd = subscription?.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null;
   const start = existingEnd && existingEnd > from ? existingEnd : from;
-  const end = new Date(start);
   const months = cycle === 'annual' ? 12 : 1;
-  // setMonth handles month lengths and year rollover; the 31st of a month
-  // followed by a short month lands in the next one, which is the conventional
-  // and customer-favourable direction.
-  end.setMonth(end.getMonth() + months);
+  const end = addMonths(start, months);
   return { start, end };
 }
 
