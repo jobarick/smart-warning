@@ -15,6 +15,7 @@
 // Degrades deliberately. With no DATABASE_URL there are no orgs, no accounts
 // and no history — the relay runs in-memory as a single global room, which is
 // what keeps LAN and dev zero-config. See config.js.
+require('dotenv').config();
 const http = require('http');
 const db = require('./db');
 const push = require('./push');
