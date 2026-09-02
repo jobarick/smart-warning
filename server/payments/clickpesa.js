@@ -391,8 +391,15 @@ async function diagnose({ phoneNumber = null, amount = '1000', currency = 'TZS' 
 
 // Small indirection so diagnose() reads the same whether or not a number was
 // given, without building an order reference it will not use.
+//
+// Prefix is 'SD', not 'SWDIAG' — makeOrderReference() budgets exactly 2
+// prefix characters against ClickPesa's 20-character cap (2 + 8-char base36
+// timestamp + 10-char hex random = 20), same as production's 'SW'. A longer
+// prefix here made every diagnostic preview call fail with "Order Reference
+// should be less than or equal to 20 characters", independent of whether the
+// credentials or the wallet were actually fine.
 async function previewFor({ amount, currency, phoneNumber }) {
-  return preview({ amount, currency, orderReference: makeOrderReference('SWDIAG'), phoneNumber });
+  return preview({ amount, currency, orderReference: makeOrderReference('SD'), phoneNumber });
 }
 
 // Their references must be alphanumeric and unique. Prefixing keeps ours
