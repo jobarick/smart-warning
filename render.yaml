@@ -1,27 +1,25 @@
-# Render Blueprint for the whole app: the built client, the REST API, and the
-# WebSocket relay, all served by one service from one URL.
-#
-# Deploy: on render.com, New → Blueprint → point at this repo. Render provisions
-# the Postgres database, injects DATABASE_URL and PORT into the web service, and
-# gives it a public https/wss URL. Nothing else to configure — because the client
-# is served from the same origin as the API, there are no cross-host URLs to keep
-# in sync.
+# Render Blueprint for the app server: the built client and the REST API +
+# WebSocket relay, served by one service from one URL. Render still gives it a
+# public https/wss URL and injects PORT. Nothing else to configure — because
+# the client is served from the same origin as the API, there are no
+# cross-host URLs to keep in sync.
 #
 # The build runs from the repository root so it can compile client/ before
 # installing the server. Hosting the client elsewhere (a CDN, Vercel) still
 # works: without client/dist the server simply runs API-only.
-databases:
-  - name: smart-warning-db
-    # "starter" is a legacy Postgres plan Render no longer provisions fresh —
-    # basic-256mb is the current smallest paid tier as of this writing. Verify
-    # against your actual dashboard before syncing: Render may offer a direct
-    # free→paid upgrade path for this existing database under a different name,
-    # and pricing/plan slugs are Render's to confirm, not something to trust
-    # blindly from a config comment.
-    plan: basic-256mb
-    databaseName: smartwarning
-    user: smartwarning
-
+#
+# Postgres is Supabase, not a Render-provisioned database (moved 2026-09 to
+# get off Render's paid Postgres plan) — see DATABASE_URL below. Nothing else
+# in this app needs to know which provider it is; the server talks to it as
+# plain Postgres either way (server/db.js).
+#
+# ⚠️ There used to be a `databases: [smart-warning-db]` block here that Render
+# auto-provisioned and billed for. Removing it from this file does NOT delete
+# that database in Render — Render blueprints only create/update declared
+# resources, never delete ones you've removed. If the Supabase cutover below
+# is verified working, go delete (or downgrade) `smart-warning-db` yourself in
+# the Render dashboard, or you'll keep paying for a database nothing reads
+# from anymore.
 services:
   - type: web
     name: smart-warning-relay
@@ -31,13 +29,17 @@ services:
     startCommand: node server/index.js
     healthCheckPath: /api/health
     envVars:
-      # Durable incident history + multi-tenant orgs. Wired automatically from the
-      # database above. Its presence also switches the backend into orgs/accounts
-      # mode (per-org rooms + supervisor login).
+      # Durable incident history + multi-tenant orgs. Its presence also switches
+      # the backend into orgs/accounts mode (per-org rooms + supervisor login).
+      #
+      # A manual secret pointing at Supabase Postgres, not a Render-provisioned
+      # database — set the actual connection string in the Render dashboard
+      # (Environment tab). Use Supabase's pooled/transaction-mode connection
+      # string (port 6543), not the direct one — Render's plan does not hold a
+      # single long-lived connection the way a VPS would, and the app opens a
+      # normal `pg` pool.
       - key: DATABASE_URL
-        fromDatabase:
-          name: smart-warning-db
-          property: connectionString
+        sync: false
       # Secret used to sign supervisor session tokens (JWT). Render generates a
       # strong random value; keep it stable or existing sessions are invalidated.
       - key: JWT_SECRET

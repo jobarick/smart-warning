@@ -54,13 +54,17 @@ legal pages.
 
 **2. Backend → an always-on host.** The backend reads `process.env.PORT` and
 exposes a `/` health check, so it runs as-is on Render, Railway, Fly.io, etc.
-- **Render (recommended):** New → Blueprint on this repo. `render.yaml` provisions
-  a free **Postgres** database *and* the web service, and wires `DATABASE_URL`
-  into it automatically — so incident history works out of the box. Copy the
-  service's public URL for step 3.
-- **Railway / Fly / Cloud Run:** use `server/Dockerfile`, then set `DATABASE_URL`
-  yourself to a Postgres instance. Omit it and the backend runs relay-only
-  (no persistence) — still fully functional for live alerts.
+Postgres is **Supabase**, not a host-provisioned database (moved off Render's
+paid Postgres plan 2026-09) — create a project at supabase.com and use its
+pooled connection string (port 6543) as `DATABASE_URL`; the schema
+self-creates on first boot (`server/db.js`), so there's no migration step.
+- **Render:** New → Blueprint on this repo. `render.yaml` provisions the web
+  service only now; set `DATABASE_URL` yourself in the dashboard's
+  Environment tab to your Supabase connection string. Copy the service's
+  public URL for step 3.
+- **Railway / Fly / Cloud Run:** use `server/Dockerfile`, then set the same
+  `DATABASE_URL`. Omit it and the backend runs relay-only (no persistence) —
+  still fully functional for live alerts.
 
 **3. Point the client at the relay.** On the Vercel project, set an environment
 variable `VITE_WS_URL` to the relay's public URL, e.g.
