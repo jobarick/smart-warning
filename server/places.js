@@ -100,7 +100,7 @@ out center ${Math.max(limit * 4, 20)};`;
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         // Overpass asks that clients identify themselves.
-        'User-Agent': 'SmartWarning/1.0 (emergency alerting; +https://smart-warning-relay.onrender.com)',
+        'User-Agent': 'SmartWarning/1.0 (emergency alerting; +https://smart-warning-relay-6lf3.onrender.com)',
       },
       body: 'data=' + encodeURIComponent(query),
       signal: controller.signal,

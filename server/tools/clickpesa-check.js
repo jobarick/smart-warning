@@ -172,7 +172,7 @@ Credentials are good and collection is live.
 
 Remaining, in the ClickPesa dashboard:
   • Register the webhook:
-    https://smart-warning-relay.onrender.com/api/payments/mobile-money/webhook
+    https://smart-warning-relay-6lf3.onrender.com/api/payments/mobile-money/webhook
   • Optionally set a checksum key and add it as CLICKPESA_CHECKSUM_KEY.
     Not load-bearing — every callback is verified against the gateway before
     anything is provisioned — but it lets a forged callback be rejected on

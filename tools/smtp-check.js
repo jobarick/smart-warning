@@ -149,7 +149,7 @@ async function main() {
   if (r.ok) {
     console.log('OK — connected and authenticated. This URL will work.\n');
     console.log('Set it on Render, and the queued mail drains by itself within a minute:');
-    console.log('  curl -s https://smart-warning-relay.onrender.com/api/health\n');
+    console.log('  curl -s https://smart-warning-relay-6lf3.onrender.com/api/health\n');
     process.exit(0);
   }
 

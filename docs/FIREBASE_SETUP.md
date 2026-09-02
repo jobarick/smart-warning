@@ -123,13 +123,13 @@ Instead of:
 ## 5. Verify
 
 ```bash
-curl https://smart-warning-relay.onrender.com/api/health
+curl https://smart-warning-relay-6lf3.onrender.com/api/health
 ```
 
 `channels.nativePush` must be `true`. For more detail:
 
 ```bash
-curl https://smart-warning-relay.onrender.com/api/push/device
+curl https://smart-warning-relay-6lf3.onrender.com/api/push/device
 ```
 
 Returns `{ "enabled": true, "project": "...", "reason": null }`.

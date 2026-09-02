@@ -68,7 +68,7 @@ self-creates on first boot (`server/db.js`), so there's no migration step.
 
 **3. Point the client at the relay.** On the Vercel project, set an environment
 variable `VITE_WS_URL` to the relay's public URL, e.g.
-`wss://smart-warning-relay.onrender.com`, and redeploy. Without it the client
+`wss://smart-warning-relay-6lf3.onrender.com`, and redeploy. Without it the client
 falls back to `ws(s)://<same-host>:3001` (the LAN behaviour).
 
 **4. Security is built in when a database is configured.** With `DATABASE_URL`

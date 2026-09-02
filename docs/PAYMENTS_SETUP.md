@@ -134,7 +134,7 @@ confirm what the deployment itself sees.
 Point the application's webhook at:
 
 ```
-https://smart-warning-relay.onrender.com/api/payments/mobile-money/webhook
+https://smart-warning-relay-6lf3.onrender.com/api/payments/mobile-money/webhook
 ```
 
 Subscribe to **PAYMENT RECEIVED** and **PAYMENT FAILED**.
@@ -172,7 +172,7 @@ prompt to Mixx by Yas and says so on screen, rather than failing at the gateway.
 
 1. Get the secret key from **Developers → API keys** (`sk_live_…` / `sk_test_…`).
 2. Add a webhook endpoint at
-   `https://smart-warning-relay.onrender.com/api/payments/card/webhook`
+   `https://smart-warning-relay-6lf3.onrender.com/api/payments/card/webhook`
    subscribed to `checkout.session.completed`,
    `checkout.session.async_payment_succeeded`,
    `checkout.session.async_payment_failed`, `checkout.session.expired` and
@@ -258,11 +258,11 @@ Useful during a manual test:
 
 ```bash
 # Is mobile money configured on this deployment?
-curl -s https://smart-warning-relay.onrender.com/api/health | jq .channels
+curl -s https://smart-warning-relay-6lf3.onrender.com/api/health | jq .channels
 
 # Watch a payment resolve
 curl -s -H "Authorization: Bearer $TOKEN" \
-  "https://smart-warning-relay.onrender.com/api/payments/status?reference=SW..."
+  "https://smart-warning-relay-6lf3.onrender.com/api/payments/status?reference=SW..."
 ```
 
 ---

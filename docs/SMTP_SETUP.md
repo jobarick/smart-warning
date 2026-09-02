@@ -38,7 +38,7 @@ itself — no migration, no manual step, no code change.
 >
 > ### Reading the state without a dashboard login
 >
-> `curl -s https://smart-warning-relay.onrender.com/api/health` →
+> `curl -s https://smart-warning-relay-6lf3.onrender.com/api/health` →
 > `channels.mailQueue` = `{ pending, sent, failed, at, lastError }`
 >
 > - **`sent: 0` with `pending` climbing** — nothing has ever been delivered.
@@ -112,7 +112,7 @@ Credentials are redacted in that line by design.
 ## Verify
 
 ```bash
-curl https://smart-warning-relay.onrender.com/api/health
+curl https://smart-warning-relay-6lf3.onrender.com/api/health
 ```
 
 `channels.mail` is `true` and `channels.mailProvider` names the provider.

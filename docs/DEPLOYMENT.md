@@ -82,7 +82,7 @@ billing for a database nothing reads from.
 Verify a deploy:
 
 ```bash
-curl https://smart-warning-relay.onrender.com/api/health
+curl https://smart-warning-relay-6lf3.onrender.com/api/health
 ```
 
 ```json
