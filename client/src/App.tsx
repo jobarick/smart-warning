@@ -893,6 +893,7 @@ export default function App() {
         onArmAudio={() => void arm()}
         view={view}
         onViewChange={(v) => navigate(v === 'command' ? '/dashboard' : '/')}
+        onLogoClick={() => navigate(view === 'command' ? '/dashboard' : '/')}
         userName={settings.deviceName}
         theme={settings.theme}
         onToggleTheme={() => patchSettings({ theme: settings.theme === 'dark' ? 'light' : 'dark' })}
@@ -928,7 +929,7 @@ export default function App() {
               <Icon name="map-pin" /> Setup
             </button>
           )}
-          {org && token && (
+          {token && (
             <button className="org-tools" onClick={() => (showBilling ? window.history.back() : navigate('/billing'))} title="Plans, payment and invoices">
               <Icon name="check-circle" /> {showBilling ? 'Close' : 'Plans'}
             </button>
@@ -1098,6 +1099,7 @@ export default function App() {
               onAbout={() => navigate('/about')}
               onSettings={() => navigate('/settings')}
               onSupport={() => navigate('/support')}
+              onBilling={token ? () => navigate('/billing') : undefined}
             />
           )}
         </main>

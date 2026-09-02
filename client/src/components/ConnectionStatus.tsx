@@ -11,6 +11,7 @@ interface Props {
   onArmAudio: () => void;
   view: AppView;
   onViewChange: (v: AppView) => void;
+  onLogoClick: () => void;
   userName: string;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
@@ -22,13 +23,13 @@ const STATUS_LABEL: Record<SocketStatus, string> = {
   closed: 'Offline — retrying',
 };
 
-export function ConnectionStatus({ status, deviceCount, audioArmed, onArmAudio, view, onViewChange, userName, theme, onToggleTheme }: Props) {
+export function ConnectionStatus({ status, deviceCount, audioArmed, onArmAudio, view, onViewChange, onLogoClick, userName, theme, onToggleTheme }: Props) {
   return (
     <div className="status-bar">
-      <div className="brand">
+      <button type="button" className="brand" onClick={onLogoClick} aria-label="Smart Warning home">
         <Logo size={20} className="brand-logo" decorative />
         <span className="brand-name">Smart Warning</span>
-      </div>
+      </button>
       <div className="view-toggle" role="tablist" aria-label="View">
         <button role="tab" aria-selected={view === 'worker'} className={view === 'worker' ? 'active' : ''} onClick={() => onViewChange('worker')}>
           {userName.trim() || 'Me'}

@@ -637,11 +637,15 @@ async function reconcile() {
 }
 
 // Cancel at period end. Deliberately not immediate: they paid for the period.
-async function cancelSubscription(orgId) {
-  const sub = await db.getSubscription(orgId);
+// Subject-based like initiateMobileMoney, so a person and an organisation
+// cancel through the same path — see storeFor above.
+async function cancelSubscription(subject) {
+  const store = storeFor(subject);
+  if (!store) throw new PaymentError('no billing subject for this account', 400);
+  const sub = await store.get();
   if (!sub || sub.tier === 'free') throw new PaymentError('there is no paid subscription to cancel', 400);
-  await db.updateSubscription(orgId, { status: 'canceled', canceledAt: new Date() });
-  return db.getSubscription(orgId);
+  await store.update({ status: 'canceled', canceledAt: new Date() });
+  return store.get();
 }
 
 module.exports = {

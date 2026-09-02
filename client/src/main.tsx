@@ -6,6 +6,7 @@ import { PublicReport } from './components/PublicReport';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { VercelInsights } from './components/VercelInsights';
 import { PUBLIC_REPORT_PATTERN } from './lib/routes';
+import { registerNativeBackButton } from './lib/nativeBack';
 // Bundled, not fetched. An emergency PWA has to render identically on a locked
 // -down site network or offline, so the typefaces ship with the app rather than
 // coming from a font CDN. Variable weights keep that to two files.
@@ -19,6 +20,7 @@ import './landing.css';
 import './demo.css';
 
 registerSW({ immediate: true });
+registerNativeBackButton();
 
 // /r/<site code> is the public reporting page. Routed here rather than inside
 // App so it never mounts the relay socket, the alarm state, or the auth gate —

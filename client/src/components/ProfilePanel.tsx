@@ -20,6 +20,9 @@ interface Props {
   onAbout: () => void;
   onSettings: () => void;
   onSupport: () => void;
+  /** Undefined for a worker holding only a join code — there is no billing
+   *  subject to show plans for without an account. */
+  onBilling?: () => void;
 }
 
 /**
@@ -32,7 +35,7 @@ interface Props {
 export function ProfilePanel({
   session, org, workerCode, personal, deviceName, profile,
   incidents, persistence, historyLoading, historyError,
-  onAbout, onSettings, onSupport,
+  onAbout, onSettings, onSupport, onBilling,
 }: Props) {
   const name = session?.kind === 'supervisor' ? session.user.name : deviceName;
 
@@ -98,6 +101,11 @@ export function ProfilePanel({
       )}
 
       <div className="profile-actions">
+        {onBilling && (
+          <button className="btn settings-link" onClick={onBilling}>
+            <Icon name="check-circle" /> Plans &amp; billing
+          </button>
+        )}
         <button className="btn settings-link" onClick={onAbout}>
           About &amp; legal
         </button>

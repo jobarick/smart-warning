@@ -191,10 +191,12 @@ async function handle({ req, res, url, path }) {
   }
 
   if (path === '/api/billing/cancel' && req.method === 'POST') {
-    const ctx = await guardOrg(req, res);
-    if (ctx === false) return true;
-    if (!ctx) { sendJson(res, 501, { error: 'billing requires a database' }); return true; }
-    sendJson(res, 200, { subscription: await payments.cancelSubscription(ctx.orgId) });
+    const ctx = await requireAuth(req);
+    if (!ctx) { sendJson(res, 401, { error: 'not authenticated' }); return true; }
+    if (!db.enabled()) { sendJson(res, 501, { error: 'billing requires a database' }); return true; }
+    const subject = auth.billingSubject(ctx);
+    if (!subject) { sendJson(res, 403, { error: 'this account has no billing subject' }); return true; }
+    sendJson(res, 200, { subscription: await payments.cancelSubscription(subject) });
     return true;
   }
 
