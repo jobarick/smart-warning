@@ -4,11 +4,44 @@
 // Nothing here knows anything about alerts, organizations or billing.
 const auth = require('./auth');
 
+// Deliberately no Access-Control-Allow-Origin here — that used to be '*' back
+// when the client and API always shared one origin (Render serving both), so
+// the wildcard cost nothing. It now also fronts a genuinely cross-origin
+// client (Vercel), so a wildcard would hand any website on the internet the
+// same access. The actual origin header is computed per-request in
+// originHeaders() below and set before this object is spread in, so it
+// survives (see routes/index.js).
 const CORS = {
-  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
+
+// Origins allowed to call this API cross-origin, beyond same-origin use
+// (which browsers never subject to CORS in the first place, so Render's own
+// self-served client needs no entry here). 'https://localhost' is not a typo
+// for a stray dev server — it's where the Capacitor Android shell's WebView
+// actually runs (see client/capacitor.config.ts). CORS_ORIGINS adds more
+// (comma-separated) without a code change, e.g. for a Vercel preview URL.
+const DEFAULT_ALLOWED_ORIGINS = [
+  'https://smart-warning.vercel.app',
+  'https://localhost',
+  'http://localhost:5300',
+];
+const ALLOWED_ORIGINS = new Set([
+  ...DEFAULT_ALLOWED_ORIGINS,
+  ...(process.env.CORS_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean),
+]);
+
+// Per-request CORS headers. Omits Access-Control-Allow-Origin entirely for an
+// unrecognized origin — the browser then blocks the response itself, which is
+// the point. A request with no Origin header (curl, a server-to-server call,
+// ClickPesa's webhook) was never subject to CORS to begin with, so there is
+// nothing to compute for it.
+function originHeaders(req) {
+  const origin = req && req.headers && req.headers.origin;
+  if (!origin || !ALLOWED_ORIGINS.has(origin)) return {};
+  return { 'Access-Control-Allow-Origin': origin, Vary: 'Origin' };
+}
 
 function sendJson(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json', ...CORS });
@@ -83,4 +116,4 @@ function rateLimiter({ windowMs, max, name }) {
   };
 }
 
-module.exports = { CORS, sendJson, readJson, readText, bearer, clientIp, rateLimiter };
+module.exports = { CORS, originHeaders, sendJson, readJson, readText, bearer, clientIp, rateLimiter };

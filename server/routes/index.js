@@ -8,7 +8,7 @@
 // Order matters only where two patterns could match the same path; where it
 // does, the module that owns the more specific pattern says so in a comment.
 const staticFiles = require('../static');
-const { sendJson, CORS } = require('../http');
+const { sendJson, CORS, originHeaders } = require('../http');
 
 const MODULES = [
   require('./health'),
@@ -25,6 +25,16 @@ const MODULES = [
 ];
 
 async function handle(req, res) {
+  // Set once, per request, before anything downstream calls writeHead — Node
+  // merges headers set via setHeader with whatever a later writeHead() call
+  // adds, so this survives into every response (sendJson's, the static file
+  // server's, this OPTIONS branch's) without each of them needing to know
+  // about origins. A request from an origin not on the allowlist gets no
+  // Access-Control-Allow-Origin at all, which is what makes the browser
+  // enforce the restriction on its end.
+  const cors = originHeaders(req);
+  for (const [key, value] of Object.entries(cors)) res.setHeader(key, value);
+
   if (req.method === 'OPTIONS') {
     res.writeHead(204, CORS);
     res.end();
