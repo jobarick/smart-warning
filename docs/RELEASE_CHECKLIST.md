@@ -105,10 +105,19 @@ curl -sI https://smart-warning.vercel.app/privacy | grep -iE 'HTTP/|location'
 
 ## Not automated, and why
 
-There is **no CI workflow**, deliberately. A GitHub Actions deploy workflow
-existed once, was built around a misdiagnosis, failed on every push for want of
-secrets nobody set, and was deleted. Both hosts deploy themselves from `main`.
+There is **no CI *deploy* workflow**, deliberately. A GitHub Actions deploy
+workflow existed once, was built around a misdiagnosis, failed on every push
+for want of secrets nobody set, and was deleted. Both hosts still deploy
+themselves from `main`, unchanged.
 
-A Lighthouse CI job that fails a build on a score drop is the one automation
-worth adding — the manual step above is the thing most likely to get skipped.
-It is not set up yet; the command is above so it is at least one paste away.
+The one GitHub Actions workflow that does exist,
+[`canary.yml`](../.github/workflows/canary.yml), is not a deploy gate — it
+never runs on push and can't block or approve anything. It only polls
+`/api/health` and the frontend on a schedule and files a GitHub issue on
+failure. Needs no secret, so it can't fail the way the old one did. See
+[`INCIDENT_RUNBOOK.md`](INCIDENT_RUNBOOK.md) for what to do when it fires.
+
+A Lighthouse CI job that fails a build on a score drop is the one deploy-time
+automation worth adding — the manual step above is the thing most likely to
+get skipped. It is not set up yet; the command is above so it is at least one
+paste away.

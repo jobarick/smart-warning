@@ -10,7 +10,22 @@
     { "source": "/terms", "destination": "/legal/terms.html", "permanent": false },
     { "source": "/delete", "destination": "/legal/delete.html", "permanent": false }
   ],
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+  "rewrites": [
+    { "source": "/", "destination": "/index.html" },
+    { "source": "/dashboard", "destination": "/index.html" },
+    { "source": "/get-started", "destination": "/index.html" },
+    { "source": "/demo", "destination": "/index.html" },
+    { "source": "/emergency", "destination": "/index.html" },
+    { "source": "/safety", "destination": "/index.html" },
+    { "source": "/alerts", "destination": "/index.html" },
+    { "source": "/profile", "destination": "/index.html" },
+    { "source": "/settings", "destination": "/index.html" },
+    { "source": "/about", "destination": "/index.html" },
+    { "source": "/support", "destination": "/index.html" },
+    { "source": "/billing", "destination": "/index.html" },
+    { "source": "/setup", "destination": "/index.html" },
+    { "source": "/r/:code", "destination": "/index.html" }
+  ],
   "headers": [
     {
       "source": "/(.*)",
