@@ -95,44 +95,50 @@ services:
       # use. Alerting is never affected either way.
       - key: BILLING_ENFORCE
         sync: false
-      # Self-hosted routing server (see the smart-warning-osrm service below),
-      # replacing the free public router.project-osrm.org demo — no SLA, best
-      # effort only. NOT declared via fromService: Render's private-network
-      # host/port properties are for plain-HTTP internal traffic, and
-      # server/routing.js expects a full URL with scheme. Set this by hand,
-      # once smart-warning-osrm exists and has a real URL, to that service's
-      # public HTTPS address (e.g. https://smart-warning-osrm.onrender.com) —
-      # see osrm/README.md. Leave unset and the code default
-      # (router.project-osrm.org) still applies, exactly as it did before this
-      # service existed — nothing breaks either way, this is a quality-of-
-      # routing upgrade, never a required one.
+      # Mapbox Directions — the primary, worldwide road-routing provider
+      # (driving, walking, alternatives, optional traffic). Server-side only:
+      # server/routing.js never sends this to the browser. Without it the
+      # server falls back to ROUTING_URL below, then to a straight-line
+      # estimate — routing degrades gracefully, it never blocks an alert.
+      - key: MAPBOX_ACCESS_TOKEN
+        sync: false
+      # Optional: "true" to route driving through mapbox/driving-traffic
+      # instead of the standard driving profile. Leave unset/false for
+      # predictable, non-traffic-aware driving ETAs.
+      - key: MAPBOX_TRAFFIC
+        sync: false
+      # Optional OSRM fallback, only consulted when Mapbox is unavailable and
+      # this is deliberately set — there is no default. NOT declared via
+      # fromService: Render's private-network host/port properties are for
+      # plain-HTTP internal traffic, and server/routing.js expects a full URL
+      # with scheme. Leave unset in normal operation — see the note below
+      # this block on why no OSRM service is declared in this Blueprint at
+      # all. If you deploy one yourself, set this to its public HTTPS address
+      # and be aware of its actual coverage (see osrm/README.md) before
+      # pointing worldwide traffic at it.
       - key: ROUTING_URL
         sync: false
 
-  # Self-hosted OSRM routing, Tanzania only — see osrm/README.md for what this
-  # is, why the scope is Tanzania, and how to widen it. A second, separately
-  # billed service: check its plan against current Render pricing before
-  # approving this Blueprint change. Does NOT auto-rebuild on every push to
-  # main the way the relay does above — there is nothing in this service that
-  # depends on this repo's application code, only the Dockerfile here, so a
-  # rebuild is only worth triggering to refresh the map data or bump the OSRM
-  # image version.
+  # No second `smart-warning-osrm` service is declared here on purpose.
   #
-  # plan is 1c-2g (1 CPU, 2GB RAM, ~$25/mo), not the relay's starter/512MB —
-  # the first deploy on starter built fine but crashed at runtime with zero
-  # output from osrm-routed. Then 1c-2g crashed the SAME way, at nearly the
-  # same ~50s mark, which argues against simple OOM (more RAM should survive
-  # longer, not die at the same wall-clock time) — see osrm/Dockerfile's
-  # current diagnostic comment for what's being isolated before spending on
-  # another plan guess. Don't downgrade the plan without re-testing against a
-  # real deploy, not just a hunch.
+  # Mapbox (MAPBOX_ACCESS_TOKEN above) is the production worldwide routing
+  # provider; OSRM is optional legacy fallback only, off by default
+  # (ROUTING_URL unset). A self-hosted OSRM service is a separate, separately
+  # billed Render service (~$25/mo on the plan this used to run — 1 CPU/2GB,
+  # required after the 512MB starter plan crashed at runtime) for coverage
+  # that, even self-hosted, would be one region's extract, not the world —
+  # see osrm/README.md. Deploying Smart Warning must never require it.
   #
-  # healthCheckPath is temporarily two Liechtenstein points (Vaduz -> Schaan),
-  # matching the diagnostic extract in osrm/Dockerfile — revert together.
-  - type: web
-    name: smart-warning-osrm
-    runtime: docker
-    dockerfilePath: ./osrm/Dockerfile
-    dockerContext: ./osrm
-    plan: 1c-2g
-    healthCheckPath: /route/v1/driving/9.5209,47.1410;9.5083,47.1662
+  # osrm/Dockerfile and osrm/README.md are kept in the repo as optional
+  # infrastructure for future use — nothing here deletes them. To stand the
+  # service back up for local testing or as a deliberate fallback, add a
+  # `type: web` / `runtime: docker` / `dockerfilePath: ./osrm/Dockerfile`
+  # block back here (or create it directly in the Render dashboard) and then
+  # set ROUTING_URL on smart-warning-relay to its address.
+  #
+  # ⚠️ If `smart-warning-osrm` already exists as a Render service from before
+  # this change, removing it from this file does NOT delete or stop billing
+  # for it — Render Blueprints only create/update declared resources, never
+  # delete ones you've removed (same caveat as the smart-warning-db note
+  # above). Go delete or suspend it by hand in the Render dashboard if you
+  # want the ~$25/mo charge to actually stop.

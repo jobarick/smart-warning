@@ -98,20 +98,28 @@ curl https://smart-warning-relay-6lf3.onrender.com/api/health
 [FIREBASE_SETUP.md](FIREBASE_SETUP.md) and [SMTP_SETUP.md](SMTP_SETUP.md) to
 turn the two `false` entries on.
 
-### Routing: a second Render service
+### Routing
 
-`smart-warning-osrm` (added 2026-09-03) is a self-hosted OSRM routing server,
-replacing the free public `router.project-osrm.org` demo that
-`server/routing.js` used to default to. It's a **separate, separately billed**
-Docker-based Render service — see [`osrm/README.md`](../osrm/README.md) for
-what it is, why its coverage is Tanzania-only, and how to widen it.
+Worldwide road routing (driving and walking, with alternatives) is
+**Mapbox Directions**. Set `MAPBOX_ACCESS_TOKEN` on **`smart-warning-relay`**
+(server-side secret — never in a `VITE_` variable, never in the client
+bundle). Optionally set `MAPBOX_TRAFFIC=true` to route driving through
+`mapbox/driving-traffic` instead of the standard driving profile; `/api/route`
+responses report `trafficAware` honestly either way. Without a token the
+server falls back to OSRM (below) and then to a straight-line estimate — it
+never crashes or blocks an alert for a missing key.
 
-It does not auto-deploy alongside the relay on every push — there is nothing
-in it that depends on this repo's application code, only `osrm/Dockerfile`.
-Once it exists and has a URL, set `ROUTING_URL` on **`smart-warning-relay`**
-(a plain public URL, not a secret) to that service's address. Until that's
-set, the code default (the public demo) still applies — nothing breaks either
-way, this is a quality upgrade, not a required migration.
+`smart-warning-osrm` (added 2026-09-03) is a second, separately billed
+Docker-based Render service running self-hosted OSRM — see
+[`osrm/README.md`](../osrm/README.md) for what it is. **It is a diagnostic
+extract (currently Liechtenstein), not worldwide coverage**, and is never used
+automatically. `server/routing.js` has no default `ROUTING_URL` — OSRM (this
+service, the public demo, or any other instance) is only consulted, as a
+fallback behind Mapbox, when `ROUTING_URL` is deliberately set on
+`smart-warning-relay` to that service's address (a plain public URL, not a
+secret). It does not auto-deploy alongside the relay on every push — there is
+nothing in it that depends on this repo's application code, only
+`osrm/Dockerfile`.
 
 ### Debugging trick worth reusing
 

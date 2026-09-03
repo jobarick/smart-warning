@@ -7,35 +7,44 @@
 // person, and which way do I go.
 //
 // ─────────────────────────────────────────────────────────────────────────────
-//  WHAT THIS IS NOT
+//  PROVIDERS
 //
-//  It is NOT traffic-aware. Live traffic is not available from any provider
-//  that works without a commercial key and billing account, so a duration here
-//  is free-flow. It is stated honestly in the response as `trafficAware: false`
-//  rather than implied, because a supervisor deciding whether to drive or run
-//  is entitled to know the number does not account for congestion.
+//  Mapbox Directions is the primary, worldwide provider — real driving and
+//  walking graphs everywhere Mapbox has coverage, with optional traffic-aware
+//  driving. It needs MAPBOX_ACCESS_TOKEN (server-side only; never sent to the
+//  browser). OSRM is an optional secondary fallback, used only when
+//  ROUTING_URL is deliberately set — there is no default OSRM endpoint,
+//  because neither the public demo nor this project's own self-hosted extract
+//  (see osrm/README.md — Tanzania/diagnostic scope only) may be silently
+//  advertised as worldwide coverage. Below both, a straight-line estimate
+//  always resolves.
 //
-//  It is also NOT on the alarm path. Nothing here can delay, block or fail an
-//  alert: routing is requested after an incident exists, is time-boxed hard,
-//  and degrades to a straight-line estimate rather than an error. A person
-//  must never be waiting on a map server to find out someone needs help.
+//  It is NOT on the alarm path. Nothing here can delay, block or fail an
+//  alert: routing is requested after an incident exists, is time-boxed hard
+//  across the whole provider chain, and degrades to a straight-line estimate
+//  rather than an error. A person must never be waiting on a map server to
+//  find out someone needs help.
 // ─────────────────────────────────────────────────────────────────────────────
-//
-// Provider is pluggable via ROUTING_URL. The default is OSRM's public demo
-// server: no key, no account, good geometry — and explicitly best-effort, with
-// no SLA. For production volume, run your own OSRM or point ROUTING_URL at a
-// hosted one; the response shape is unchanged.
 const geo = require('./geo');
 
-const ROUTING_URL = (process.env.ROUTING_URL || 'https://router.project-osrm.org').replace(/\/+$/, '');
+const MAPBOX_TOKEN = process.env.MAPBOX_ACCESS_TOKEN || '';
+const MAPBOX_TRAFFIC = /^true$/i.test(process.env.MAPBOX_TRAFFIC || '');
 
-// Hard ceiling. A supervisor staring at a spinner during an emergency is worse
-// than a straight-line estimate shown immediately.
+// Deliberately no default. Earlier versions defaulted this to OSRM's public
+// demo server; now that Mapbox is the primary worldwide provider, OSRM only
+// runs when an operator has explicitly pointed it at something — the demo, a
+// self-hosted instance, or this project's own diagnostic extract.
+const ROUTING_URL = (process.env.ROUTING_URL || '').replace(/\/+$/, '');
+
+// Hard ceiling for the whole provider chain, not per provider. A supervisor
+// staring at a spinner during an emergency is worse than a straight-line
+// estimate shown immediately, so trying Mapbox then OSRM must never cost more
+// wall-clock time than trying one provider used to.
 const TIMEOUT_MS = 3500;
 
 // Positions jitter by a few metres constantly. Rounding the cache key to ~11 m
 // means a stationary device reuses one answer instead of re-routing on GPS
-// noise, which is what keeps the public server usable at all.
+// noise, which is what keeps a free-tier provider usable at all.
 const CACHE_TTL_MS = 30_000;
 const CACHE_MAX = 500;
 const cache = new Map(); // key → { at, value }
@@ -44,12 +53,30 @@ const cache = new Map(); // key → { at, value }
 // degraded estimate does not disagree with the rest of the product.
 const FALLBACK_SPEED_M_PER_MIN = { driving: 500, walking: 80 };
 
-function enabled() {
+function mapboxEnabled() {
+  return Boolean(MAPBOX_TOKEN);
+}
+
+function osrmEnabled() {
   return Boolean(ROUTING_URL);
 }
 
+function enabled() {
+  return mapboxEnabled() || osrmEnabled();
+}
+
+function osrmProviderName() {
+  return ROUTING_URL.includes('project-osrm.org') ? 'osrm-demo' : 'osrm';
+}
+
+// Deliberately minimal: identifies which provider is configured without
+// leaking anything about it. Never include MAPBOX_ACCESS_TOKEN, ROUTING_URL,
+// or any other endpoint detail here — this is served from the public,
+// unauthenticated /api/health.
 function status() {
-  return { provider: ROUTING_URL.includes('project-osrm.org') ? 'osrm-demo' : 'osrm', url: ROUTING_URL, trafficAware: false };
+  if (mapboxEnabled()) return { provider: 'mapbox', trafficAware: MAPBOX_TRAFFIC };
+  if (osrmEnabled()) return { provider: osrmProviderName(), trafficAware: false };
+  return { provider: 'straight-line', trafficAware: false };
 }
 
 function cacheKey(from, to, profile, alternatives) {
@@ -73,8 +100,9 @@ function toCache(key, value) {
   }
 }
 
-// What we return when there is no route service, no network, or it took too
-// long. A bearing and a distance still orient someone; a null does not.
+// What we return when there is no route service, no network, or the whole
+// chain took too long. A bearing and a distance still orient someone; a null
+// does not.
 function straightLine(from, to, profile) {
   const distanceM = geo.haversine(from.lat, from.lng, to.lat, to.lng);
   const speed = FALLBACK_SPEED_M_PER_MIN[profile] || FALLBACK_SPEED_M_PER_MIN.driving;
@@ -93,9 +121,9 @@ function straightLine(from, to, profile) {
   };
 }
 
-// OSRM returns GeoJSON coordinates as [lng, lat]; Leaflet wants [lat, lng].
-// Getting this backwards puts a route in the wrong hemisphere, so it is done
-// in exactly one place.
+// Every provider here returns GeoJSON coordinates as [lng, lat]; Leaflet wants
+// [lat, lng]. Getting this backwards puts a route in the wrong hemisphere, so
+// it is done in exactly one place.
 function toLatLngs(coordinates) {
   if (!Array.isArray(coordinates)) return [];
   return coordinates
@@ -103,10 +131,105 @@ function toLatLngs(coordinates) {
     .map(([lng, lat]) => [lat, lng]);
 }
 
+function remainingMs(deadline) {
+  return Math.max(0, deadline - Date.now());
+}
+
+/** Mapbox Directions v5. Throws on any failure — the caller decides the fallback. */
+async function mapboxRoute(from, to, { profile, alternatives, budgetMs }) {
+  const mbProfile = profile === 'walking' ? 'walking' : (MAPBOX_TRAFFIC ? 'driving-traffic' : 'driving');
+  const coords = `${from.lng},${from.lat};${to.lng},${to.lat}`;
+  const params = new URLSearchParams({
+    overview: 'full',
+    geometries: 'geojson',
+    alternatives: alternatives ? 'true' : 'false',
+    access_token: MAPBOX_TOKEN,
+  });
+  const url = `https://api.mapbox.com/directions/v5/mapbox/${mbProfile}/${coords}?${params}`;
+
+  const res = await fetch(url, { signal: AbortSignal.timeout(Math.max(1, budgetMs)) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const payload = await res.json();
+
+  const routes = Array.isArray(payload?.routes) ? payload.routes : [];
+  if (payload?.code !== 'Ok' || routes.length === 0) throw new Error(payload?.code || 'no route');
+
+  const best = routes[0];
+  return {
+    ok: true,
+    degraded: false,
+    provider: 'mapbox',
+    trafficAware: mbProfile === 'driving-traffic',
+    profile,
+    distanceM: Math.round(best.distance),
+    durationS: Math.round(best.duration),
+    geometry: toLatLngs(best.geometry?.coordinates),
+    alternatives: routes.slice(1, 3).map((r) => ({
+      distanceM: Math.round(r.distance),
+      durationS: Math.round(r.duration),
+      geometry: toLatLngs(r.geometry?.coordinates),
+    })),
+    bearing: geo.bearing(from.lat, from.lng, to.lat, to.lng),
+  };
+}
+
+/**
+ * OSRM /route/v1. Throws on any failure — the caller decides the fallback.
+ *
+ * OSRM profile names, and which graphs a given deployment even carries, vary
+ * by instance (this project's own self-hosted extract is car-only — see
+ * osrm/README.md). Rather than assume a foot graph exists on whatever
+ * ROUTING_URL an operator points here, walking is routed on the driving graph
+ * and re-timed at walking speed below, as before. This is a known limitation
+ * of the OSRM fallback path specifically; Mapbox (the primary provider) uses
+ * its real walking profile.
+ */
+async function osrmRoute(from, to, { profile, alternatives, budgetMs }) {
+  const coords = `${from.lng},${from.lat};${to.lng},${to.lat}`;
+  const params = new URLSearchParams({
+    overview: 'full',
+    geometries: 'geojson',
+    alternatives: alternatives ? 'true' : 'false',
+  });
+  const url = `${ROUTING_URL}/route/v1/driving/${coords}?${params}`;
+
+  const res = await fetch(url, { signal: AbortSignal.timeout(Math.max(1, budgetMs)) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const payload = await res.json();
+
+  const routes = Array.isArray(payload?.routes) ? payload.routes : [];
+  if (payload?.code !== 'Ok' || routes.length === 0) throw new Error(payload?.code || 'no route');
+
+  const best = routes[0];
+  const walking = profile === 'walking';
+  const durationFor = (r) => (walking
+    ? Math.max(60, Math.round((r.distance / FALLBACK_SPEED_M_PER_MIN.walking) * 60))
+    : Math.round(r.duration));
+
+  return {
+    ok: true,
+    degraded: false,
+    provider: osrmProviderName(),
+    trafficAware: false, // OSRM here never carries live traffic; never imply otherwise
+    profile,
+    distanceM: Math.round(best.distance),
+    durationS: durationFor(best),
+    geometry: toLatLngs(best.geometry?.coordinates),
+    alternatives: routes.slice(1, 3).map((r) => ({
+      distanceM: Math.round(r.distance),
+      durationS: durationFor(r),
+      geometry: toLatLngs(r.geometry?.coordinates),
+    })),
+    bearing: geo.bearing(from.lat, from.lng, to.lat, to.lng),
+  };
+}
+
 /**
  * Route between two points.
  *
- * Always resolves. On any failure it returns a straight-line estimate with
+ * Always resolves. Tries Mapbox first, then OSRM if configured and there is
+ * still time left in the shared budget, then falls back to a straight line.
+ * On any failure short of that it returns a straight-line estimate with
  * `degraded: true` — callers render the same shape either way and never have
  * to handle an error during an incident.
  */
@@ -120,58 +243,29 @@ async function route(from, to, { profile = 'driving', alternatives = true } = {}
   const cached = fromCache(key);
   if (cached) return { ...cached, cached: true };
 
-  // OSRM profile names differ from ours; its demo server only carries the
-  // driving graph, so walking requests are routed on it and re-timed below.
-  const coords = `${from.lng},${from.lat};${to.lng},${to.lat}`;
-  const params = new URLSearchParams({
-    overview: 'full',
-    geometries: 'geojson',
-    alternatives: alternatives ? 'true' : 'false',
-  });
-  const url = `${ROUTING_URL}/route/v1/driving/${coords}?${params}`;
+  const deadline = Date.now() + TIMEOUT_MS;
+  let value = null;
 
-  let payload;
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    payload = await res.json();
-  } catch (e) {
-    // Deliberately quiet at warn level: during an incident with a device on a
-    // weak connection this can fire repeatedly, and it is a degradation, not a
-    // fault.
-    console.warn(`[routing] falling back to straight-line: ${e.message}`);
-    return straightLine(from, to, profile);
+  if (mapboxEnabled()) {
+    try {
+      value = await mapboxRoute(from, to, { profile, alternatives, budgetMs: remainingMs(deadline) });
+    } catch (e) {
+      // Deliberately quiet at warn level: during an incident with a device on
+      // a weak connection this can fire repeatedly, and it is a degradation,
+      // not a fault. Never logs the request URL — it carries the access token.
+      console.warn(`[routing] mapbox unavailable, falling back: ${e.message}`);
+    }
   }
 
-  const routes = Array.isArray(payload?.routes) ? payload.routes : [];
-  if (payload?.code !== 'Ok' || routes.length === 0) {
-    return straightLine(from, to, profile);
+  if (!value && osrmEnabled() && remainingMs(deadline) > 200) {
+    try {
+      value = await osrmRoute(from, to, { profile, alternatives, budgetMs: remainingMs(deadline) });
+    } catch (e) {
+      console.warn(`[routing] osrm unavailable, falling back: ${e.message}`);
+    }
   }
 
-  const best = routes[0];
-  const walking = profile === 'walking';
-  // The graph is a driving one. Re-time on foot from its distance rather than
-  // reporting a driving duration to somebody who is walking out of a building.
-  const durationFor = (r) => (walking
-    ? Math.max(60, Math.round((r.distance / FALLBACK_SPEED_M_PER_MIN.walking) * 60))
-    : Math.round(r.duration));
-
-  const value = {
-    ok: true,
-    degraded: false,
-    provider: status().provider,
-    trafficAware: false, // no free provider offers it; never imply otherwise
-    profile,
-    distanceM: Math.round(best.distance),
-    durationS: durationFor(best),
-    geometry: toLatLngs(best.geometry?.coordinates),
-    alternatives: routes.slice(1, 3).map((r) => ({
-      distanceM: Math.round(r.distance),
-      durationS: durationFor(r),
-      geometry: toLatLngs(r.geometry?.coordinates),
-    })),
-    bearing: geo.bearing(from.lat, from.lng, to.lat, to.lng),
-  };
+  if (!value) return straightLine(from, to, profile);
 
   toCache(key, value);
   return value;
