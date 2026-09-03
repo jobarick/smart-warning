@@ -10,6 +10,8 @@
     "test": "node --test \"_tests/**/*.test.js\""
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.2",
+    "@capacitor/core": "^8.4.2",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",
     "jsonwebtoken": "^9.0.3",
