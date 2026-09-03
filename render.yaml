@@ -117,10 +117,17 @@ services:
   # depends on this repo's application code, only the Dockerfile here, so a
   # rebuild is only worth triggering to refresh the map data or bump the OSRM
   # image version.
+  #
+  # plan is 1c-2g (1 CPU, 2GB RAM, ~$25/mo), not the relay's starter/512MB —
+  # the first deploy on starter built fine but crashed instantly at runtime
+  # with zero output from osrm-routed, consistent with an OOM kill: the
+  # customize step alone peaked at ~2.3GB RAM processing Tanzania's graph, and
+  # serving it needs the graph loaded too. Don't downgrade this without
+  # re-testing against a real deploy, not just a hunch.
   - type: web
     name: smart-warning-osrm
     runtime: docker
     dockerfilePath: ./osrm/Dockerfile
     dockerContext: ./osrm
-    plan: starter
+    plan: 1c-2g
     healthCheckPath: /route/v1/driving/39.2083,-6.7924;39.2696,-6.8235
