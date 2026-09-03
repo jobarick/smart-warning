@@ -44,4 +44,13 @@ FROM ghcr.io/project-osrm/osrm-backend:v26.9.0-debian
 WORKDIR /data
 COPY --from=builder /data /data
 EXPOSE 5000
-CMD ["osrm-routed", "--algorithm", "mld", "--max-table-size", "1", "/data/map.osrm"]
+# ⚠️ TEMPORARY DIAGNOSTIC — wrapped in `sh -c` so osrm-routed's real exit code
+# and any output it prints get captured explicitly, and so the container
+# doesn't immediately exit/restart afterward (`sleep 300` holds it open for
+# five minutes so there's time to actually read the log before Render cycles
+# the instance again). Render's log capture has shown NOTHING between startup
+# and "Exited with status 1" on every attempt so far, on both the real
+# Tanzania extract and this tiny Liechtenstein one — this either surfaces the
+# real error or proves osrm-routed itself is producing none, which is a
+# different and important answer. Revert to the plain CMD once answered.
+CMD ["sh", "-c", "osrm-routed --algorithm mld --max-table-size 1 /data/map.osrm; echo \"===DIAGNOSTIC=== osrm-routed exited with code $?\"; sleep 300"]
