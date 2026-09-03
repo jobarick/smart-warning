@@ -1,0 +1,9 @@
+{
+  "name": "backup-drill",
+  "private": true,
+  "description": "Isolated deps for the backup-restore drill (server/tools/backup-drill/index.js). Deliberately NOT part of server/package.json — a WASM Postgres has no business in the dependency tree of every real deploy, only in this on-demand tool's own node_modules.",
+  "dependencies": {
+    "@electric-sql/pglite": "0.3.3",
+    "@electric-sql/pglite-socket": "^0.0.8"
+  }
+}
