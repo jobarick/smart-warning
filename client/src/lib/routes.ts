@@ -13,7 +13,14 @@
  * added here and forgotten there would be a route that silently stops working
  * offline, which is the exact failure this file exists to prevent.
  *
- * So: add a path here, and both sides learn about it at once.
+ * A THIRD list has to agree too: `client/vercel.json`'s `rewrites`, one layer
+ * down from the SW — only a path listed there gets `index.html` from Vercel at
+ * all; anything else (a typo, a stale asset URL, a bot probe) gets a real 404
+ * instead of a 200'd app shell. It cannot read this file — it's evaluated by
+ * Vercel's build system before any app code runs — so it stays a plain,
+ * manually-kept list that has to be updated by hand alongside this one.
+ *
+ * So: add a path here, and update `client/vercel.json` to match.
  */
 export const SPA_PATHS = [
   '/',
