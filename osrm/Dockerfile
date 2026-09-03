@@ -51,4 +51,4 @@ EXPOSE 5000
 # matched — the exact kind of thing that fails silently rather than printing
 # a usage error. This round only changes that one value to confirm the fix
 # before reverting the rest of the diagnostic scaffolding.
-CMD ["sh", "-c", "osrm-routed --algorithm MLD --max-table-size 1 /data/map.osrm; echo \"real exit code: $?\"; sleep 300"]
+CMD ["osrm-routed", "--algorithm", "MLD", "/data/map.osrm"]
