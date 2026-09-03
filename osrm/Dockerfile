@@ -44,11 +44,14 @@ FROM ghcr.io/project-osrm/osrm-backend:v26.9.0-debian
 WORKDIR /data
 COPY --from=builder /data /data
 EXPOSE 5000
-# ⚠️ TEMPORARY DIAGNOSTIC, round 3. Round 2's `--help` output revealed the
-# actual bug: `-a [ --algorithm ] arg (=CH) ... Can be CH, MLD.` — UPPERCASE.
-# Every attempt so far passed `--algorithm mld` in lowercase. That's a plain
-# string match against "CH"/"MLD", not case-normalized, so `mld` never
-# matched — the exact kind of thing that fails silently rather than printing
-# a usage error. This round only changes that one value to confirm the fix
-# before reverting the rest of the diagnostic scaffolding.
-CMD ["sh", "-c", "osrm-routed --algorithm MLD --max-table-size 1 /data/map.osrm; echo \"real exit code: $?\"; sleep 300"]
+# ⚠️ TEMPORARY DIAGNOSTIC, round 4. Round 3 (uppercase MLD) did NOT fix it —
+# still a silent exit(1), ruling out the case bug as the actual cause (worth
+# keeping the uppercase fix regardless, since it's correct either way).
+#
+# New hypothesis: `--max-table-size 1` was set carelessly when this Dockerfile
+# was first written — it caps the /table distance-matrix endpoint (default
+# 100), and 1 is a degenerate value. A startup validation rejecting it would
+# throw before osrm-routed's own logging is initialized, which exactly
+# matches "silent exit(1), not even a usage error." This round just drops the
+# flag entirely to test that, keeping --algorithm MLD from round 3.
+CMD ["sh", "-c", "osrm-routed --algorithm MLD /data/map.osrm; echo \"real exit code: $?\"; sleep 300"]
