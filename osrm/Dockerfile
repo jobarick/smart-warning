@@ -17,11 +17,12 @@
 FROM ghcr.io/project-osrm/osrm-backend:v26.9.0-debian AS builder
 WORKDIR /data
 
-# Redirects (osm.pbf -> osm.pbf, "latest" -> a dated file) are normal here —
-# curl -L follows them. ~670MB as of 2026-09; Geofabrik updates this URL's
-# target in place, so a rebuild always gets a current map, not a stale one.
-RUN curl -L --fail --retry 3 -o map.osm.pbf \
-    https://download.geofabrik.de/africa/tanzania-latest.osm.pbf
+# Docker's own ADD-from-URL, not `RUN curl` — the osrm-backend image doesn't
+# ship curl or wget, and ADD needs neither: BuildKit fetches it directly,
+# redirects ("latest" -> a dated file) included. ~670MB as of 2026-09;
+# Geofabrik updates this URL's target in place, so a rebuild always gets a
+# current map, not a stale one.
+ADD https://download.geofabrik.de/africa/tanzania-latest.osm.pbf /data/map.osm.pbf
 
 # The modern MLD pipeline (extract, then partition, then customize) rather
 # than the older CH one (extract, then contract) — MLD is what upstream OSRM
