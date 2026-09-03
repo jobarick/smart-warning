@@ -174,10 +174,10 @@ deleted). The sequence that recovered from it:
    means the browser blocks the very backend the client is correctly pointed
    at — then push.
 
-Budget this as hours, not minutes. And go in knowing that **any data not
-backed up outside the host is gone** — there is no backup/restore drill on
-record yet (see the audit's P0 list), and last time the answer to "do we need
-the old production data" was a deliberate "no," not a recovery.
+Budget this as hours, not minutes. Last time the answer to "do we need the
+old production data" was a deliberate "no," not a recovery — but that was a
+choice, not a guarantee that the data was recoverable. See "Backup-restore
+drill" below for what is actually provable about restoring it.
 
 ---
 
@@ -195,7 +195,43 @@ preview/staging tier" finding in the audit doc.
 
 ---
 
-## After the incident
+## Backup-restore drill
+
+Supabase holds the only copy of production data — there is no separate
+backup step run today, so "can we actually restore it" was, until this drill
+existed, an assumption rather than a proven fact. `server/tools/backup-drill/`
+answers that, safely:
+
+- **Dumps** every table from a real source database with plain `SELECT`s —
+  nothing here can write to it.
+- **Restores** into a fresh, throwaway PGlite instance (an embedded, real
+  Postgres compiled to WASM) that is destroyed when the script exits. There is
+  no argument or env var that can point the restore step anywhere else, on
+  purpose — this cannot accidentally overwrite a real database.
+- **Never writes the dumped rows to disk.** Production data lives only in the
+  script's memory for the seconds the drill takes.
+- Verifies row-for-row counts per table, plus referential-integrity spot
+  checks (e.g. every `incident_events` row still resolves to a real
+  `incidents` row after restore).
+
+Its dependencies are deliberately isolated in
+`server/tools/backup-drill/package.json`, **not** `server/package.json` — a
+WASM Postgres has no business in the dependency tree of every real deploy.
+
+```bash
+cd server/tools/backup-drill && npm install   # one-time
+( set -a; source <(grep '^DATABASE_URL=' ../../.env | sed 's/^DATABASE_URL=/SOURCE_DATABASE_URL=/'); set +a; node index.js )
+```
+
+### Drill log
+
+| Date | Result | Notes |
+|---|---|---|
+| 2026-09-03 | **PASS** | 16 rows across 17 tables (organizations 1, users 1, incidents 1, incident_events 2, reports 2, subscriptions 1, transactions 6, consents 1, rest empty), all row counts matched exactly, 0 referential-integrity orphans. First run of this drill — establishes that production data is provably restorable, not just assumed to be. |
+
+Re-run this after any schema change that touches `init()`, and add a row here
+each time — a drill log with one entry from a year ago is barely better than
+no drill at all.
 
 There's no postmortem template on record yet, so start with the minimum that
 makes the next one faster:

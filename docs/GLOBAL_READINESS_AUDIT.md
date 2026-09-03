@@ -217,7 +217,7 @@ in the repo today, so effort goes where the real gaps are.
 | MFA | ❌ **Not found.** `server/auth.js` is bcrypt + JWT only, no second factor anywhere. |
 | Strict object-level authorization | ✅ **Already solid.** `server/guards.js` is genuinely careful — every org-scoped route resolves org membership per-request, personal accounts are explicitly refused org-scoped routes rather than silently passed a null org, and the comments show this was already reasoned through deliberately. |
 | Independent security review | ❌ Can't be done by me — needs a real external reviewer. `/security-review` (a local skill) can review a diff, not stand in for one. |
-| On-call, status page, incident runbook, backup/restore drill, regional failover test | ❌ **None exist.** No status page, no runbook doc, no backup-restore test recorded, no failover test — Render `starter` plan is single-instance/single-region by construction, so "regional failover" isn't currently something the hosting tier even offers. |
+| On-call, status page, incident runbook, backup/restore drill, regional failover test | ⚠️ **Partial, updated 2026-09-03.** `docs/INCIDENT_RUNBOOK.md` now exists (severity judged by whether alerting itself still works, known failure modes grounded in this project's real history). `server/tools/backup-drill/` proved a real production restore: 16 rows across 17 tables, exact count match, 0 referential-integrity orphans (log in the runbook). **Still none: on-call rotation, public status page, regional failover test** — Render `starter` plan is single-instance/single-region by construction, so failover isn't something the hosting tier even offers today. |
 
 ### P1 — before a paid public launch
 
@@ -264,8 +264,9 @@ correctly during a real outage, because that has never been tested.
    biggest visibility gap.
 3. Narrow the SPA fallback so a missing asset 404s instead of silently
    serving the app shell.
-4. Write down an incident runbook and run one real backup-restore drill —
-   these are hours of work, not weeks, and currently don't exist at all.
+4. ✅ **Done 2026-09-03** — `docs/INCIDENT_RUNBOOK.md` written, and one real
+   backup-restore drill run and passed (`server/tools/backup-drill/`, log in
+   the runbook). Re-run the drill after any schema change.
 5. Decide, deliberately, whether MFA and a written on-call rotation are
    in scope for this launch or explicitly deferred — right now they're
    neither done nor decided against.
