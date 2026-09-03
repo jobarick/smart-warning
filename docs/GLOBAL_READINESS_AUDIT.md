@@ -213,7 +213,7 @@ in the repo today, so effort goes where the real gaps are.
 | Synthetic canaries | ❌ **Not found.** `/api/health` exists and is honest, but nothing polls it from outside on a schedule with alerting. |
 | Tested provider fallback | ⚠️ **Partial.** Routing has a tested fallback (straight-line). Push has web-push + FCM as two channels but no evidence of a drill proving failover. Mail has one provider. |
 | Remove sensitive details from public health endpoint | ✅ **Mostly already done** — see Task 3 above; only `clients`/`uptime` are minor. |
-| Replace OSRM demo dependency | 🔴 **Confirmed live gap** — see Task 2. Operational fix (set `ROUTING_URL`), not code. |
+| Replace OSRM demo dependency | ⚠️ **In progress 2026-09-03** — self-hosted service built (`osrm/`), pending Render Blueprint approval and then setting `ROUTING_URL`. See Task 2. |
 | MFA | ❌ **Not found.** `server/auth.js` is bcrypt + JWT only, no second factor anywhere. |
 | Strict object-level authorization | ✅ **Already solid.** `server/guards.js` is genuinely careful — every org-scoped route resolves org membership per-request, personal accounts are explicitly refused org-scoped routes rather than silently passed a null org, and the comments show this was already reasoned through deliberately. |
 | Independent security review | ❌ Can't be done by me — needs a real external reviewer. `/security-review` (a local skill) can review a diff, not stand in for one. |
@@ -258,7 +258,10 @@ is a materially better starting position than "critical secret exposure" or
 correctly during a real outage, because that has never been tested.
 
 **Must fix before any worldwide/emergency-critical launch claim:**
-1. Point `ROUTING_URL` at a non-demo provider.
+1. ⚠️ **In progress 2026-09-03** — `smart-warning-osrm` (self-hosted, Tanzania-
+   only, `osrm/`) is built and in `render.yaml`, pending the user's Blueprint
+   approval (a second billed service) and then setting `ROUTING_URL` once it
+   has a URL. Not done until both of those happen.
 2. Stand up even a minimal synthetic canary (an external cron hitting
    `/api/health` and alerting on failure) — cheapest possible fix for the
    biggest visibility gap.

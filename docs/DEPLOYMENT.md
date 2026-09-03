@@ -98,6 +98,21 @@ curl https://smart-warning-relay-6lf3.onrender.com/api/health
 [FIREBASE_SETUP.md](FIREBASE_SETUP.md) and [SMTP_SETUP.md](SMTP_SETUP.md) to
 turn the two `false` entries on.
 
+### Routing: a second Render service
+
+`smart-warning-osrm` (added 2026-09-03) is a self-hosted OSRM routing server,
+replacing the free public `router.project-osrm.org` demo that
+`server/routing.js` used to default to. It's a **separate, separately billed**
+Docker-based Render service — see [`osrm/README.md`](../osrm/README.md) for
+what it is, why its coverage is Tanzania-only, and how to widen it.
+
+It does not auto-deploy alongside the relay on every push — there is nothing
+in it that depends on this repo's application code, only `osrm/Dockerfile`.
+Once it exists and has a URL, set `ROUTING_URL` on **`smart-warning-relay`**
+(a plain public URL, not a secret) to that service's address. Until that's
+set, the code default (the public demo) still applies — nothing breaks either
+way, this is a quality upgrade, not a required migration.
+
 ### Debugging trick worth reusing
 
 `GET /api/health` returns `clients`, which is `wss.clients.size` — the

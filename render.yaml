@@ -95,3 +95,32 @@ services:
       # use. Alerting is never affected either way.
       - key: BILLING_ENFORCE
         sync: false
+      # Self-hosted routing server (see the smart-warning-osrm service below),
+      # replacing the free public router.project-osrm.org demo — no SLA, best
+      # effort only. NOT declared via fromService: Render's private-network
+      # host/port properties are for plain-HTTP internal traffic, and
+      # server/routing.js expects a full URL with scheme. Set this by hand,
+      # once smart-warning-osrm exists and has a real URL, to that service's
+      # public HTTPS address (e.g. https://smart-warning-osrm.onrender.com) —
+      # see osrm/README.md. Leave unset and the code default
+      # (router.project-osrm.org) still applies, exactly as it did before this
+      # service existed — nothing breaks either way, this is a quality-of-
+      # routing upgrade, never a required one.
+      - key: ROUTING_URL
+        sync: false
+
+  # Self-hosted OSRM routing, Tanzania only — see osrm/README.md for what this
+  # is, why the scope is Tanzania, and how to widen it. A second, separately
+  # billed service: check its plan against current Render pricing before
+  # approving this Blueprint change. Does NOT auto-rebuild on every push to
+  # main the way the relay does above — there is nothing in this service that
+  # depends on this repo's application code, only the Dockerfile here, so a
+  # rebuild is only worth triggering to refresh the map data or bump the OSRM
+  # image version.
+  - type: web
+    name: smart-warning-osrm
+    runtime: docker
+    dockerfilePath: ./osrm/Dockerfile
+    dockerContext: ./osrm
+    plan: starter
+    healthCheckPath: /route/v1/driving/39.2083,-6.7924;39.2696,-6.8235
