@@ -119,15 +119,20 @@ services:
   # image version.
   #
   # plan is 1c-2g (1 CPU, 2GB RAM, ~$25/mo), not the relay's starter/512MB —
-  # the first deploy on starter built fine but crashed instantly at runtime
-  # with zero output from osrm-routed, consistent with an OOM kill: the
-  # customize step alone peaked at ~2.3GB RAM processing Tanzania's graph, and
-  # serving it needs the graph loaded too. Don't downgrade this without
-  # re-testing against a real deploy, not just a hunch.
+  # the first deploy on starter built fine but crashed at runtime with zero
+  # output from osrm-routed. Then 1c-2g crashed the SAME way, at nearly the
+  # same ~50s mark, which argues against simple OOM (more RAM should survive
+  # longer, not die at the same wall-clock time) — see osrm/Dockerfile's
+  # current diagnostic comment for what's being isolated before spending on
+  # another plan guess. Don't downgrade the plan without re-testing against a
+  # real deploy, not just a hunch.
+  #
+  # healthCheckPath is temporarily two Liechtenstein points (Vaduz -> Schaan),
+  # matching the diagnostic extract in osrm/Dockerfile — revert together.
   - type: web
     name: smart-warning-osrm
     runtime: docker
     dockerfilePath: ./osrm/Dockerfile
     dockerContext: ./osrm
     plan: 1c-2g
-    healthCheckPath: /route/v1/driving/39.2083,-6.7924;39.2696,-6.8235
+    healthCheckPath: /route/v1/driving/9.5209,47.1410;9.5083,47.1662

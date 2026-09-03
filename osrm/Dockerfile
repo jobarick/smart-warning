@@ -17,12 +17,16 @@
 FROM ghcr.io/project-osrm/osrm-backend:v26.9.0-debian AS builder
 WORKDIR /data
 
-# Docker's own ADD-from-URL, not `RUN curl` — the osrm-backend image doesn't
-# ship curl or wget, and ADD needs neither: BuildKit fetches it directly,
-# redirects ("latest" -> a dated file) included. ~670MB as of 2026-09;
-# Geofabrik updates this URL's target in place, so a rebuild always gets a
-# current map, not a stale one.
-ADD https://download.geofabrik.de/africa/tanzania-latest.osm.pbf /data/map.osm.pbf
+# ⚠️ TEMPORARY DIAGNOSTIC — Liechtenstein (~3.4MB, the standard tiny extract
+# OSRM's own quickstart docs use), NOT Tanzania, while isolating why the real
+# Tanzania deploy dies ~50s into startup with zero output on both 512MB and
+# 2GB plans. If this tiny graph starts up cleanly, the problem is graph-size-
+# vs-RAM and Tanzania just needs a bigger plan. If it fails identically, the
+# problem is the deployment mechanism itself, independent of data size — and
+# a bigger plan for the real extract would have been the wrong next spend.
+# MUST be reverted to the real Tanzania line above once this is answered —
+# see the git history on this file for that line.
+ADD https://download.geofabrik.de/europe/liechtenstein-latest.osm.pbf /data/map.osm.pbf
 
 # The modern MLD pipeline (extract, then partition, then customize) rather
 # than the older CH one (extract, then contract) — MLD is what upstream OSRM
