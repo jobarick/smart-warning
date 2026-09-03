@@ -44,13 +44,11 @@ FROM ghcr.io/project-osrm/osrm-backend:v26.9.0-debian
 WORKDIR /data
 COPY --from=builder /data /data
 EXPOSE 5000
-# ⚠️ TEMPORARY DIAGNOSTIC, round 2. Round 1 (plain `sh -c` wrapper) proved the
-# exit is a clean, deliberate `exit(1)` (not a signal/OOM kill) but captured
-# ZERO output before that — even though a clean exit() should flush stdio.
-# This round tests three things in one pass, cheaply, before guessing further:
-#   1. `ls -la /data` — are the expected .osrm* companion files actually there
-#      and non-empty after COPY --from=builder?
-#   2. `osrm-routed --help` — does the binary even run and print anything at
-#      all, ruling out a broken binary/missing shared library?
-#   3. Only then the real invocation, same as round 1.
-CMD ["sh", "-c", "echo '=== ls -la /data ==='; ls -la /data; echo '=== osrm-routed --help ==='; osrm-routed --help; echo \"help exit code: $?\"; echo '=== real invocation ==='; osrm-routed --algorithm mld --max-table-size 1 /data/map.osrm; echo \"real exit code: $?\"; sleep 300"]
+# ⚠️ TEMPORARY DIAGNOSTIC, round 3. Round 2's `--help` output revealed the
+# actual bug: `-a [ --algorithm ] arg (=CH) ... Can be CH, MLD.` — UPPERCASE.
+# Every attempt so far passed `--algorithm mld` in lowercase. That's a plain
+# string match against "CH"/"MLD", not case-normalized, so `mld` never
+# matched — the exact kind of thing that fails silently rather than printing
+# a usage error. This round only changes that one value to confirm the fix
+# before reverting the rest of the diagnostic scaffolding.
+CMD ["sh", "-c", "osrm-routed --algorithm MLD --max-table-size 1 /data/map.osrm; echo \"real exit code: $?\"; sleep 300"]
