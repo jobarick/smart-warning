@@ -20,9 +20,16 @@ export function useRoute() {
   // navigation (so whatever is behind it in history is trustworthy — see
   // App.tsx's overlay-route handling) or is the browser's original entry for
   // a fresh/direct load, which has no such marker.
+  //
+  // `next` may carry a query string (e.g. '/get-started?step=login') for a
+  // screen that reads it directly off `window.location.search`. `path` stays
+  // the bare pathname regardless — every `path === '/x'` comparison in this
+  // app assumes that, and a query string leaking into it would silently break
+  // every one of them.
   const navigate = useCallback((next: string) => {
-    if (next !== window.location.pathname) window.history.pushState({ sw: true }, '', next);
-    setPath(next);
+    const pathname = next.split('?')[0];
+    if (next !== window.location.pathname + window.location.search) window.history.pushState({ sw: true }, '', next);
+    setPath(pathname);
   }, []);
 
   // For correcting an unrecognized URL on load without leaving a history

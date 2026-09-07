@@ -7,8 +7,13 @@ import { Icon } from './Icon';
 import { Logo } from './Logo';
 
 interface Props {
-  /** Takes a visitor to the account-choice screen. */
-  onGetStarted: () => void;
+  /**
+   * Takes a visitor to the entry gate. A `step` says which door they already
+   * chose — 'login' for "Sign in", 'worker' for "I have a team code" — so
+   * that gate can open straight to their form instead of the account-choice
+   * screen everyone else needs. Omitted, it lands on the choice screen.
+   */
+  onGetStarted: (step?: 'login' | 'worker') => void;
   /** Plays the twelve-second simulation. */
   onWatchDemo: () => void;
 }
@@ -34,9 +39,9 @@ export function LandingPage({ onGetStarted, onWatchDemo }: Props) {
   usePricingSeen();
 
   /** Which button sent them onward — the whole point of measuring this page. */
-  const go = (cta: string) => {
+  const go = (cta: string, step?: 'login' | 'worker') => {
     track('click_cta', { cta });
-    onGetStarted();
+    onGetStarted(step);
   };
 
   return (
@@ -52,7 +57,7 @@ export function LandingPage({ onGetStarted, onWatchDemo }: Props) {
           <a href="#pricing">Pricing</a>
           <a href="#privacy">Privacy</a>
           <a href="/legal/">Legal</a>
-          <button className="lp-nav-cta" onClick={() => go('nav_sign_in')}>Sign in</button>
+          <button className="lp-nav-cta" onClick={() => go('nav_sign_in', 'login')}>Sign in</button>
         </nav>
       </header>
 
@@ -67,7 +72,7 @@ export function LandingPage({ onGetStarted, onWatchDemo }: Props) {
             <button className="lp-cta" onClick={() => go('hero_get_started')}>
               Get started — free for 30 days
             </button>
-            <button className="lp-cta lp-cta-quiet" onClick={() => go('hero_team_code')}>
+            <button className="lp-cta lp-cta-quiet" onClick={() => go('hero_team_code', 'worker')}>
               I have a team code
             </button>
           </div>
