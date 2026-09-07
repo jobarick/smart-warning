@@ -37,6 +37,25 @@ function clearResetFromUrl() {
 }
 
 /**
+ * Arrives as `?step=login` or `?step=worker` when the visitor already said
+ * which door they want — the landing page's "Sign in" and "I have a team
+ * code" buttons, specifically. Everyone else lands on `choose` and picks.
+ *
+ * Only these two: `signup` and `personal` create something, and a link that
+ * silently pre-selects "create an organization" is a link that creates
+ * organizations by accident. `login` and `worker` don't write anything until
+ * their own form is submitted, so pre-selecting them costs nothing.
+ */
+function initialStepFromUrl(): Step {
+  if (resetTokenFromUrl()) return 'reset';
+  try {
+    const step = new URLSearchParams(window.location.search).get('step');
+    if (step === 'login' || step === 'worker') return step;
+  } catch { /* ignore */ }
+  return 'choose';
+}
+
+/**
  * What the individual plan costs, in the server's own words.
  *
  * This screen used to state the price as a literal. A number typed into a
@@ -88,7 +107,7 @@ function AuthLegalFooter() {
 export function AuthGate({ onAuthed, notice }: Props) {
   const price = usePersonalPrice();
   const [linkToken] = useState(resetTokenFromUrl);
-  const [step, setStep] = useState<Step>(() => (resetTokenFromUrl() ? 'reset' : 'choose'));
+  const [step, setStep] = useState<Step>(initialStepFromUrl);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<{ mailConfigured: boolean } | null>(null);

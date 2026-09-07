@@ -837,7 +837,12 @@ export default function App() {
     );
   }
   if (showLandingEarly) {
-    return <LandingPage onGetStarted={() => navigate(AUTH_ROUTE)} onWatchDemo={() => navigate(DEMO_ROUTE)} />;
+    return (
+      <LandingPage
+        onGetStarted={(step) => navigate(step ? `${AUTH_ROUTE}?step=${step}` : AUTH_ROUTE)}
+        onWatchDemo={() => navigate(DEMO_ROUTE)}
+      />
+    );
   }
 
   // Accounts required but not signed in → the public front door, then the gate.
@@ -852,7 +857,12 @@ export default function App() {
     if (isNativeApp() || path === AUTH_ROUTE) {
       return <AuthGate onAuthed={onAuthed} notice={authNotice} />;
     }
-    return <LandingPage onGetStarted={() => navigate(AUTH_ROUTE)} onWatchDemo={() => navigate(DEMO_ROUTE)} />;
+    return (
+      <LandingPage
+        onGetStarted={(step) => navigate(step ? `${AUTH_ROUTE}?step=${step}` : AUTH_ROUTE)}
+        onWatchDemo={() => navigate(DEMO_ROUTE)}
+      />
+    );
   }
 
   // Terms & Conditions, once per device, after joining or signing in.
