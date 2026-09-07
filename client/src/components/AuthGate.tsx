@@ -248,11 +248,29 @@ export function AuthGate({ onAuthed, notice }: Props) {
                 of those can be answered by somebody who has never been here.
                 The distinguishing fact goes in the sub-line, because that is
                 what someone hesitating between two of these needs. */}
-            <button className="auth-choice" onClick={() => go('personal')}>
+            {/* Each label carries an explicit aria-label rather than leaning on
+                the visible <b> + <small> text. The two sit adjacent in the DOM
+                with no space or punctuation between them — fine for sighted
+                visitors, who read the line break the layout gives it, but a
+                screen reader has no such cue and some concatenate the raw text
+                nodes into one run-on word ("trialJust"). The aria-label repeats
+                the same words with real punctuation, so the distinguishing
+                sub-line the code comment above this block calls out for
+                somebody hesitating between two of these is not lost to anyone
+                using assistive tech. */}
+            <button
+              className="auth-choice"
+              onClick={() => go('personal')}
+              aria-label="Start my free trial. Just me, looking after myself. 30 days free, no card."
+            >
               <Icon name="user" />
               <span><b>Start my free trial</b><small>Just me, looking after myself. 30 days free, no card</small></span>
             </button>
-            <button className="auth-choice" onClick={() => go('worker')}>
+            <button
+              className="auth-choice"
+              onClick={() => go('worker')}
+              aria-label="Join my team. Someone gave me a team code. No account needed."
+            >
               <Icon name="check-circle" />
               <span><b>Join my team</b><small>Someone gave me a team code. No account needed</small></span>
             </button>
@@ -261,11 +279,19 @@ export function AuthGate({ onAuthed, notice }: Props) {
                 Somebody setting up a site for the first time has no reason to
                 look for it behind a sign-in they do not yet have — so the first
                 screen now says it outright. */}
-            <button className="auth-choice" onClick={() => go('signup')}>
+            <button
+              className="auth-choice"
+              onClick={() => go('signup')}
+              aria-label="Set this up for my workplace. I'll get a code to share, and a screen showing who is on site."
+            >
               <Icon name="siren" />
               <span><b>Set this up for my workplace</b><small>I'll get a code to share, and a screen showing who is on site</small></span>
             </button>
-            <button className="auth-choice" onClick={() => go('login')}>
+            <button
+              className="auth-choice"
+              onClick={() => go('login')}
+              aria-label="Sign in. I already have an account."
+            >
               <Icon name="lock" />
               <span><b>Sign in</b><small>I already have an account</small></span>
             </button>
