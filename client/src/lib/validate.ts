@@ -143,6 +143,18 @@ export function parseWireMessage(raw: unknown): WireMessage | null {
         cancelled: m.cancelled === true,
       };
     }
+    case 'acknowledged': {
+      // Same rule as 'responding': unnamed, it could attach itself to a later
+      // emergency and claim it had been seen when it had not.
+      const incidentId = str(m.incidentId);
+      if (!incidentId) return null;
+      return {
+        kind: 'acknowledged',
+        incidentId: incidentId.slice(0, 64),
+        by: str(m.by, 'A Safety Coordinator').slice(0, 80),
+        timestamp: num(m.timestamp, Date.now()),
+      };
+    }
     default:
       return null;
   }

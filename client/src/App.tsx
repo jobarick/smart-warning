@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
+  AcknowledgedMessage,
   AlertMessage,
   AlertType,
   AllClearMessage,
@@ -158,6 +159,7 @@ export default function App() {
   const [consented, setConsented] = useState(() => hasAcceptedCurrentTerms());
   const [showAbout, setShowAbout] = useState(() => window.location.pathname === '/about');
   const [responder, setResponder] = useState<RespondingMessage | null>(null);
+  const [ackNotice, setAckNotice] = useState<AcknowledgedMessage | null>(null);
   const [lastAlert, setLastAlert] = useState<number | null>(null);
   const [lastSync, setLastSync] = useState<number | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
@@ -459,6 +461,15 @@ export default function App() {
       // actually ringing, so it can never be shown against a later one.
       if (m.kind === 'responding') {
         setResponder(m.cancelled ? null : m);
+        return;
+      }
+
+      // A supervisor has seen it — no route yet, maybe no route ever, but not
+      // unwatched. Matched against the live alert by incident id at the point
+      // of use, same as `responder`, so it can never be shown against a later
+      // emergency.
+      if (m.kind === 'acknowledged') {
+        setAckNotice(m);
         return;
       }
 
@@ -882,6 +893,8 @@ export default function App() {
   // a reply to an earlier emergency can never be shown against this one. Read
   // by both the alert overlay's text and the map's responder marker below.
   const activeResponder = responder && alarm.alert && responder.incidentId === alarm.alert.id ? responder : null;
+  // Same discipline, for the plainer "someone has seen this" notice.
+  const activeAckNotice = ackNotice && alarm.alert && ackNotice.incidentId === alarm.alert.id ? ackNotice : null;
 
   // The user's screens run inside a fixed shell: the chrome stays put and the
   // active tab scrolls inside it. Scoped to this view — the command centre has
@@ -1132,6 +1145,7 @@ export default function App() {
           // Matched by incident id at the point of use, so a response to an
           // earlier emergency can never be shown against this one.
           responder={activeResponder}
+          ackNotice={activeAckNotice}
           // Only the device that raised it may retract it as a mistake.
           // Anyone else calling it a false alarm is guessing about someone
           // else's emergency.

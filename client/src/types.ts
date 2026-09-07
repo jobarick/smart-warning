@@ -144,6 +144,25 @@ export interface ReportsMessage {
 }
 
 /**
+ * A supervisor has seen the alert — not that anyone is coming, only that it is
+ * no longer unwatched. Sent the moment `POST /acknowledge` succeeds, well
+ * before there is a route (or a location) to build a `RespondingMessage` from,
+ * so the person who raised it learns someone has seen it without having to
+ * wait on GPS, routing, or a supervisor actually moving.
+ *
+ * Same incident-id discipline as `RespondingMessage`: a new alert invalidates
+ * the last one's acknowledgement, so it can never be shown against the wrong
+ * emergency.
+ */
+export interface AcknowledgedMessage {
+  kind: 'acknowledged';
+  incidentId: string;
+  /** Display name of whoever acknowledged it. */
+  by: string;
+  timestamp: number;
+}
+
+/**
  * A supervisor is on their way, and how far off they are.
  *
  * This is the answer to the question a frightened person actually has, and
@@ -190,7 +209,8 @@ export type WireMessage =
   | HeartbeatMessage
   | RosterMessage
   | TrackMessage
-  | RespondingMessage;
+  | RespondingMessage
+  | AcknowledgedMessage;
 
 export interface Settings {
   deviceName: string;

@@ -86,6 +86,15 @@ async function handle({ req, res, url, path }) {
       incidentId, orgId: ctx.orgId, kind: 'acknowledged', actorName: by, actorRole: 'supervisor',
     }).catch((e) => console.error('[db] recordIncidentEvent(acknowledged):', e.message));
 
+    // Tell the room. Until this, acknowledging only ever wrote a database row —
+    // raiseAlert and the all-clear/status messages all reach connected devices
+    // over the relay, but this HTTP route had no equivalent, so the person who
+    // pressed SOS had no way to learn a Safety Coordinator had seen it short of
+    // a full `responding` announcement, which needs a route (and so a location
+    // on both ends) that may be minutes away or may never come. This is the
+    // plain "somebody has seen this" a raiser is owed immediately.
+    relay.broadcast(ctx.orgId, { kind: 'acknowledged', incidentId, by, timestamp: Date.now() });
+
     sendJson(res, 200, { incident });
     return true;
   }
