@@ -99,6 +99,27 @@ export function LandingPage({ onGetStarted, onWatchDemo }: Props) {
           </ul>
         </section>
 
+        {/* Deliberately the second thing on the page, not the fourth. This used
+            to sit below "Who it is for" — true of the code as written, but a
+            visitor deciding whether to trust an emergency product with their
+            location reads that decision top to bottom, and three sections is
+            a long way to carry an open question about what happens if they
+            actually need police, fire, or an ambulance. */}
+        <section className="lp-section">
+          <div className="lp-honest">
+            <h2>What Smart Warning is not</h2>
+            <p>
+              Smart Warning complements emergency services — it does not replace them. It cannot
+              dispatch police, fire, or an ambulance, and it is not affiliated with any emergency
+              service or government body.
+            </p>
+            <p>
+              <b>In a life-threatening emergency, call your local emergency number first</b>, then
+              use Smart Warning to alert the people around you.
+            </p>
+          </div>
+        </section>
+
         <section className="lp-section" id="how">
           <h2>How it works</h2>
           <ol className="lp-steps">
@@ -145,25 +166,6 @@ export function LandingPage({ onGetStarted, onWatchDemo }: Props) {
                 a map, and an incident record you can hand to an inspector.</p>
               <p className="lp-price">Team and site plans, billed monthly or yearly.</p>
             </article>
-          </div>
-        </section>
-
-        {/* Deliberately prominent, and deliberately not softened. This used to
-            live behind the sign-up form inside the consent gate, which meant
-            the most important sentence in the product was invisible to anyone
-            deciding whether to trust it. */}
-        <section className="lp-section">
-          <div className="lp-honest">
-            <h2>What Smart Warning is not</h2>
-            <p>
-              Smart Warning complements emergency services — it does not replace them. It cannot
-              dispatch police, fire, or an ambulance, and it is not affiliated with any emergency
-              service or government body.
-            </p>
-            <p>
-              <b>In a life-threatening emergency, call your local emergency number first</b>, then
-              use Smart Warning to alert the people around you.
-            </p>
           </div>
         </section>
 
