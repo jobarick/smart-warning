@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { AlertMessage, RespondingMessage, Settings } from '../types';
+import type { AcknowledgedMessage, AlertMessage, RespondingMessage, Settings } from '../types';
 import { ALERT_META, SEVERITY_META, severityWants } from '../types';
 import { effectiveFlashRate, SAFE_FLASH_RATE } from '../lib/settings';
 import { Icon } from './Icon';
@@ -16,12 +16,14 @@ interface Props {
   onAllClear: () => void;
   /** A supervisor on their way to this incident, if one has said so. */
   responder?: RespondingMessage | null;
+  /** A supervisor has seen this incident, even before there is a route to it. */
+  ackNotice?: AcknowledgedMessage | null;
   /** True when THIS device raised the alarm, so it may retract it. */
   canRetract?: boolean;
   onFalseAlarm?: () => void;
 }
 
-export function AlertOverlay({ alert, acknowledged, settings, label, safeConfirmed, onConfirmSafe, onAcknowledge, onAllClear, responder, canRetract, onFalseAlarm }: Props) {
+export function AlertOverlay({ alert, acknowledged, settings, label, safeConfirmed, onConfirmSafe, onAcknowledge, onAllClear, responder, ackNotice, canRetract, onFalseAlarm }: Props) {
   // Retracting also stops every siren on site, so it takes a second tap the
   // same way all-clear does — but it is worded as taking the alarm back, not
   // as declaring an emergency over.
@@ -141,6 +143,20 @@ export function AlertOverlay({ alert, acknowledged, settings, label, safeConfirm
           >
             {confirmRetract ? 'Tap again — this was a false alarm' : 'I raised this by mistake'}
           </button>
+        )}
+
+        {/* The first, plainer news: somebody has seen this. Shown only until a
+            `responder` arrives — once there is a route and an ETA, that
+            already implies someone has seen it, and saying both is one more
+            line between a frightened person and the fact that actually
+            answers their question. */}
+        {ackNotice && !responder && (
+          <div className="responder-note" role="status" aria-live="polite">
+            <Icon name="check-circle" />
+            <span>
+              <strong>{ackNotice.by}</strong> has seen this alert
+            </span>
+          </div>
         )}
 
         {/* The question the person having the emergency is actually asking.
