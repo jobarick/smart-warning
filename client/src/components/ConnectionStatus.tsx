@@ -20,7 +20,7 @@ interface Props {
 const STATUS_LABEL: Record<SocketStatus, string> = {
   open: 'Connected',
   connecting: 'Connecting…',
-  closed: 'Offline — retrying',
+  closed: 'Offline, retrying',
 };
 
 export function ConnectionStatus({ status, deviceCount, audioArmed, onArmAudio, view, onViewChange, onLogoClick, userName, theme, onToggleTheme }: Props) {

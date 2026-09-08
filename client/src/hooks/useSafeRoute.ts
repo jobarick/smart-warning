@@ -28,7 +28,7 @@ export function useSafeRoute(
       .catch(() => {
         // Whatever went wrong, the person reading this is in an emergency and a
         // raw fetch error tells them nothing useful.
-        if (!cancelled) setError('Can’t reach the server. Follow your site’s procedure — emergency numbers are below.');
+        if (!cancelled) setError('Can’t reach the server. Follow your site’s procedure. Emergency numbers are below.');
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };

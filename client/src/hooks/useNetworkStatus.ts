@@ -20,7 +20,7 @@ const BARS: Record<string, number> = { 'slow-2g': 1, '2g': 1, '3g': 3, '4g': 4 }
 function read(conn: ConnectionLike | undefined, online: boolean): NetworkStatus {
   if (!online) return { online: false, type: 'offline', bars: 0, label: 'Offline' };
   const eff = conn?.effectiveType ?? '';
-  const type = conn?.type === 'wifi' ? 'Wi-Fi' : eff ? eff.toUpperCase() : 'Online';
+  const type = conn?.type === 'wifi' ? 'WiFi' : eff ? eff.toUpperCase() : 'Online';
   const bars = conn?.type === 'wifi' ? 4 : BARS[eff] ?? 3;
   const label = bars >= 4 ? 'Strong' : bars >= 3 ? 'Good' : 'Weak';
   return { online: true, type, bars, label: `${label} (${type})` };

@@ -264,7 +264,7 @@ async function raiseAlert(orgId, alert, worker = null, origin = 'unknown', actor
   // stop the other. Both are fire-and-forget beside the broadcast above.
   const notification = {
     title: `🚨 ${titleCase(alert.type)} alert`,
-    body: alert.message || `${titleCase(alert.severity)} severity — raised by ${alert.sender || 'a worker'}`,
+    body: alert.message || `${titleCase(alert.severity)} severity, raised by ${alert.sender || 'a worker'}`,
     type: alert.type,
     severity: alert.severity,
     tag: 'sw-alert',
@@ -303,7 +303,7 @@ async function fileStaleReplay(ws, alert, ageMs) {
     try {
       await db.createReport({
         orgId: ws.orgId,
-        message: `Offline SOS — ${alert.type}/${alert.severity} raised by ${alert.sender || 'a worker'} `
+        message: `Offline SOS: ${alert.type}/${alert.severity} raised by ${alert.sender || 'a worker'} `
           + `${minutes} minutes ago, delivered when their device regained signal.`
           + (alert.message ? ` They said: "${String(alert.message).slice(0, 300)}"` : ''),
         location: where,
@@ -438,7 +438,7 @@ function attach(server) {
           const standDown = retracted
             ? {
                 title: 'False alarm',
-                body: `${msg.sender || 'The person who raised it'} withdrew the alert — there is no emergency`,
+                body: `${msg.sender || 'The person who raised it'} withdrew the alert, there is no emergency`,
                 tag: 'sw-alert',
               }
             : {

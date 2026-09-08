@@ -65,12 +65,12 @@ export function LandingPage({ onGetStarted, onWatchDemo }: Props) {
         <section className="lp-hero">
           <h1>Help arrives faster when everyone knows at once.</h1>
           <p className="lp-lead">
-            One tap raises the alarm — on every phone on your site, with your live location,
+            One tap raises the alarm, on every phone on your site, with your live location,
             in about a second. For one person, or a team of five hundred.
           </p>
           <div className="lp-cta-row">
             <button className="lp-cta" onClick={() => go('hero_get_started')}>
-              Get started — free for 30 days
+              Get started, free for 30 days
             </button>
             <button className="lp-cta lp-cta-quiet" onClick={() => go('hero_team_code', 'worker')}>
               I have a team code
@@ -83,7 +83,7 @@ export function LandingPage({ onGetStarted, onWatchDemo }: Props) {
             onClick={() => { track('click_cta', { cta: 'hero_demo' }); onWatchDemo(); }}
           >
             <span className="lp-demo-pip" aria-hidden="true" />
-            Watch it happen — 12 seconds, no signup
+            Watch it happen. 12 seconds, no signup
           </button>
 
           <p className="lp-cta-note">No card required. Works in any phone browser.</p>
@@ -109,12 +109,12 @@ export function LandingPage({ onGetStarted, onWatchDemo }: Props) {
           <div className="lp-honest">
             <h2>What Smart Warning is not</h2>
             <p>
-              Smart Warning complements emergency services — it does not replace them. It cannot
+              Smart Warning complements emergency services. It does not replace them. It cannot
               dispatch police, fire, or an ambulance, and it is not affiliated with any emergency
               service or government body.
             </p>
             <p>
-              <b>In a life-threatening emergency, call your local emergency number first</b>, then
+              <b>In a life threatening emergency, call your local emergency number first</b>, then
               use Smart Warning to alert the people around you.
             </p>
           </div>
@@ -127,12 +127,12 @@ export function LandingPage({ onGetStarted, onWatchDemo }: Props) {
               <span className="lp-step-n">1</span>
               <h3>Raise it</h3>
               <p>Pick what is happening and hold the SOS button. Fire, medical, security,
-                hazard, cyber, or evacuation — each at four severities.</p>
+                hazard, cyber, or evacuation, each at four severities.</p>
             </li>
             <li>
               <span className="lp-step-n">2</span>
               <h3>Everyone knows</h3>
-              <p>Phones with Smart Warning open alarm at once — full screen, siren, vibration.
+              <p>Phones with Smart Warning open alarm at once: full screen, siren, vibration.
                 Phones that are locked or closed get a push notification. Your location appears
                 on the map either way.</p>
             </li>
@@ -162,7 +162,7 @@ export function LandingPage({ onGetStarted, onWatchDemo }: Props) {
             <article className="lp-card">
               <Icon name="siren" />
               <h3>For a site or team</h3>
-              <p>Your workers join with a code — no accounts to create. You get a live roster,
+              <p>Your workers join with a code, no accounts to create. You get a live roster,
                 a map, and an incident record you can hand to an inspector.</p>
               <p className="lp-price">Team and site plans, billed monthly or yearly.</p>
             </article>
@@ -177,7 +177,7 @@ export function LandingPage({ onGetStarted, onWatchDemo }: Props) {
             <article>
               <h3>We do not track you in the background</h3>
               <p>The app asks for your location only while an alert is active. When it is cleared,
-                it stops. There is no background location permission in this app — you can check
+                it stops. There is no background location permission in this app. You can check
                 the permission list yourself.</p>
             </article>
             <article>
@@ -189,7 +189,7 @@ export function LandingPage({ onGetStarted, onWatchDemo }: Props) {
             <article>
               <h3>We cannot read your password</h3>
               <p>It is stored in a form that cannot be reversed. If you lose it we can help you set a
-                new one — we can never send you the old one. Everything travels over an encrypted
+                new one. We can never send you the old one. Everything travels over an encrypted
                 connection, on the web and in the app.</p>
             </article>
             <article>
@@ -208,7 +208,7 @@ export function LandingPage({ onGetStarted, onWatchDemo }: Props) {
         <section className="lp-section lp-final">
           <h2>Ready when you are</h2>
           <p>Set it up before you need it. That is the whole point.</p>
-          <button className="lp-cta" onClick={() => go('footer_get_started')}>Get started — free for 30 days</button>
+          <button className="lp-cta" onClick={() => go('footer_get_started')}>Get started, free for 30 days</button>
         </section>
       </main>
 
@@ -217,12 +217,12 @@ export function LandingPage({ onGetStarted, onWatchDemo }: Props) {
           <h3>About Smart Warning</h3>
           <p>
             Smart Warning is built by <b>{PROVIDER}</b>, an independent software team in Tanzania.
-            We build it because a fire alarm on a wall only helps the people who can hear it — and
+            We build it because a fire alarm on a wall only helps the people who can hear it, and
             most emergencies start with one person who needs everyone else to know, now.
           </p>
           <p>
             Questions, problems, or something that did not work when it mattered:{' '}
-            <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a> — we answer.
+            <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>, we answer.
           </p>
         </div>
         <nav className="lp-footer-links">
@@ -333,8 +333,8 @@ function PricingSection({ billing, onGetStarted }: { billing: ReturnType<typeof 
     <section className="lp-section" id="pricing">
       <h2>What it costs</h2>
       <p className="lp-section-sub">
-        Every plan starts with a 30-day trial. We do not ask for payment details to begin, and
-        nothing charges itself when the trial ends — you choose a plan, or you keep the free one.
+        Every plan starts with a 30 day trial. We do not ask for payment details to begin, and
+        nothing charges itself when the trial ends. You choose a plan, or you keep the free one.
       </p>
 
       <div className="lp-plans">
@@ -363,13 +363,13 @@ function PricingSection({ billing, onGetStarted }: { billing: ReturnType<typeof 
 
       {enterprise && (
         <p className="lp-plan-enterprise">
-          <b>{enterprise.name}</b> — {enterprise.tagline.toLowerCase()}{' '}
+          <b>{enterprise.name}</b>: {enterprise.tagline.toLowerCase()}{' '}
           <a href={`mailto:${SUPPORT_EMAIL}`}>Talk to us</a>.
         </p>
       )}
 
       <p className="lp-pay">
-        {mobileMoney.enabled && <>Pay with mobile money — Mixx by Yas, M-Pesa, Airtel Money, HaloPesa, EzyPesa. </>}
+        {mobileMoney.enabled && <>Pay with mobile money: Mixx by Yas, MPesa, Airtel Money, HaloPesa, EzyPesa. </>}
         {card.enabled && <>Cards accepted. </>}
         Prices in Tanzanian shillings. Cancel whenever you like; you keep the plan until the month you paid for runs out.
       </p>

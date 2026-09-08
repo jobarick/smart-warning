@@ -227,7 +227,7 @@ export interface Settings {
   shareLocation: boolean; // opt-in GPS — sends lat/long to the command roster
   zone: string; // area/zone this device is working in (shown to the supervisor)
   profileId: string; // active industry profile — relabels alert types + protocols
-  operatorId: string; // stable per-operator identifier, e.g. "SA-2026-0017"
+  operatorId: string; // stable per-operator identifier, e.g. "SA.2026.0017"
   assemblyLat: number | null; // assembly / safe-zone coordinates
   assemblyLng: number | null;
   assemblyLabel: string; // name of the assembly point
@@ -269,9 +269,9 @@ export const severityWants = (s: Severity) => ({
 
 /** What to do when each alert type fires — shown to workers and on the command panel. */
 export const SAFETY_PROTOCOL: Record<AlertType, string[]> = {
-  fire: ['Leave the building now', 'Do not use the elevator', 'Follow the lit route to assembly', 'Do not re-enter'],
+  fire: ['Leave the building now', 'Do not use the elevator', 'Follow the lit route to assembly', 'Do not reenter'],
   medical: ['Keep the casualty still', 'Clear the area around them', 'Send someone to guide first aid in', 'Report injuries and hazards'],
-  security: ['Move to a secure room', 'Lock or barricade the door', 'Stay quiet and out of sight', 'Wait for the all-clear'],
+  security: ['Move to a secure room', 'Lock or barricade the door', 'Stay quiet and out of sight', 'Wait for the all clear'],
   hazard: ['Stop work immediately', 'Move upwind of the hazard', 'Wear the required PPE', 'Report the spill or release'],
   cyber: ['Disconnect affected systems', 'Do not power devices off', 'Stop using shared drives', 'Await IT security instructions'],
   evacuation: ['Evacuate immediately', 'Do not use the elevator', 'Proceed to the assembly point', 'Check in when you arrive'],
