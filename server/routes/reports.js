@@ -25,7 +25,7 @@ async function handle({ req, res, url, path }) {
 
   if (path === '/api/public/reports' && req.method === 'POST') {
     if (!ORGS) { sendJson(res, 501, { error: 'public reporting requires a database' }); return true; }
-    if (!allowReport(req)) { sendJson(res, 429, { error: 'too many reports — please wait a few minutes' }); return true; }
+    if (!allowReport(req)) { sendJson(res, 429, { error: 'too many reports, please wait a few minutes' }); return true; }
     const body = await readJson(req);
     const org = await db.getOrgByPublicCode(body.publicCode);
     if (!org) { sendJson(res, 404, { error: 'unknown site code' }); return true; }

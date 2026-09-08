@@ -215,7 +215,7 @@ export function cancelSubscription(token: string) {
 
 /** Money as a customer here would write it: "TZS 80,000" / "$30". */
 export function formatMoney(amount: number | null, currency: Currency): string {
-  if (amount == null) return '—';
+  if (amount == null) return 'N/A';
   if (currency === 'USD') return `$${amount.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
   return `TZS ${Math.round(amount).toLocaleString('en-US')}`;
 }
@@ -225,14 +225,14 @@ export function describeStatus(e: Entitlements | null): string {
   if (!e) return '';
   switch (e.status) {
     case 'pending_payment':
-      return 'Payment pending — waiting for confirmation';
+      return 'Payment pending, waiting for confirmation';
     case 'past_due':
       return e.graceEndsAt
-        ? `Payment overdue — access continues until ${new Date(e.graceEndsAt).toLocaleDateString()}`
+        ? `Payment overdue, access continues until ${new Date(e.graceEndsAt).toLocaleDateString()}`
         : 'Payment overdue';
     case 'canceled':
       return e.currentPeriodEnd
-        ? `Cancelled — active until ${new Date(e.currentPeriodEnd).toLocaleDateString()}`
+        ? `Cancelled, active until ${new Date(e.currentPeriodEnd).toLocaleDateString()}`
         : 'Cancelled';
     case 'expired':
       return 'Subscription ended';

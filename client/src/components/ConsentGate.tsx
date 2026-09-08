@@ -52,7 +52,7 @@ export function ConsentGate({ onAccept }: Props) {
             should not have to read a legal document to learn this. */}
         <p className="consent-urgent">
           If you are in immediate danger, call your local emergency services directly now.
-          This app assists with emergency communication — it does not replace them.
+          This app assists with emergency communication. It does not replace them.
         </p>
 
         <div className="consent-tabs" role="tablist">

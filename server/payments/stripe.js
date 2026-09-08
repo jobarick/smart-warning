@@ -127,7 +127,7 @@ async function createCheckoutSession({
           // Stripe works in minor units; USD has cents where TZS does not.
           unit_amount: toMinorUnits(amount, currency),
           product_data: {
-            name: `Smart Warning — ${planName || planId}`,
+            name: `Smart Warning: ${planName || planId}`,
             description: `${cycle === 'annual' ? 'Annual' : 'Monthly'} subscription`,
           },
         },

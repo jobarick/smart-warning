@@ -37,7 +37,7 @@ export interface OperatorMeta {
 
 export const OPERATORS: Record<Operator, OperatorMeta> = {
   mixx_by_yas:  { id: 'mixx_by_yas',  label: 'Mixx by Yas',    short: 'Mixx',   wallet: 'Mixx',        collectable: true },
-  mpesa:        { id: 'mpesa',        label: 'Vodacom M-Pesa', short: 'M-Pesa', wallet: 'M-Pesa',      collectable: true },
+  mpesa:        { id: 'mpesa',        label: 'Vodacom MPesa', short: 'MPesa', wallet: 'MPesa',      collectable: true },
   airtel_money: { id: 'airtel_money', label: 'Airtel Money',   short: 'Airtel', wallet: 'Airtel Money', collectable: true },
   halopesa:     { id: 'halopesa',     label: 'HaloPesa',       short: 'Halo',   wallet: 'HaloPesa',    collectable: true },
   ezypesa:      { id: 'ezypesa',      label: 'EzyPesa',        short: 'Ezy',    wallet: 'EzyPesa',     collectable: true },

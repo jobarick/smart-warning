@@ -15,7 +15,7 @@ const TONES: { value: Settings['sirenTone']; label: string }[] = [
   { value: 'auto', label: 'Auto (per alert type)' },
   { value: 'wail', label: 'Classic wail' },
   { value: 'yelp', label: 'Yelp (fast sweep)' },
-  { value: 'hilo', label: 'Hi-lo two-tone' },
+  { value: 'hilo', label: 'Hi lo two tone' },
   { value: 'pulse', label: 'Pulse beep' },
   { value: 'phaser', label: 'Phaser sweep' },
 ];
@@ -33,7 +33,7 @@ export function SettingsPanel({ settings, onChange, onTestSiren, onTestAlarm, si
         <select value={settings.profileId} onChange={(e) => onChange({ profileId: e.target.value })}>
           {INDUSTRY_PROFILES.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.label} — {p.tagline}
+              {p.label}: {p.tagline}
             </option>
           ))}
         </select>
@@ -66,7 +66,7 @@ export function SettingsPanel({ settings, onChange, onTestSiren, onTestAlarm, si
           type="text"
           value={settings.operatorId}
           maxLength={24}
-          placeholder="e.g. SA-2026-0017"
+          placeholder="e.g. SA.2026.0017"
           onChange={(e) => onChange({ operatorId: e.target.value })}
         />
       </label>
@@ -78,7 +78,7 @@ export function SettingsPanel({ settings, onChange, onTestSiren, onTestAlarm, si
           onChange={(e) => onChange({ shareLocation: e.target.checked })}
         />
         <span>
-          Share my location — <em>sends GPS coordinates to the command view so a Safety Coordinator can find you</em>
+          Share my location, <em>sends GPS coordinates to the command view so a Safety Coordinator can find you</em>
         </span>
       </label>
 
@@ -116,7 +116,7 @@ export function SettingsPanel({ settings, onChange, onTestSiren, onTestAlarm, si
       </label>
 
       <label className="field">
-        <span>Border thickness — {settings.borderThickness}px</span>
+        <span>Border thickness: {settings.borderThickness}px</span>
         <input
           type="range"
           min={10}
@@ -127,7 +127,7 @@ export function SettingsPanel({ settings, onChange, onTestSiren, onTestAlarm, si
       </label>
 
       <label className="field">
-        <span>Brightness — {Math.round(settings.brightness * 100)}%</span>
+        <span>Brightness: {Math.round(settings.brightness * 100)}%</span>
         <input
           type="range"
           min={30}
@@ -150,7 +150,7 @@ export function SettingsPanel({ settings, onChange, onTestSiren, onTestAlarm, si
       </label>
 
       <label className="field">
-        <span>Flash rate — {Math.min(settings.flashRate, maxRate)} / sec</span>
+        <span>Flash rate: {Math.min(settings.flashRate, maxRate)} / sec</span>
         <input
           type="range"
           min={1}
@@ -168,7 +168,7 @@ export function SettingsPanel({ settings, onChange, onTestSiren, onTestAlarm, si
           onChange={(e) => onChange({ allowFastStrobe: e.target.checked })}
         />
         <span>
-          Allow flash rates above {SAFE_FLASH_RATE}/sec — <em>I understand rapid flashing can trigger
+          Allow flash rates above {SAFE_FLASH_RATE}/sec, <em>I understand rapid flashing can trigger
           seizures in photosensitive people</em>
         </span>
       </label>
@@ -180,7 +180,7 @@ export function SettingsPanel({ settings, onChange, onTestSiren, onTestAlarm, si
           onChange={(e) => onChange({ silentMode: e.target.checked })}
         />
         <span>
-          Silent mode — <em>flash and border only, no siren on this device</em>
+          Silent mode, <em>flash and border only, no siren on this device</em>
         </span>
       </label>
 
@@ -200,7 +200,7 @@ export function SettingsPanel({ settings, onChange, onTestSiren, onTestAlarm, si
       </label>
 
       <label className="field">
-        <span>Volume — {Math.round(settings.volume * 100)}%</span>
+        <span>Volume: {Math.round(settings.volume * 100)}%</span>
         <input
           type="range"
           min={0}

@@ -55,7 +55,7 @@ export function SystemFooter({ connected, lastSync, now, queued, queuedSince }: 
       <span className="sysfoot-health">
         <span className="sysfoot-dot" />
         {holding
-          ? `${queued} held ${held(now - queuedSince!)} — will send when reconnected`
+          ? `${queued} held ${held(now - queuedSince!)}, will send when reconnected`
           : ok
             ? 'System operational'
             : connected

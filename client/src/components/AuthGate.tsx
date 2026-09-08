@@ -299,8 +299,8 @@ export function AuthGate({ onAuthed, notice }: Props) {
                 after this screen. This is the one place that says what it
                 means, before anybody has to pick a door based on it. */}
             <p className="auth-glossary">
-              A <b>Safety Coordinator</b> is whoever watches a site's alerts — they see who is
-              present and call the all-clear.
+              A <b>Safety Coordinator</b> is whoever watches a site's alerts, they see who is
+              present and call the all clear.
             </p>
 
             {/* The most important sentence in the product, and until now it was
@@ -308,8 +308,8 @@ export function AuthGate({ onAuthed, notice }: Props) {
                 nobody reaches without first deciding to trust this. Somebody
                 still deciding needs to read it here. */}
             <p className="auth-disclaimer">
-              Smart Warning alerts the people around you. It cannot dispatch emergency services —
-              <b> in a life-threatening emergency, call your local emergency number first</b>.
+              Smart Warning alerts the people around you. It cannot dispatch emergency services.
+              <b> In a life threatening emergency, call your local emergency number first</b>.
             </p>
           </>
         )}
@@ -379,7 +379,7 @@ export function AuthGate({ onAuthed, notice }: Props) {
                 <p className="auth-sub">
                   <b>No access to that inbox?</b> Ask another Safety Coordinator in your organization to sign in and
                   add you, or reach us from the Support screen. Nobody at Smart Warning can see or send you your old
-                  password — it is stored in a form that cannot be read back.
+                  password. It is stored in a form that cannot be read back.
                 </p>
                 <button className="auth-submit" type="button" onClick={() => go('reset')}>I have a code</button>
                 <p className="auth-alt"><button type="button" onClick={() => go('login')}>Back to sign in</button></p>
@@ -420,7 +420,7 @@ export function AuthGate({ onAuthed, notice }: Props) {
             <button type="button" className="auth-back" onClick={() => go('choose')}><Icon name="arrow-left" /> Back</button>
             <h1 className="auth-title">Create a personal account</h1>
             <p className="auth-sub">
-              For one person. No team code and no organization — just you. Free for 30 days
+              For one person. No team code and no organization, just you. Free for 30 days
               {price ? <>, then <b>{price}</b> a month</> : null}. We do not ask for payment
               details now, and we will tell you before the trial ends.
             </p>
@@ -459,7 +459,7 @@ export function AuthGate({ onAuthed, notice }: Props) {
             <p className="auth-sub">You'll get a team code to share with your workers.</p>
             <label className="auth-field">
               <span>Organization name</span>
-              <input value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="e.g. Acme Plant — North Site" />
+              <input value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="e.g. Acme Plant, North Site" />
             </label>
             <label className="auth-field">
               <span>Your name</span>

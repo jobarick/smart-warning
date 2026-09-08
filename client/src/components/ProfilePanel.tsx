@@ -71,7 +71,7 @@ export function ProfilePanel({
                 : historyLoading ? 'Loading…' : 'History unavailable.'}
             </p>
           ) : historyError ? (
-            <p className="hint">History unavailable — retrying.</p>
+            <p className="hint">History unavailable, retrying.</p>
           ) : incidents.length === 0 ? (
             <p className="hint">No incidents recorded yet.</p>
           ) : (

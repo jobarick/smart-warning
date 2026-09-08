@@ -131,18 +131,18 @@ const KNOWN_ROUTES = new Set<string>(SPA_PATHS);
 
 const ROUTE_TITLE: Record<string, string> = {
   '/': 'Smart Warning',
-  [AUTH_ROUTE]: 'Get started — Smart Warning',
-  [DEMO_ROUTE]: 'See it in action — Smart Warning',
-  '/dashboard': 'Command Centre — Smart Warning',
-  '/emergency': 'Emergency — Smart Warning',
-  '/safety': 'Safety — Smart Warning',
-  '/alerts': 'Alerts — Smart Warning',
-  '/profile': 'Profile — Smart Warning',
-  '/settings': 'Settings — Smart Warning',
-  '/about': 'About — Smart Warning',
-  '/support': 'Support — Smart Warning',
-  '/billing': 'Plans & Billing — Smart Warning',
-  '/setup': 'Setup — Smart Warning',
+  [AUTH_ROUTE]: 'Get started: Smart Warning',
+  [DEMO_ROUTE]: 'See it in action: Smart Warning',
+  '/dashboard': 'Command Centre: Smart Warning',
+  '/emergency': 'Emergency: Smart Warning',
+  '/safety': 'Safety: Smart Warning',
+  '/alerts': 'Alerts: Smart Warning',
+  '/profile': 'Profile: Smart Warning',
+  '/settings': 'Settings: Smart Warning',
+  '/about': 'About: Smart Warning',
+  '/support': 'Support: Smart Warning',
+  '/billing': 'Plans & Billing: Smart Warning',
+  '/setup': 'Setup: Smart Warning',
 };
 
 export default function App() {
@@ -735,7 +735,7 @@ export default function App() {
       id: crypto.randomUUID(),
       type: 'security',
       severity: 'high',
-      message: 'This is a local test alarm — other devices are not affected.',
+      message: 'This is a local test alarm. Other devices are not affected.',
       sender: `${settings.deviceName} (local test)`,
       timestamp: Date.now(),
     });
@@ -937,7 +937,7 @@ export default function App() {
                   href={`/r/${org.publicCode}`}
                   target="_blank"
                   rel="noreferrer"
-                  title="Public reporting page — safe to print or share. Reports queue for your review."
+                  title="Public reporting page, safe to print or share. Reports queue for your review."
                 >
                   Public report link
                 </a>

@@ -86,7 +86,7 @@ export function AboutPanel({ token, orgName, personalEmail, onDeleted, onBack }:
           emergency app that is vague about who stands behind it is asking for
           trust it has not offered anything in return for. */}
       <p className="about-provider">
-        Smart Warning — the application, the system and its product design — is by <strong>{PROVIDER}</strong>.
+        Smart Warning, the application, the system and its product design, is by <strong>{PROVIDER}</strong>.
       </p>
       <dl className="about-facts">
         <div><dt>App version</dt><dd className="mono">{APP_VERSION}</dd></div>
@@ -98,7 +98,7 @@ export function AboutPanel({ token, orgName, personalEmail, onDeleted, onBack }:
           thing for someone to understand about this product. */}
       <p className="about-note">
         Smart Warning helps organizations communicate and coordinate during an emergency.
-        It complements official emergency services — it does not replace them, and it cannot
+        It complements official emergency services. It does not replace them, and it cannot
         guarantee rescue or response. In immediate danger, call your local emergency number.
       </p>
 
@@ -125,12 +125,12 @@ export function AboutPanel({ token, orgName, personalEmail, onDeleted, onBack }:
           <p className="about-warn">
             {deletable === 'organization' ? (
               <>
-                This permanently deletes <strong>{orgName}</strong> — its Safety Coordinators, every member,
+                This permanently deletes <strong>{orgName}</strong>: its Safety Coordinators, every member,
                 all incident history, all stored location records and all reports. It cannot be undone.
               </>
             ) : (
               <>
-                This permanently deletes your account — your emergency contacts, your registered devices
+                This permanently deletes your account: your emergency contacts, your registered devices
                 and your subscription. It cannot be undone.
               </>
             )}

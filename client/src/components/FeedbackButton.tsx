@@ -88,7 +88,7 @@ export function FeedbackButton() {
 
       {stage === 'thanks' ? (
         <div className="fb-thanks">
-          <p className="fb-thanks-line">Thank you — that genuinely helps.</p>
+          <p className="fb-thanks-line">Thank you, that genuinely helps.</p>
           <p className="fb-thanks-sub">
             We read every one of these. If you left an address, you may hear back from a person.
           </p>
@@ -98,7 +98,7 @@ export function FeedbackButton() {
         <form onSubmit={submit}>
           <h2 className="fb-title">What almost stopped you from signing up?</h2>
           <p className="fb-sub">
-            Anything — a price, a missing feature, something that did not make sense. Short is fine.
+            Anything, a price, a missing feature, something that did not make sense. Short is fine.
           </p>
           <textarea
             className="fb-text"
@@ -110,7 +110,7 @@ export function FeedbackButton() {
             autoFocus
           />
           <label className="fb-field">
-            <span>Email <small>optional — only if you want a reply</small></span>
+            <span>Email <small>optional, only if you want a reply</small></span>
             <input
               type="email"
               value={email}

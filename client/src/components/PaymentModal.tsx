@@ -234,7 +234,7 @@ export function PaymentModal({ plan, token, cycle = 'monthly', defaultPhone, onC
             </p>
             {payment?.message && <p className="pay-note">{payment.message}</p>}
             <button type="button" className="pay-cancel" onClick={close}>
-              Close — this keeps running
+              Close, this keeps running
             </button>
             <p className="pay-safety">
               Closing this window will not cancel the payment. Your subscription updates
@@ -247,7 +247,7 @@ export function PaymentModal({ plan, token, cycle = 'monthly', defaultPhone, onC
           <div className="pay-body pay-done">
             <div className="pay-tick" aria-hidden="true"><Icon name="check" /></div>
             <h4>Payment received</h4>
-            <p>{plan.name} is active{payment?.phoneNumber ? ` — paid from ${payment.phoneNumber}` : ''}.</p>
+            <p>{plan.name} is active{payment?.phoneNumber ? `, paid from ${payment.phoneNumber}` : ''}.</p>
             <button type="button" className="pay-submit" onClick={close}>Done</button>
           </div>
         )}

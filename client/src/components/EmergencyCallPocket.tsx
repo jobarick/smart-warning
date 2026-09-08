@@ -77,7 +77,7 @@ export function EmergencyCallPocket({ lat, lng, alertType, defaultOpen = false }
         </span>
         <span className="pocket-where">
           {country}
-          {stale && <span className="pocket-stale" title="Shown from the last saved copy — position not confirmed">saved</span>}
+          {stale && <span className="pocket-stale" title="Shown from the last saved copy, position not confirmed">saved</span>}
         </span>
         <span className="pocket-chevron" aria-hidden="true">{open ? '−' : '+'}</span>
       </button>

@@ -24,7 +24,7 @@ export function AlertLog({ entries }: { entries: LogEntry[] }) {
                     <Icon name={ALERT_META[e.type].icon} className="log-icon" style={{ color: ALERT_META[e.type].color }} />
                     <span className="log-text">
                       <strong style={{ color: ALERT_META[e.type].color }}>{ALERT_META[e.type].label}</strong>{' '}
-                      ({SEVERITY_META[e.severity].label}){e.message ? ` — ${e.message}` : ''}
+                      ({SEVERITY_META[e.severity].label}){e.message ? `: ${e.message}` : ''}
                     </span>
                   </>
                 ) : (

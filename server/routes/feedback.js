@@ -71,7 +71,7 @@ async function handle({ req, res, path }) {
   // its own rate-limit bucket, and no way to reference an organisation.
   if (path === '/api/feedback/visitor' && req.method === 'POST') {
     if (!allowVisitorFeedback(req)) {
-      sendJson(res, 429, { error: 'thanks — that is enough for now, try again later' });
+      sendJson(res, 429, { error: 'thanks, that is enough for now, try again later' });
       return true;
     }
     if (!db.enabled()) { sendJson(res, 501, { error: 'feedback requires a database' }); return true; }

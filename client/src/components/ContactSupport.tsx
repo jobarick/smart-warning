@@ -9,12 +9,12 @@ export const SUPPORT_EMAIL = 'jobarick@gmail.com';
 const TOPICS: { title: string; body: string; subject: string }[] = [
   {
     title: 'Technical support',
-    body: 'Sign-in trouble, devices not receiving alerts, sirens or notifications not firing, deployment questions.',
+    body: 'Sign in trouble, devices not receiving alerts, sirens or notifications not firing, deployment questions.',
     subject: 'Technical support',
   },
   {
     title: 'Product inquiries',
-    body: 'Rolling Smart Warning out to a new site, pricing, multi-site setups, and what the platform does today.',
+    body: 'Rolling Smart Warning out to a new site, pricing, multi site setups, and what the platform does today.',
     subject: 'Product inquiry',
   },
   {
@@ -53,7 +53,7 @@ export function ContactSupport({ onBack }: Props) {
         <h2>Contact &amp; support</h2>
         <p>
           For help with the Smart Warning platform itself. In an emergency, use the alert
-          button or your local emergency number — not this page.
+          button or your local emergency number, not this page.
         </p>
       </header>
 

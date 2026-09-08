@@ -58,7 +58,7 @@ async function escalateOne(incident) {
   // this is a reminder about the same emergency, not a new one.
   const notification = {
     title: `⏰ Still unacknowledged: ${titleCase(incident.type)} alert`,
-    body: incident.message || `Raised by ${incident.sender || 'a worker'} — nobody has acknowledged this yet`,
+    body: incident.message || `Raised by ${incident.sender || 'a worker'}, nobody has acknowledged this yet`,
     type: incident.type,
     severity: incident.severity,
     tag: 'sw-alert',

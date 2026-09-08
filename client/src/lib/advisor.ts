@@ -91,7 +91,7 @@ const OPENING_MOVE: Record<AlertType, AdvisorAction> = {
   hazard: { text: 'Establish wind direction before choosing where to muster', urgency: 'now' },
   // The same call the routing engine makes: a compromised network is not a
   // reason to put people outdoors.
-  cyber: { text: 'Keep people in place — isolate systems, do not evacuate the building', urgency: 'now' },
+  cyber: { text: 'Keep people in place, isolate systems, do not evacuate the building', urgency: 'now' },
   evacuation: { text: 'Confirm the route to the assembly point is passable', urgency: 'now' },
 };
 
@@ -150,11 +150,11 @@ export function assess(input: AdvisorInput): Assessment | null {
     return {
       risk: 20,
       band: 'low',
-      headline: 'Advisory in effect — no alarm sounding',
+      headline: 'Advisory in effect, no alarm sounding',
       actions: [
         { text: 'Set out what would move this to a full alert, and who makes that call', urgency: 'soon' },
         ...(pendingReports > 0
-          ? [{ text: `${pendingReports} public report${pendingReports === 1 ? '' : 's'} waiting — review before the advisory expires`, urgency: 'soon' as Urgency }]
+          ? [{ text: `${pendingReports} public report${pendingReports === 1 ? '' : 's'} waiting, review before the advisory expires`, urgency: 'soon' as Urgency }]
           : []),
       ],
       resources: [],
@@ -234,29 +234,29 @@ export function assess(input: AdvisorInput): Assessment | null {
     });
   } else if (muster.length > 0) {
     actions.push({
-      text: 'Everyone has reported safe — stand down once the hazard itself is confirmed clear',
+      text: 'Everyone has reported safe. Stand down once the hazard itself is confirmed clear',
       urgency: 'now',
     });
   }
 
   if (minutes >= 10) {
-    actions.push({ text: 'Past ten minutes — confirm external services are en route and log the ETA', urgency: 'now' });
+    actions.push({ text: 'Past ten minutes, confirm external services are en route and log the ETA', urgency: 'now' });
   }
 
   if (muster.length > 0 && located.length / muster.length < 0.5) {
-    actions.push({ text: 'Positions are sparse — fall back to a zone-by-zone roll call', urgency: 'soon' });
+    actions.push({ text: 'Positions are sparse, fall back to a zone by zone roll call', urgency: 'soon' });
   }
 
   if (lowBattery.length > 0) {
     actions.push({
-      text: `${lowBattery.length} device${lowBattery.length === 1 ? '' : 's'} under 20% — may drop off the roster before this ends`,
+      text: `${lowBattery.length} device${lowBattery.length === 1 ? '' : 's'} under 20%, may drop off the roster before this ends`,
       urgency: 'watch',
     });
   }
 
   if (pendingReports > 0) {
     actions.push({
-      text: `${pendingReports} public report${pendingReports === 1 ? '' : 's'} waiting — may describe this same incident`,
+      text: `${pendingReports} public report${pendingReports === 1 ? '' : 's'} waiting, may describe this same incident`,
       urgency: 'soon',
     });
   }
@@ -267,7 +267,7 @@ export function assess(input: AdvisorInput): Assessment | null {
 
   const headline =
     unaccounted.length > 0
-      ? `${accounted.length} of ${muster.length} reported safe — ${unaccounted.length} outstanding`
+      ? `${accounted.length} of ${muster.length} reported safe, ${unaccounted.length} outstanding`
       : muster.length > 0
         ? `All ${muster.length} reported safe`
         : 'No devices are reporting';
