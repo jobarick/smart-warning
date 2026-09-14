@@ -39,8 +39,8 @@ export function TrustedCircle({ token, locale }: Props) {
 
   const add = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) { setError('Give this contact a name.'); return; }
-    if (!phone.trim() && !email.trim()) { setError('Add a phone number or an email so this person can be reached.'); return; }
+    if (!name.trim()) { setError(t(locale, 'contacts.nameRequired')); return; }
+    if (!phone.trim() && !email.trim()) { setError(t(locale, 'contacts.needReachable')); return; }
     if (items.length >= max) { setError(t(locale, 'contacts.limitReached', { max: String(max) })); return; }
     setBusy(true); setError(null);
     try {

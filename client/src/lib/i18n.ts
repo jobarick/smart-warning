@@ -58,7 +58,9 @@ export type StringKey =
   | 'contacts.add'
   | 'contacts.saving'
   | 'contacts.remove'
-  | 'contacts.limitReached';
+  | 'contacts.limitReached'
+  | 'contacts.nameRequired'
+  | 'contacts.needReachable';
 
 type Vars = Record<string, string>;
 
@@ -105,6 +107,8 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'contacts.saving': 'Saving…',
     'contacts.remove': 'Remove',
     'contacts.limitReached': 'You can have up to {max} trusted contacts',
+    'contacts.nameRequired': 'Give this contact a name.',
+    'contacts.needReachable': 'Add a phone number or an email so this person can be reached.',
   },
   sw: {
     'sos.heading': 'SOS ya Dharura',
@@ -148,6 +152,8 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'contacts.saving': 'Inahifadhi…',
     'contacts.remove': 'Ondoa',
     'contacts.limitReached': 'Unaweza kuwa na watu {max} wa kuaminika',
+    'contacts.nameRequired': 'Mpe mtu huyu jina.',
+    'contacts.needReachable': 'Ongeza namba ya simu au barua pepe ili mtu huyu aweze kupatikana.',
   },
 };
 
