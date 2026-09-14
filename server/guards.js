@@ -165,6 +165,12 @@ const allowLogin = rateLimiter({ windowMs: 15 * 60 * 1000, max: 20, name: 'login
 // both mint a new user row, so both draw from the same bucket.
 const allowSignup = rateLimiter({ windowMs: 60 * 60 * 1000, max: 10, name: 'signup' });
 
+// Inviting teammates. Keyed by IP like the other auth limiters — generous for
+// the same reason (a whole site office behind one address), but bounded so
+// one compromised or careless session cannot turn this into a mail-bombing
+// tool against arbitrary addresses.
+const allowOrgInvite = rateLimiter({ windowMs: 60 * 60 * 1000, max: 30, name: 'org-invite' });
+
 // Feedback from somebody who has no account — a visitor on the landing page
 // answering "what almost stopped you?".
 //
@@ -208,5 +214,5 @@ function allowPasswordResetForAddress(email) {
 module.exports = {
   requireAuth, guardOrg, orgContext, orgIdFromRequest, deviceOwnerFromRequest, allowFeature,
   allowReport, allowPlaces, allowWebhook, allowPasswordReset, allowPasswordResetForAddress,
-  allowVisitorFeedback, allowLogin, allowSignup,
+  allowVisitorFeedback, allowLogin, allowSignup, allowOrgInvite,
 };

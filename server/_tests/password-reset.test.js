@@ -134,7 +134,10 @@ test('a registered address is emailed a link and a pasteable code', async () => 
   const msg = sent.at(-1);
   assert.equal(msg.to, EMAIL);
   assert.match(msg.subject, /reset/i);
-  assert.match(msg.body, /https:\/\/smart-warning\.example\/\?reset=/);
+  // /get-started, not a bare '/': a signed-out visitor at '/' sees the
+  // marketing landing page, not the screen that reads this token — see
+  // auth.js's requestPasswordReset for why the link must land on AuthGate.
+  assert.match(msg.body, /https:\/\/smart-warning\.example\/get-started\?reset=/);
   // The provider is named in the message people actually receive.
   assert.match(msg.body, /Idefenda Lab/);
 });
