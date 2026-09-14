@@ -937,6 +937,8 @@ export default function App() {
         userName={settings.deviceName}
         theme={settings.theme}
         onToggleTheme={() => patchSettings({ theme: settings.theme === 'dark' ? 'light' : 'dark' })}
+        locale={settings.locale}
+        onToggleLocale={() => patchSettings({ locale: settings.locale === 'en' ? 'sw' : 'en' })}
       />
 
       {session && (
@@ -1063,7 +1065,7 @@ export default function App() {
         <main className="worker worker-tabbed">
           {tab === 'home' && (
             <>
-              <SosPanel profile={profile} disabled={alarmActive} onTrigger={trigger} />
+              <SosPanel profile={profile} disabled={alarmActive} onTrigger={trigger} locale={settings.locale} />
               {/* Below the SOS, never above it. Billing is the least important
                   thing on this screen and must never push the button that
                   matters further down. Renders nothing unless there is

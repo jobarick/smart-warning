@@ -1,6 +1,20 @@
-import type { Settings } from '../types';
+import type { Settings, Locale } from '../types';
 
 const STORAGE_KEY = 'alert-system-settings-v1';
+
+/**
+ * A one-time guess for a first-time visitor, not a claim about who they are —
+ * every screen that reads it has a switcher right there to override it. Only
+ * `sw` is detected explicitly; everything else falls back to English rather
+ * than guessing at a language this build does not ship yet.
+ */
+function detectLocale(): Locale {
+  try {
+    return navigator.language?.toLowerCase().startsWith('sw') ? 'sw' : 'en';
+  } catch {
+    return 'en';
+  }
+}
 
 export const DEFAULT_SETTINGS: Settings = {
   deviceName: `Device-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -22,6 +36,7 @@ export const DEFAULT_SETTINGS: Settings = {
   assemblyLng: null,
   assemblyLabel: 'Assembly point',
   theme: 'dark',
+  locale: detectLocale(),
 };
 
 /** Build a stable operator ID from a name, e.g. "Samirah A." → "SA-2026-0017". */

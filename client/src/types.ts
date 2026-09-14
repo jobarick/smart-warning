@@ -232,7 +232,11 @@ export interface Settings {
   assemblyLng: number | null;
   assemblyLabel: string; // name of the assembly point
   theme: 'dark' | 'light'; // black or white background
+  locale: Locale;
 }
+
+/** The two languages this build ships. See lib/i18n.ts for the strings. */
+export type Locale = 'en' | 'sw';
 
 import type { IconName } from './components/Icon';
 
