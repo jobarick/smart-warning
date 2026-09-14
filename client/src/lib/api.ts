@@ -137,6 +137,33 @@ export async function fetchIncidents(
   return res.json();
 }
 
+export type PlaceKind = 'hospital' | 'police' | 'fire' | 'shelter' | 'pharmacy';
+
+export interface Place {
+  name: string;
+  lat: number;
+  lng: number;
+  kind: PlaceKind;
+  distanceM: number;
+  phone: string | null;
+  address: string | null;
+}
+
+/**
+ * GET /api/emergency/nearby — server/places.js. Public, unauthenticated
+ * (published-facility data, not incident data), rate-limited server-side
+ * (allowPlaces). The endpoint itself never throws — a bad third-party lookup
+ * degrades to `{ places: [] }`, so the only errors this can surface are a
+ * network failure to our own API or the 429 from that rate limit.
+ */
+export async function fetchNearby(kind: PlaceKind, lat: number, lng: number): Promise<Place[]> {
+  const params = new URLSearchParams({ kind, lat: String(lat), lng: String(lng) });
+  const res = await fetch(`${API_BASE}/api/emergency/nearby?${params.toString()}`);
+  if (!res.ok) throw new Error(res.status === 429 ? 'too many lookups — wait a moment' : `nearby lookup failed (${res.status})`);
+  const body = await res.json();
+  return Array.isArray(body.places) ? body.places : [];
+}
+
 /**
  * A supervisor's formal "I have seen this" — separate from the per-device
  * siren mute, which never leaves the device. `alreadyAcknowledged: true`
