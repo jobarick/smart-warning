@@ -49,6 +49,7 @@ import { hasAcceptedCurrentTerms, saveConsent } from './lib/consent';
 import { TERMS_VERSION } from './lib/terms';
 import { PushToggle } from './components/PushToggle';
 import { EmergencyCallPocket } from './components/EmergencyCallPocket';
+import { NearbyHelp } from './components/NearbyHelp';
 import { SafeRoutePanel } from './components/SafeRoutePanel';
 import { ContactSupport } from './components/ContactSupport';
 import { unsubscribe as unsubscribePush } from './lib/push';
@@ -1100,6 +1101,11 @@ export default function App() {
                 lat={telemetry.lat}
                 lng={telemetry.lng}
                 alertType={alarm.alert?.type ?? null}
+              />
+              <NearbyHelp
+                lat={settings.shareLocation ? telemetry.lat : null}
+                lng={settings.shareLocation ? telemetry.lng : null}
+                locale={settings.locale}
               />
               <Suspense fallback={<PanelFallback label="map" />}>
                 <MapPanel

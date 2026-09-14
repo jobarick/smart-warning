@@ -33,7 +33,19 @@ export type StringKey =
   | 'severity.critical'
   | 'settings.language'
   | 'settings.languageEnglish'
-  | 'settings.languageSwahili';
+  | 'settings.languageSwahili'
+  | 'nearby.heading'
+  | 'nearby.disclaimer'
+  | 'nearby.empty'
+  | 'nearby.loading'
+  | 'nearby.error'
+  | 'nearby.needLocation'
+  | 'nearby.openInMaps'
+  | 'nearby.kind.hospital'
+  | 'nearby.kind.police'
+  | 'nearby.kind.fire'
+  | 'nearby.kind.shelter'
+  | 'nearby.kind.pharmacy';
 
 type Vars = Record<string, string>;
 
@@ -55,6 +67,18 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'settings.language': 'Language',
     'settings.languageEnglish': 'English',
     'settings.languageSwahili': 'Kiswahili',
+    'nearby.heading': 'Nearby help',
+    'nearby.disclaimer': 'From OpenStreetMap, not a verified directory. Always follow official guidance where it is available.',
+    'nearby.empty': 'Nothing found nearby',
+    'nearby.loading': 'Looking nearby…',
+    'nearby.error': "Couldn't look this up — try again in a moment",
+    'nearby.needLocation': 'Turn on location sharing to see nearby help',
+    'nearby.openInMaps': 'Open in maps',
+    'nearby.kind.hospital': 'Hospital',
+    'nearby.kind.police': 'Police',
+    'nearby.kind.fire': 'Fire station',
+    'nearby.kind.shelter': 'Shelter',
+    'nearby.kind.pharmacy': 'Pharmacy',
   },
   sw: {
     'sos.heading': 'SOS ya Dharura',
@@ -73,6 +97,18 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'settings.language': 'Lugha',
     'settings.languageEnglish': 'Kiingereza',
     'settings.languageSwahili': 'Kiswahili',
+    'nearby.heading': 'Msaada wa Karibu',
+    'nearby.disclaimer': 'Taarifa kutoka OpenStreetMap, si orodha iliyothibitishwa. Fuata maelekezo rasmi pale yanapopatikana.',
+    'nearby.empty': 'Hakuna kilichopatikana karibu',
+    'nearby.loading': 'Inatafuta karibu…',
+    'nearby.error': 'Imeshindikana kupata taarifa — jaribu tena baadaye kidogo',
+    'nearby.needLocation': 'Washa kushiriki eneo ili kuona msaada wa karibu',
+    'nearby.openInMaps': 'Fungua kwenye ramani',
+    'nearby.kind.hospital': 'Hospitali',
+    'nearby.kind.police': 'Polisi',
+    'nearby.kind.fire': 'Kituo cha Zimamoto',
+    'nearby.kind.shelter': 'Kimbilio',
+    'nearby.kind.pharmacy': 'Duka la Dawa',
   },
 };
 
@@ -96,4 +132,12 @@ export const SEVERITY_KEY: Record<'low' | 'medium' | 'high' | 'critical', String
   medium: 'severity.medium',
   high: 'severity.high',
   critical: 'severity.critical',
+};
+
+export const PLACE_KIND_KEY: Record<'hospital' | 'police' | 'fire' | 'shelter' | 'pharmacy', StringKey> = {
+  hospital: 'nearby.kind.hospital',
+  police: 'nearby.kind.police',
+  fire: 'nearby.kind.fire',
+  shelter: 'nearby.kind.shelter',
+  pharmacy: 'nearby.kind.pharmacy',
 };
