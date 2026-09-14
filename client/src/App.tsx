@@ -660,8 +660,25 @@ export default function App() {
     setSafeFor(id);
   }, [alarm.alert]);
 
+  // Guards a double-tap on the SOS button from becoming two incidents. The
+  // button disables once `alarmActive` flips true, but that only happens
+  // after the server echoes the alert back — online, a second tap inside
+  // that round trip would otherwise still go out with its own fresh id
+  // before the button catches up. A ref, not state, because React batches
+  // state updates within one tick, so two synchronous clicks can both still
+  // read the old value (the exact trap PaymentModal's `submitting` ref
+  // exists to avoid, for the same class of double-submit bug on payments).
+  //
+  // Kept deliberately short — this catches a double-tap artifact, not a
+  // worried person pressing SOS again a second later because the first tap
+  // did not seem to register. That second press is a real emergency and
+  // must never be silently swallowed; matches the server's own ALERT_COOLDOWN_MS.
+  const lastTriggerAt = useRef(0);
   const trigger = useCallback(
     (type: AlertType, severity: Severity, message: string) => {
+      const now = Date.now();
+      if (now - lastTriggerAt.current < 500) return;
+      lastTriggerAt.current = now;
       void arm(); // we're inside a user gesture — unlock audio for later sirens
       const alert: AlertMessage = {
         kind: 'alert',
