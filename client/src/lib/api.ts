@@ -282,6 +282,62 @@ export async function resetPassword(input: { token: string; password: string }):
   return res.json();
 }
 
+// --- Team invites ---
+//
+// Adding a second (or third) supervisor to an organization. Every invited
+// account is a full supervisor today — role differentiation is separate,
+// later work.
+
+export interface OrgInvite {
+  id: string;
+  email: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export async function inviteTeammate(email: string, token: string): Promise<{ ok: boolean; mailConfigured: boolean }> {
+  const res = await fetch(`${API_BASE}/api/org/invites`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not send that invite'));
+  return res.json();
+}
+
+export async function fetchOrgInvites(token: string): Promise<OrgInvite[]> {
+  const res = await fetch(`${API_BASE}/api/org/invites`, { headers: authHeaders(token) });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not load invites'));
+  const body = await res.json();
+  return body.invites ?? [];
+}
+
+export async function revokeInvite(id: string, token: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/org/invites/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not revoke that invite'));
+}
+
+/** What the accept-invite screen shows before anyone has typed anything. */
+export async function previewInvite(token: string): Promise<{ email: string; orgName: string }> {
+  const res = await fetch(`${API_BASE}/api/auth/invite/${encodeURIComponent(token)}`);
+  if (!res.ok) throw new Error(await errorMessage(res, 'that invite is not valid'));
+  return res.json();
+}
+
+/** Spend an invite and create the account it names. Returns a signed-in session. */
+export async function acceptInvite(input: { token: string; name: string; password: string }): Promise<AuthResult> {
+  const res = await fetch(`${API_BASE}/api/auth/accept-invite`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not accept that invite'));
+  return res.json();
+}
+
 // Validate a stored supervisor token; returns the fresh user or null if invalid.
 export async function fetchMe(token: string): Promise<AuthUser | null> {
   const res = await fetch(`${API_BASE}/api/auth/me`, { headers: authHeaders(token) });

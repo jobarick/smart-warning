@@ -5,7 +5,7 @@ const db = require('../db');
 const { ORGS } = require('../config');
 const { sendJson, readJson } = require('../http');
 const {
-  requireAuth, allowPasswordReset, allowPasswordResetForAddress, allowLogin, allowSignup,
+  requireAuth, allowPasswordReset, allowPasswordResetForAddress, allowLogin, allowSignup, allowOrgInvite,
 } = require('../guards');
 
 async function handle({ req, res, path }) {
@@ -58,6 +58,25 @@ async function handle({ req, res, path }) {
     if (!allowPasswordReset(req)) { sendJson(res, 429, { error: 'too many attempts — please wait a few minutes' }); return true; }
     const body = await readJson(req);
     sendJson(res, 200, await auth.resetPassword({ token: body.token, password: body.password }));
+    return true;
+  }
+
+  // What the accept-invite screen shows before anyone has typed anything.
+  const inviteMatch = path.match(/^\/api\/auth\/invite\/([^/]+)$/);
+  if (inviteMatch && req.method === 'GET') {
+    if (!ORGS) { sendJson(res, 501, { error: 'accounts require a database (DATABASE_URL)' }); return true; }
+    if (!allowOrgInvite(req)) { sendJson(res, 429, { error: 'too many attempts — please wait a while' }); return true; }
+    sendJson(res, 200, await auth.previewInvite(inviteMatch[1]));
+    return true;
+  }
+
+  // Spend an invite and create the account it names. Shares signup's rate
+  // limit — both mint a new user row.
+  if (path === '/api/auth/accept-invite' && req.method === 'POST') {
+    if (!ORGS) { sendJson(res, 501, { error: 'accounts require a database (DATABASE_URL)' }); return true; }
+    if (!allowSignup(req)) { sendJson(res, 429, { error: 'too many attempts — please wait a while' }); return true; }
+    const body = await readJson(req);
+    sendJson(res, 201, await auth.acceptInvite(body));
     return true;
   }
 

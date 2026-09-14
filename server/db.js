@@ -481,6 +481,29 @@ async function init() {
     );
     CREATE INDEX IF NOT EXISTS password_resets_user_idx ON password_resets (user_id, created_at DESC);
 
+    -- An invitation to join an organisation as a second (or third, or
+    -- fourth) supervisor.
+    --
+    -- Same shape as password_resets on purpose, for the same reasons: only
+    -- the hash of the token is stored (the token itself lives in exactly the
+    -- sent email and nowhere else), and single-use/expiry is enforced in the
+    -- UPDATE that consumes it, not by a read-then-write.
+    --
+    -- email is NOT unique here — the same address can be invited again after
+    -- an earlier invite expires or is revoked, and re-inviting must not be a
+    -- distinct code path from inviting the first time.
+    CREATE TABLE IF NOT EXISTS org_invites (
+      id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id     UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      email      TEXT NOT NULL,
+      token_hash TEXT NOT NULL UNIQUE,
+      invited_by UUID REFERENCES users(id) ON DELETE SET NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      used_at    TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS org_invites_org_idx ON org_invites (org_id, created_at DESC);
+
     -- The people a personal account has asked to be told when they raise an
     -- alarm.
     --
@@ -835,6 +858,83 @@ async function setUserPassword(userId, passwordHash) {
     [userId],
   );
   return rows[0];
+}
+
+// --- Organization invites ---------------------------------------------------
+
+async function createOrgInvite({ orgId, email, tokenHash, invitedBy, expiresAt }) {
+  if (!pool) throw new Error('persistence disabled');
+  const { rows } = await pool.query(
+    `INSERT INTO org_invites (org_id, email, token_hash, invited_by, expires_at)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (token_hash) DO NOTHING
+     RETURNING *`,
+    [orgId, email.toLowerCase(), tokenHash, invitedBy, expiresAt],
+  );
+  return rows[0] || null;
+}
+
+// Pending invites for an org's own management screen — never the token, only
+// what an admin needs to see who has an open invite and revoke it.
+async function listOrgInvites(orgId) {
+  if (!pool || !orgId) return [];
+  const { rows } = await pool.query(
+    `SELECT id, email, expires_at, created_at FROM org_invites
+      WHERE org_id = $1 AND used_at IS NULL AND expires_at > now()
+      ORDER BY created_at DESC`,
+    [orgId],
+  );
+  return rows;
+}
+
+async function countPendingInvites(orgId) {
+  if (!pool || !orgId) return 0;
+  const { rows } = await pool.query(
+    `SELECT COUNT(*)::int AS n FROM org_invites WHERE org_id = $1 AND used_at IS NULL AND expires_at > now()`,
+    [orgId],
+  );
+  return rows[0] ? rows[0].n : 0;
+}
+
+/**
+ * Preview an invite without spending it — what the accept screen shows before
+ * anyone has typed a password. Unused/unexpired only, same as consuming it.
+ */
+async function getOrgInvite(tokenHash) {
+  if (!pool) return null;
+  const { rows } = await pool.query(
+    `SELECT oi.email, oi.expires_at, o.name AS org_name
+       FROM org_invites oi JOIN organizations o ON o.id = oi.org_id
+      WHERE oi.token_hash = $1 AND oi.used_at IS NULL AND oi.expires_at > now()`,
+    [tokenHash],
+  );
+  return rows[0] || null;
+}
+
+/**
+ * Spend an invite, returning the org it belongs to and the email it was sent
+ * to. The unused/unexpired test lives in the UPDATE's WHERE clause, same
+ * reasoning as consumePasswordReset: a link opened twice must succeed once.
+ */
+async function consumeOrgInvite(tokenHash) {
+  if (!pool) return null;
+  const { rows } = await pool.query(
+    `UPDATE org_invites
+        SET used_at = now()
+      WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()
+      RETURNING org_id, email`,
+    [tokenHash],
+  );
+  return rows[0] || null;
+}
+
+async function deleteOrgInvite(id, orgId) {
+  if (!pool || !orgId) return null;
+  const { rows } = await pool.query(
+    `DELETE FROM org_invites WHERE id = $1 AND org_id = $2 AND used_at IS NULL RETURNING id`,
+    [id, orgId],
+  );
+  return rows[0] || null;
 }
 
 // --- Personal emergency contacts -------------------------------------------
@@ -2087,6 +2187,12 @@ module.exports = {
   createPasswordReset,
   consumePasswordReset,
   setUserPassword,
+  createOrgInvite,
+  listOrgInvites,
+  countPendingInvites,
+  getOrgInvite,
+  consumeOrgInvite,
+  deleteOrgInvite,
   ensureUserSubscription,
   getUserSubscription,
   updateUserSubscription,

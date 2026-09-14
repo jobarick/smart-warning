@@ -77,6 +77,7 @@ const MapPanel = lazy(() => import('./components/MapPanel').then((m) => ({ defau
 const CommandDashboard = lazy(() => import('./components/CommandDashboard').then((m) => ({ default: m.CommandDashboard })));
 const FeedbackCenter = lazy(() => import('./components/FeedbackCenter').then((m) => ({ default: m.FeedbackCenter })));
 const DestinationsManager = lazy(() => import('./components/DestinationsManager').then((m) => ({ default: m.DestinationsManager })));
+const TeamInvites = lazy(() => import('./components/TeamInvites').then((m) => ({ default: m.TeamInvites })));
 const BillingPanel = lazy(() => import('./components/BillingPanel').then((m) => ({ default: m.BillingPanel })));
 
 // Deliberately plain: a spinner that appears for one frame is noise, and these
@@ -1029,6 +1030,7 @@ export default function App() {
           </button>
           <Suspense fallback={<PanelFallback label="tools" />}>
             <DestinationsManager token={token} roster={roster} />
+            {token && <TeamInvites token={token} />}
             <FeedbackCenter token={token} />
           </Suspense>
         </main>
