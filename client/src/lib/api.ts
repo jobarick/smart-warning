@@ -427,6 +427,68 @@ export async function deletePushSubscription(
   }).catch(() => {});
 }
 
+// --- Personal emergency contacts ("Trusted Circle") ---
+//
+// Individual accounts only — server/routes/contacts.js refuses an org
+// account with a 403, because an organization has a roster and Safety
+// Coordinators instead. These are the people told when SOMEONE raises an
+// alarm; today nothing on the alert path actually notifies them yet (the
+// list is stored, but delivery is not wired up).
+
+export interface Contact {
+  id: string;
+  name: string;
+  relation: string | null;
+  phone: string | null;
+  email: string | null;
+  priority: number;
+  notify: boolean;
+  verifiedAt: string | null;
+}
+
+export async function fetchContacts(token: string): Promise<{ contacts: Contact[]; max: number }> {
+  const res = await fetch(`${API_BASE}/api/contacts`, { headers: authHeaders(token) });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not load your trusted circle'));
+  return res.json();
+}
+
+export async function createContact(
+  input: { name: string; relation?: string; phone?: string; email?: string; notify?: boolean },
+  token: string,
+): Promise<Contact> {
+  const res = await fetch(`${API_BASE}/api/contacts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not save this contact'));
+  const body = await res.json();
+  return body.contact;
+}
+
+export async function updateContact(
+  id: string,
+  patch: { name?: string; relation?: string; phone?: string; email?: string; notify?: boolean },
+  token: string,
+): Promise<Contact> {
+  const res = await fetch(`${API_BASE}/api/contacts/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not update this contact'));
+  const body = await res.json();
+  return body.contact;
+}
+
+export async function deleteContact(id: string, token: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/contacts/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not remove this contact'));
+}
+
 // --- Organization profile ---
 
 export async function updateOrg(

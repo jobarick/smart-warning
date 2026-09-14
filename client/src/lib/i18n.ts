@@ -45,7 +45,20 @@ export type StringKey =
   | 'nearby.kind.police'
   | 'nearby.kind.fire'
   | 'nearby.kind.shelter'
-  | 'nearby.kind.pharmacy';
+  | 'nearby.kind.pharmacy'
+  | 'contacts.heading'
+  | 'contacts.notice'
+  | 'contacts.empty'
+  | 'contacts.name'
+  | 'contacts.relation'
+  | 'contacts.relationPlaceholder'
+  | 'contacts.phone'
+  | 'contacts.email'
+  | 'contacts.notify'
+  | 'contacts.add'
+  | 'contacts.saving'
+  | 'contacts.remove'
+  | 'contacts.limitReached';
 
 type Vars = Record<string, string>;
 
@@ -79,6 +92,19 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'nearby.kind.fire': 'Fire station',
     'nearby.kind.shelter': 'Shelter',
     'nearby.kind.pharmacy': 'Pharmacy',
+    'contacts.heading': 'Trusted circle',
+    'contacts.notice': 'These are people you trust, not an emergency service — they cannot dispatch help.',
+    'contacts.empty': 'No one added yet',
+    'contacts.name': 'Name',
+    'contacts.relation': 'Relation',
+    'contacts.relationPlaceholder': 'e.g. sister, neighbour',
+    'contacts.phone': 'Phone',
+    'contacts.email': 'Email',
+    'contacts.notify': 'Notify this person',
+    'contacts.add': 'Add to trusted circle',
+    'contacts.saving': 'Saving…',
+    'contacts.remove': 'Remove',
+    'contacts.limitReached': 'You can have up to {max} trusted contacts',
   },
   sw: {
     'sos.heading': 'SOS ya Dharura',
@@ -109,6 +135,19 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'nearby.kind.fire': 'Kituo cha Zimamoto',
     'nearby.kind.shelter': 'Kimbilio',
     'nearby.kind.pharmacy': 'Duka la Dawa',
+    'contacts.heading': 'Mzunguko wa Watu wa Kuaminika',
+    'contacts.notice': 'Hawa ni watu unaowaamini, si huduma ya dharura — hawawezi kutuma msaada.',
+    'contacts.empty': 'Bado hakuna aliyeongezwa',
+    'contacts.name': 'Jina',
+    'contacts.relation': 'Uhusiano',
+    'contacts.relationPlaceholder': 'mfano: dada, jirani',
+    'contacts.phone': 'Simu',
+    'contacts.email': 'Barua pepe',
+    'contacts.notify': 'Mjulishe mtu huyu',
+    'contacts.add': 'Ongeza kwenye mzunguko wa kuaminika',
+    'contacts.saving': 'Inahifadhi…',
+    'contacts.remove': 'Ondoa',
+    'contacts.limitReached': 'Unaweza kuwa na watu {max} wa kuaminika',
   },
 };
 
