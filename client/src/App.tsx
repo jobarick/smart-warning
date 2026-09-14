@@ -1148,6 +1148,7 @@ export default function App() {
               onSettings={() => navigate('/settings')}
               onSupport={() => navigate('/support')}
               onBilling={token ? () => navigate('/billing') : undefined}
+              locale={settings.locale}
             />
           )}
         </main>
