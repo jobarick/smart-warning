@@ -1,18 +1,20 @@
 import { useEffect, useState } from 'react';
-import type { AlertType, Severity } from '../types';
-import { ALERT_META, SEVERITY_META } from '../types';
+import type { AlertType, Locale, Severity } from '../types';
+import { ALERT_META } from '../types';
 import type { IndustryProfile } from '../lib/profiles';
+import { t, SEVERITY_KEY } from '../lib/i18n';
 import { Icon } from './Icon';
 
 interface Props {
   profile: IndustryProfile;
   disabled: boolean;
   onTrigger: (type: AlertType, severity: Severity, message: string) => void;
+  locale: Locale;
 }
 
 const SEVERITIES: Severity[] = ['low', 'medium', 'high', 'critical'];
 
-export function SosPanel({ profile, disabled, onTrigger }: Props) {
+export function SosPanel({ profile, disabled, onTrigger, locale }: Props) {
   const [selected, setSelected] = useState<AlertType | null>(null);
   const [severity, setSeverity] = useState<Severity>('high');
   const [message, setMessage] = useState('');
@@ -38,7 +40,7 @@ export function SosPanel({ profile, disabled, onTrigger }: Props) {
 
   return (
     <section className="sos" aria-labelledby="sos-heading">
-      <h2 id="sos-heading" className="sos-title">Emergency SOS</h2>
+      <h2 id="sos-heading" className="sos-title">{t(locale, 'sos.heading')}</h2>
 
       <button
         type="button"
@@ -50,11 +52,21 @@ export function SosPanel({ profile, disabled, onTrigger }: Props) {
         <span className="sos-hero-ring" aria-hidden="true" />
         <span className="sos-hero-word">SOS</span>
         <span className="sos-hero-sub">
-          {disabled ? 'Alert active' : chosen ? `Tap to send ${chosen.label}` : 'Tap to alert'}
+          {disabled
+            ? t(locale, 'sos.alertActive')
+            /* chosen.label is still English-only — it comes from the
+               industry profile's own alert list (lib/profiles.ts), a much
+               larger translation job (5 profiles × several alerts each,
+               with full protocol text) deliberately left for its own pass. */
+            : chosen ? t(locale, 'sos.tapToSend', { type: chosen.label }) : t(locale, 'sos.tapToAlert')}
         </span>
       </button>
 
-      <p className="sos-pick">{disabled ? 'An alert is active' : chosen ? `${SEVERITY_META[severity].label} severity` : 'Choose the emergency, then press SOS'}</p>
+      <p className="sos-pick">
+        {disabled
+          ? t(locale, 'sos.alertActiveLong')
+          : chosen ? t(locale, 'sos.severityLabel', { severity: t(locale, SEVERITY_KEY[severity]) }) : t(locale, 'sos.choosePrompt')}
+      </p>
 
       <div className={`sos-types ${flash ? 'flash' : ''}`} role="group" aria-label="Emergency type">
         {profile.alerts.map((a) => {
@@ -88,7 +100,7 @@ export function SosPanel({ profile, disabled, onTrigger }: Props) {
             disabled={disabled}
             onClick={() => setSeverity(s)}
           >
-            {SEVERITY_META[s].label}
+            {t(locale, SEVERITY_KEY[s])}
           </button>
         ))}
       </div>
@@ -97,13 +109,15 @@ export function SosPanel({ profile, disabled, onTrigger }: Props) {
         className="sos-msg"
         type="text"
         maxLength={120}
-        placeholder="Add a location or note (optional)"
+        placeholder={t(locale, 'sos.notePlaceholder')}
         value={message}
         disabled={disabled}
         onChange={(e) => setMessage(e.target.value)}
       />
 
-      <p className="sos-hint">{profile.label} · alerts reach every connected device on your network</p>
+      {/* profile.label (industry profile name) is also part of the larger
+          lib/profiles.ts translation job — left in English for now. */}
+      <p className="sos-hint">{t(locale, 'sos.hint', { profile: profile.label })}</p>
     </section>
   );
 }
