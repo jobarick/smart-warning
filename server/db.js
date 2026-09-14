@@ -145,7 +145,7 @@ async function init() {
       id          BIGSERIAL PRIMARY KEY,
       incident_id TEXT NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
       org_id      UUID,
-      kind        TEXT NOT NULL, -- raised | responding | acknowledged | escalated | resolved
+      kind        TEXT NOT NULL, -- raised | notified | responding | acknowledged | escalated | resolved
       actor_name  TEXT,
       actor_role  TEXT,          -- worker | supervisor | system
       detail      JSONB,
