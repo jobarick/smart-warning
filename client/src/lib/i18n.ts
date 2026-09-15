@@ -60,7 +60,78 @@ export type StringKey =
   | 'contacts.remove'
   | 'contacts.limitReached'
   | 'contacts.nameRequired'
-  | 'contacts.needReachable';
+  | 'contacts.needReachable'
+  | 'landing.skipToContent'
+  | 'landing.nav.how'
+  | 'landing.nav.pricing'
+  | 'landing.nav.privacy'
+  | 'landing.nav.legal'
+  | 'landing.nav.signin'
+  | 'landing.hero.heading'
+  | 'landing.hero.lead'
+  | 'landing.hero.getStarted'
+  | 'landing.hero.teamCode'
+  | 'landing.hero.watchDemo'
+  | 'landing.hero.noCard'
+  | 'landing.hero.trust1'
+  | 'landing.hero.trust2'
+  | 'landing.hero.trust3'
+  | 'landing.hero.trust4'
+  | 'landing.honest.heading'
+  | 'landing.honest.p1'
+  | 'landing.honest.p2b'
+  | 'landing.honest.p2'
+  | 'landing.how.heading'
+  | 'landing.how.step1Title'
+  | 'landing.how.step1Body'
+  | 'landing.how.step2Title'
+  | 'landing.how.step2Body'
+  | 'landing.how.step3Title'
+  | 'landing.how.step3Body'
+  | 'landing.who.heading'
+  | 'landing.who.soloTitle'
+  | 'landing.who.soloBody'
+  | 'landing.who.soloPriceFree'
+  | 'landing.who.soloPricePaid'
+  | 'landing.who.teamTitle'
+  | 'landing.who.teamBody'
+  | 'landing.who.teamPrice'
+  | 'landing.pricing.heading'
+  | 'landing.pricing.sub'
+  | 'landing.pricing.mostPopular'
+  | 'landing.pricing.oneSeat'
+  | 'landing.pricing.upToSeats'
+  | 'landing.pricing.anySeats'
+  | 'landing.pricing.free'
+  | 'landing.pricing.perMonth'
+  | 'landing.pricing.talkToUs'
+  | 'landing.pricing.mobileMoney'
+  | 'landing.pricing.cardsAccepted'
+  | 'landing.pricing.termsNote'
+  | 'landing.pricing.startTrial'
+  | 'landing.privacy.heading'
+  | 'landing.privacy.card1Title'
+  | 'landing.privacy.card1Body'
+  | 'landing.privacy.card2Title'
+  | 'landing.privacy.card2Body'
+  | 'landing.privacy.card3Title'
+  | 'landing.privacy.card3Body'
+  | 'landing.privacy.card4Title'
+  | 'landing.privacy.card4Body'
+  | 'landing.privacy.linkPrivacy'
+  | 'landing.privacy.linkTerms'
+  | 'landing.privacy.linkDelete'
+  | 'landing.final.heading'
+  | 'landing.final.body'
+  | 'landing.footer.aboutHeading'
+  | 'landing.footer.aboutP1'
+  | 'landing.footer.aboutP2'
+  | 'landing.footer.aboutAnswer'
+  | 'landing.footer.terms'
+  | 'landing.footer.privacy'
+  | 'landing.footer.accountDeletion'
+  | 'landing.footer.support'
+  | 'landing.footer.copyright';
 
 type Vars = Record<string, string>;
 
@@ -109,6 +180,77 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'contacts.limitReached': 'You can have up to {max} trusted contacts',
     'contacts.nameRequired': 'Give this contact a name.',
     'contacts.needReachable': 'Add a phone number or an email so this person can be reached.',
+    'landing.skipToContent': 'Skip to content',
+    'landing.nav.how': 'How it works',
+    'landing.nav.pricing': 'Pricing',
+    'landing.nav.privacy': 'Privacy',
+    'landing.nav.legal': 'Legal',
+    'landing.nav.signin': 'Sign in',
+    'landing.hero.heading': 'Help arrives faster when everyone knows at once.',
+    'landing.hero.lead': 'One tap raises the alarm, on every phone on your site, with your live location, in about a second. For one person, or a team of five hundred.',
+    'landing.hero.getStarted': 'Get started, free for 30 days',
+    'landing.hero.teamCode': 'I have a team code',
+    'landing.hero.watchDemo': 'Watch it happen. 12 seconds, no signup',
+    'landing.hero.noCard': 'No card required. Works in any phone browser.',
+    'landing.hero.trust1': 'Built by {provider}',
+    'landing.hero.trust2': 'Location shared only during an active alert',
+    'landing.hero.trust3': 'No background tracking',
+    'landing.hero.trust4': 'Delete your account any time',
+    'landing.honest.heading': 'What Smart Warning is not',
+    'landing.honest.p1': 'Smart Warning complements emergency services. It does not replace them. It cannot dispatch police, fire, or an ambulance, and it is not affiliated with any emergency service or government body.',
+    'landing.honest.p2b': 'In a life threatening emergency, call your local emergency number first',
+    'landing.honest.p2': ', then use Smart Warning to alert the people around you.',
+    'landing.how.heading': 'How it works',
+    'landing.how.step1Title': 'Raise it',
+    'landing.how.step1Body': 'Pick what is happening and hold the SOS button. Fire, medical, security, hazard, cyber, or evacuation, each at four severities.',
+    'landing.how.step2Title': 'Everyone knows',
+    'landing.how.step2Body': 'Phones with Smart Warning open alarm at once: full screen, siren, vibration. Phones that are locked or closed get a push notification. Your location appears on the map either way.',
+    'landing.how.step3Title': 'Someone comes',
+    'landing.how.step3Body': 'Your Safety Coordinator acknowledges, and everyone you alerted sees that help is on the way, with an ETA.',
+    'landing.who.heading': 'Who it is for',
+    'landing.who.soloTitle': 'On your own',
+    'landing.who.soloBody': 'A panic button that actually reaches someone. Your trusted contacts get your live location the moment you raise an alert.',
+    'landing.who.soloPriceFree': 'Free for 30 days.',
+    'landing.who.soloPricePaid': 'Free for 30 days, then {price} a month.',
+    'landing.who.teamTitle': 'For a site or team',
+    'landing.who.teamBody': 'Your workers join with a code, no accounts to create. You get a live roster, a map, and an incident record you can hand to an inspector.',
+    'landing.who.teamPrice': 'Team and site plans, billed monthly or yearly.',
+    'landing.pricing.heading': 'What it costs',
+    'landing.pricing.sub': 'Every plan starts with a 30 day trial. We do not ask for payment details to begin, and nothing charges itself when the trial ends. You choose a plan, or you keep the free one.',
+    'landing.pricing.mostPopular': 'Most people start here',
+    'landing.pricing.oneSeat': 'One person',
+    'landing.pricing.upToSeats': 'Up to {n} people',
+    'landing.pricing.anySeats': 'Any number of people',
+    'landing.pricing.free': 'Free',
+    'landing.pricing.perMonth': '/ month',
+    'landing.pricing.talkToUs': 'Talk to us',
+    'landing.pricing.mobileMoney': 'Pay with mobile money: Mixx by Yas, MPesa, Airtel Money, HaloPesa, EzyPesa.',
+    'landing.pricing.cardsAccepted': 'Cards accepted.',
+    'landing.pricing.termsNote': 'Prices in Tanzanian shillings. Cancel whenever you like; you keep the plan until the month you paid for runs out.',
+    'landing.pricing.startTrial': 'Start your 30 days',
+    'landing.privacy.heading': 'Your location is yours',
+    'landing.privacy.card1Title': 'We do not track you in the background',
+    'landing.privacy.card1Body': 'The app asks for your location only while an alert is active. When it is cleared, it stops. There is no background location permission in this app. You can check the permission list yourself.',
+    'landing.privacy.card2Title': 'Your alert goes to your people',
+    'landing.privacy.card2Body': "Alerts are relayed to the phones in your team or your contact list. We do not sell data and we do not run ads. This website measures page visits with Vercel's cookieless analytics; the Android app and the alerting relay carry no analytics at all.",
+    'landing.privacy.card3Title': 'We cannot read your password',
+    'landing.privacy.card3Body': 'It is stored in a form that cannot be reversed. If you lose it we can help you set a new one, we can never send you the old one. Everything travels over an encrypted connection, on the web and in the app.',
+    'landing.privacy.card4Title': 'You can delete everything',
+    'landing.privacy.card4Body': 'One button deletes your account and everything attached to it: your incidents, your location history, your reports. It happens immediately.',
+    'landing.privacy.linkPrivacy': 'Full Privacy Policy',
+    'landing.privacy.linkTerms': 'Terms & Conditions',
+    'landing.privacy.linkDelete': 'How to delete your account',
+    'landing.final.heading': 'Ready when you are',
+    'landing.final.body': 'Set it up before you need it. That is the whole point.',
+    'landing.footer.aboutHeading': 'About Smart Warning',
+    'landing.footer.aboutP1': 'Smart Warning is built by {provider}, an independent software team in Tanzania. We build it because a fire alarm on a wall only helps the people who can hear it, and most emergencies start with one person who needs everyone else to know, now.',
+    'landing.footer.aboutP2': 'Questions, problems, or something that did not work when it mattered:',
+    'landing.footer.aboutAnswer': 'we answer.',
+    'landing.footer.terms': 'Terms',
+    'landing.footer.privacy': 'Privacy',
+    'landing.footer.accountDeletion': 'Account deletion',
+    'landing.footer.support': 'Support',
+    'landing.footer.copyright': 'Not an emergency service.',
   },
   sw: {
     'sos.heading': 'SOS ya Dharura',
@@ -154,6 +296,77 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'contacts.limitReached': 'Unaweza kuwa na watu {max} wa kuaminika',
     'contacts.nameRequired': 'Mpe mtu huyu jina.',
     'contacts.needReachable': 'Ongeza namba ya simu au barua pepe ili mtu huyu aweze kupatikana.',
+    'landing.skipToContent': 'Rukia hadi maudhui',
+    'landing.nav.how': 'Jinsi inavyofanya kazi',
+    'landing.nav.pricing': 'Bei',
+    'landing.nav.privacy': 'Faragha',
+    'landing.nav.legal': 'Kisheria',
+    'landing.nav.signin': 'Ingia',
+    'landing.hero.heading': 'Msaada hufika haraka zaidi wakati kila mtu anajua kwa wakati mmoja.',
+    'landing.hero.lead': 'Mguso mmoja huwasha kengele, kwenye kila simu eneo lako, ukiwa na eneo lako la moja kwa moja, ndani ya sekunde moja. Kwa mtu mmoja, au timu ya watu mia tano.',
+    'landing.hero.getStarted': 'Anza, bure kwa siku 30',
+    'landing.hero.teamCode': 'Nina msimbo wa timu',
+    'landing.hero.watchDemo': 'Tazama jinsi inavyofanya kazi. Sekunde 12, hakuna usajili',
+    'landing.hero.noCard': 'Hakuna kadi inayohitajika. Inafanya kazi kwenye kivinjari chochote cha simu.',
+    'landing.hero.trust1': 'Imetengenezwa na {provider}',
+    'landing.hero.trust2': 'Eneo hushirikiwa tu wakati wa tahadhari inayoendelea',
+    'landing.hero.trust3': 'Hakuna ufuatiliaji wa nyuma',
+    'landing.hero.trust4': 'Futa akaunti yako wakati wowote',
+    'landing.honest.heading': 'Smart Warning si nini',
+    'landing.honest.p1': 'Smart Warning huongeza huduma za dharura. Haichukui nafasi yao. Haiwezi kutuma polisi, zimamoto, au gari la wagonjwa, na haihusiani na huduma yoyote ya dharura au taasisi ya serikali.',
+    'landing.honest.p2b': 'Katika dharura inayohatarisha maisha, piga simu namba yako ya dharura kwanza',
+    'landing.honest.p2': ', kisha tumia Smart Warning kuwajulisha watu walio karibu nawe.',
+    'landing.how.heading': 'Jinsi inavyofanya kazi',
+    'landing.how.step1Title': 'Zindua',
+    'landing.how.step1Body': 'Chagua kinachotokea kisha shikilia kitufe cha SOS. Moto, matibabu, usalama, hatari, mtandao, au uhamishaji, kila moja ikiwa na viwango vinne.',
+    'landing.how.step2Title': 'Kila mtu anajua',
+    'landing.how.step2Body': 'Simu zenye Smart Warning huwasha kengele mara moja: skrini nzima, kengele, mtetemo. Simu zilizofungwa au zilizozimwa hupokea arifa. Eneo lako huonekana kwenye ramani kwa hali zote mbili.',
+    'landing.how.step3Title': 'Mtu anakuja',
+    'landing.how.step3Body': 'Msimamizi wako wa Usalama hukiri, na kila uliyemjulisha huona kuwa msaada unakuja, pamoja na muda wa kufika.',
+    'landing.who.heading': 'Ni kwa ajili ya nani',
+    'landing.who.soloTitle': 'Peke yako',
+    'landing.who.soloBody': 'Kitufe cha hofu kinachomfikia mtu kweli. Anwani zako za kuaminika hupokea eneo lako la moja kwa moja mara tu unapotoa tahadhari.',
+    'landing.who.soloPriceFree': 'Bure kwa siku 30.',
+    'landing.who.soloPricePaid': 'Bure kwa siku 30, kisha {price} kwa mwezi.',
+    'landing.who.teamTitle': 'Kwa eneo au timu',
+    'landing.who.teamBody': 'Wafanyakazi wako hujiunga kwa msimbo, hakuna akaunti za kuunda. Unapata orodha ya moja kwa moja, ramani, na rekodi ya tukio unayoweza kumkabidhi mkaguzi.',
+    'landing.who.teamPrice': 'Mipango ya timu na eneo, hulipwa kila mwezi au mwaka.',
+    'landing.pricing.heading': 'Gharama',
+    'landing.pricing.sub': 'Kila mpango huanza na jaribio la siku 30. Hatuombi taarifa za malipo kuanza, na hakuna kinachojitoza pesa jaribio linapoisha. Unachagua mpango, au unabaki na ule wa bure.',
+    'landing.pricing.mostPopular': 'Watu wengi huanzia hapa',
+    'landing.pricing.oneSeat': 'Mtu mmoja',
+    'landing.pricing.upToSeats': 'Hadi watu {n}',
+    'landing.pricing.anySeats': 'Idadi yoyote ya watu',
+    'landing.pricing.free': 'Bure',
+    'landing.pricing.perMonth': '/ mwezi',
+    'landing.pricing.talkToUs': 'Ongea nasi',
+    'landing.pricing.mobileMoney': 'Lipa kwa pesa ya simu: Mixx by Yas, MPesa, Airtel Money, HaloPesa, EzyPesa.',
+    'landing.pricing.cardsAccepted': 'Kadi zinakubaliwa.',
+    'landing.pricing.termsNote': 'Bei kwa shilingi za Kitanzania. Ghairi wakati wowote unavyotaka; unabaki na mpango hadi mwezi uliolipia utakapoisha.',
+    'landing.pricing.startTrial': 'Anza siku zako 30',
+    'landing.privacy.heading': 'Eneo lako ni lako',
+    'landing.privacy.card1Title': 'Hatukufuatilii ukiwa nyuma',
+    'landing.privacy.card1Body': 'Programu huomba eneo lako tu wakati tahadhari inaendelea. Inapofutwa, huacha. Hakuna ruhusa ya eneo la nyuma katika programu hii. Unaweza kuangalia orodha ya ruhusa mwenyewe.',
+    'landing.privacy.card2Title': 'Tahadhari yako huwafikia watu wako',
+    'landing.privacy.card2Body': 'Tahadhari husambazwa kwenye simu za timu yako au orodha yako ya anwani. Hatuuzi taarifa na hatuendeshi matangazo. Tovuti hii hupima matembezi ya ukurasa kwa kutumia takwimu za Vercel zisizo na vidakuzi; programu ya Android na huduma ya kusambaza tahadhari hazina takwimu kabisa.',
+    'landing.privacy.card3Title': 'Hatuwezi kusoma nywila yako',
+    'landing.privacy.card3Body': 'Huhifadhiwa kwa njia isiyoweza kubadilishwa nyuma. Ukiisahau tunaweza kukusaidia kuweka mpya, hatuwezi kamwe kukutumia ile ya zamani. Kila kitu husafiri kupitia muunganisho uliosimbwa, kwenye wavuti na kwenye programu.',
+    'landing.privacy.card4Title': 'Unaweza kufuta kila kitu',
+    'landing.privacy.card4Body': 'Kitufe kimoja hufuta akaunti yako na kila kilichounganishwa nayo: matukio yako, historia ya eneo lako, ripoti zako. Hutokea mara moja.',
+    'landing.privacy.linkPrivacy': 'Sera Kamili ya Faragha',
+    'landing.privacy.linkTerms': 'Vigezo na Masharti',
+    'landing.privacy.linkDelete': 'Jinsi ya kufuta akaunti yako',
+    'landing.final.heading': 'Tuko tayari wakati wowote utakapokuwa tayari',
+    'landing.final.body': 'Iweke tayari kabla hujaihitaji. Hilo ndilo lengo lote.',
+    'landing.footer.aboutHeading': 'Kuhusu Smart Warning',
+    'landing.footer.aboutP1': 'Smart Warning imetengenezwa na {provider}, timu huru ya programu nchini Tanzania. Tunaitengeneza kwa sababu kengele ya moto ukutani husaidia tu watu wanaoisikia, na dharura nyingi huanza na mtu mmoja anayehitaji kila mtu mwingine ajue, sasa hivi.',
+    'landing.footer.aboutP2': 'Maswali, matatizo, au kitu kisichofanya kazi wakati muhimu:',
+    'landing.footer.aboutAnswer': 'tunajibu.',
+    'landing.footer.terms': 'Vigezo',
+    'landing.footer.privacy': 'Faragha',
+    'landing.footer.accountDeletion': 'Kufuta akaunti',
+    'landing.footer.support': 'Msaada',
+    'landing.footer.copyright': 'Sio huduma ya dharura.',
   },
 };
 

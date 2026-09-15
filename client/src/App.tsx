@@ -871,6 +871,8 @@ export default function App() {
       <LandingPage
         onGetStarted={(step) => navigate(step ? `${AUTH_ROUTE}?step=${step}` : AUTH_ROUTE)}
         onWatchDemo={() => navigate(DEMO_ROUTE)}
+        locale={settings.locale}
+        onToggleLocale={() => patchSettings({ locale: settings.locale === 'en' ? 'sw' : 'en' })}
       />
     );
   }
@@ -891,6 +893,8 @@ export default function App() {
       <LandingPage
         onGetStarted={(step) => navigate(step ? `${AUTH_ROUTE}?step=${step}` : AUTH_ROUTE)}
         onWatchDemo={() => navigate(DEMO_ROUTE)}
+        locale={settings.locale}
+        onToggleLocale={() => patchSettings({ locale: settings.locale === 'en' ? 'sw' : 'en' })}
       />
     );
   }
