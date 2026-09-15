@@ -58,7 +58,7 @@ export function PendingReports({ reports, profile, error, onEscalate, onDismiss 
 
       {reports.length === 0 ? (
         <p className="rep-empty">
-          Nothing waiting. Reports filed from your site’s public link appear here for review — they
+          Nothing waiting. Reports filed from your site’s public link appear here for review. They
           never sound an alarm on their own.
         </p>
       ) : (

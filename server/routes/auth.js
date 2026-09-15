@@ -11,7 +11,7 @@ const {
 async function handle({ req, res, path }) {
   if (path === '/api/auth/signup' && req.method === 'POST') {
     if (!ORGS) { sendJson(res, 501, { error: 'accounts require a database (DATABASE_URL)' }); return true; }
-    if (!allowSignup(req)) { sendJson(res, 429, { error: 'too many attempts — please wait a while' }); return true; }
+    if (!allowSignup(req)) { sendJson(res, 429, { error: 'too many attempts, please wait a while' }); return true; }
     const body = await readJson(req);
     sendJson(res, 201, await auth.signup(body));
     return true;
@@ -21,7 +21,7 @@ async function handle({ req, res, path }) {
   // they create different things — and the organisation flow is in daily use.
   if (path === '/api/auth/signup/personal' && req.method === 'POST') {
     if (!ORGS) { sendJson(res, 501, { error: 'accounts require a database (DATABASE_URL)' }); return true; }
-    if (!allowSignup(req)) { sendJson(res, 429, { error: 'too many attempts — please wait a while' }); return true; }
+    if (!allowSignup(req)) { sendJson(res, 429, { error: 'too many attempts, please wait a while' }); return true; }
     const body = await readJson(req);
     sendJson(res, 201, await auth.signupIndividual(body));
     return true;
@@ -29,7 +29,7 @@ async function handle({ req, res, path }) {
 
   if (path === '/api/auth/login' && req.method === 'POST') {
     if (!ORGS) { sendJson(res, 501, { error: 'accounts require a database (DATABASE_URL)' }); return true; }
-    if (!allowLogin(req)) { sendJson(res, 429, { error: 'too many attempts — please wait a few minutes' }); return true; }
+    if (!allowLogin(req)) { sendJson(res, 429, { error: 'too many attempts, please wait a few minutes' }); return true; }
     const body = await readJson(req);
     sendJson(res, 200, await auth.login(body));
     return true;
@@ -39,13 +39,13 @@ async function handle({ req, res, path }) {
   // — see auth.requestPasswordReset for why that is not merely politeness.
   if (path === '/api/auth/forgot' && req.method === 'POST') {
     if (!ORGS) { sendJson(res, 501, { error: 'accounts require a database (DATABASE_URL)' }); return true; }
-    if (!allowPasswordReset(req)) { sendJson(res, 429, { error: 'too many attempts — please wait a few minutes' }); return true; }
+    if (!allowPasswordReset(req)) { sendJson(res, 429, { error: 'too many attempts, please wait a few minutes' }); return true; }
     const body = await readJson(req);
     // Same response either way, checked before touching auth.js at all: this
     // must read identically whether the address is over its own cooldown or
     // simply not a real account, or the endpoint becomes a way to learn which.
     if (!allowPasswordResetForAddress(body.email)) {
-      sendJson(res, 429, { error: 'too many attempts — please wait a few minutes' });
+      sendJson(res, 429, { error: 'too many attempts, please wait a few minutes' });
       return true;
     }
     sendJson(res, 200, await auth.requestPasswordReset({ email: body.email }));
@@ -55,7 +55,7 @@ async function handle({ req, res, path }) {
   // Spend a reset link and choose a new password.
   if (path === '/api/auth/reset' && req.method === 'POST') {
     if (!ORGS) { sendJson(res, 501, { error: 'accounts require a database (DATABASE_URL)' }); return true; }
-    if (!allowPasswordReset(req)) { sendJson(res, 429, { error: 'too many attempts — please wait a few minutes' }); return true; }
+    if (!allowPasswordReset(req)) { sendJson(res, 429, { error: 'too many attempts, please wait a few minutes' }); return true; }
     const body = await readJson(req);
     sendJson(res, 200, await auth.resetPassword({ token: body.token, password: body.password }));
     return true;

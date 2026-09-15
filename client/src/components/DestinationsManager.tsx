@@ -19,8 +19,8 @@ const KINDS: { id: DestinationKind; label: string; hint: string }[] = [
   { id: 'assembly', label: 'Assembly point', hint: 'Fire, evacuation and hazard alerts route here' },
   { id: 'clinic', label: 'Medical point', hint: 'Medical alerts route here before any public hospital' },
   { id: 'safe', label: 'Safe location', hint: 'Security alerts route here' },
-  { id: 'shelter', label: 'Shelter', hint: 'Severe weather and shelter-in-place' },
-  { id: 'muster', label: 'Muster station', hint: 'Secondary roll-call point' },
+  { id: 'shelter', label: 'Shelter', hint: 'Severe weather and shelter in place' },
+  { id: 'muster', label: 'Muster station', hint: 'Secondary roll call point' },
 ];
 
 /**
@@ -53,7 +53,7 @@ export function DestinationsManager({ token, roster }: Props) {
     if (!navigator.geolocation) { setError('This device cannot report a position.'); return; }
     navigator.geolocation.getCurrentPosition(
       (p) => { setLat(p.coords.latitude.toFixed(6)); setLng(p.coords.longitude.toFixed(6)); setError(null); },
-      () => setError('Could not read this device’s position — enter the coordinates by hand.'),
+      () => setError('Could not read this device’s position. Enter the coordinates by hand.'),
       { enableHighAccuracy: true, timeout: 10000 },
     );
   };

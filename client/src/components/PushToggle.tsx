@@ -46,7 +46,7 @@ export function PushToggle({ creds }: Props) {
       className={`push-toggle${on ? ' is-on' : ''}`}
       onClick={toggle}
       disabled={busy || blocked}
-      title={blocked ? 'Notifications are blocked in your browser settings' : error || (on ? 'Alerts on — tap to turn off' : 'Get alerts on this device')}
+      title={blocked ? 'Notifications are blocked in your browser settings' : error || (on ? 'Alerts on, tap to turn off' : 'Get alerts on this device')}
     >
       <Icon name={on ? 'bell' : 'bell-off'} />
       {busy ? '…' : on ? 'Alerts on' : blocked ? 'Blocked' : 'Enable alerts'}

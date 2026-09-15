@@ -101,7 +101,7 @@ export function BillingPanel({ token, onBack }: Props) {
           customer has to infer from a pricing table. */}
       <p className="bill-promise">
         <Icon name="siren" /> Emergency alerting is never billed. SOS, all-clear, roll call and
-        live location work on every plan — including while a payment is pending, overdue or
+        live location work on every plan, including while a payment is pending, overdue or
         cancelled. Plans only affect Safety Coordinator tools.
       </p>
 
@@ -117,7 +117,7 @@ export function BillingPanel({ token, onBack }: Props) {
               <span className="bill-lbl">Seats</span>
               <b>{entitlements.seats.used} / {entitlements.seats.limit}</b>
               {entitlements.seats.over && (
-                <span className="bill-sub warn">Over your plan — everyone still gets alerts</span>
+                <span className="bill-sub warn">Over your plan, everyone still gets alerts</span>
               )}
             </div>
           )}
@@ -210,7 +210,7 @@ export function BillingPanel({ token, onBack }: Props) {
               <li key={t.id}>
                 <span className={`bill-dot ${t.status}`} aria-hidden="true" />
                 <b>{formatMoney(t.amount, t.currency)}</b>
-                <span>{t.planId ?? '—'}</span>
+                <span>{t.planId ?? 'N/A'}</span>
                 <span>{t.phoneNumber || t.method}</span>
                 <span>{new Date(t.createdAt).toLocaleDateString()}</span>
                 <em>{t.status}</em>

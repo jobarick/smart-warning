@@ -32,7 +32,7 @@ async function handle({ req, res, url, path }) {
       sendJson(res, 400, { error: 'lat and lng are required' });
       return true;
     }
-    if (!allowPlaces(req)) { sendJson(res, 429, { error: 'too many lookups — please wait a moment' }); return true; }
+    if (!allowPlaces(req)) { sendJson(res, 429, { error: 'too many lookups, please wait a moment' }); return true; }
     sendJson(res, 200, { places: await places.nearby(kind, lat, lng) });
     return true;
   }
@@ -51,7 +51,7 @@ async function handle({ req, res, url, path }) {
   if (path === '/api/route' && req.method === 'GET') {
     const ctx = await orgContext(req, url);
     if (!ctx) { sendJson(res, 401, { error: 'org credentials required' }); return true; }
-    if (!allowPlaces(req)) { sendJson(res, 429, { error: 'too many route requests — please wait a moment' }); return true; }
+    if (!allowPlaces(req)) { sendJson(res, 429, { error: 'too many route requests, please wait a moment' }); return true; }
 
     const from = { lat: Number(url.searchParams.get('fromLat')), lng: Number(url.searchParams.get('fromLng')) };
     const to = { lat: Number(url.searchParams.get('toLat')), lng: Number(url.searchParams.get('toLng')) };

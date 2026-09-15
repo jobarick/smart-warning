@@ -64,7 +64,7 @@ async function diagnoseMobileMoney({ phoneNumber = null, amount = '1000', curren
     }
     if (!phone.isCollectable(msisdn)) {
       const label = phone.operatorMeta(phone.operatorOf(msisdn))?.label ?? 'that network';
-      return { ...clickpesa.status(), ok: false, checks: [{ name: 'phone', ok: false, detail: `${label} has no mobile money product — collection is not possible` }] };
+      return { ...clickpesa.status(), ok: false, checks: [{ name: 'phone', ok: false, detail: `${label} has no mobile money product, collection is not possible` }] };
     }
   }
   return clickpesa.diagnose({ phoneNumber: msisdn, amount, currency });
@@ -139,7 +139,7 @@ function validatePlanRequest({ planId, currency, cycle }) {
 
   const amount = plans.priceFor(planId, currency, cycle);
   if (amount == null) throw new PaymentError(`${plan.name} has no ${currency} price`, 400);
-  if (amount <= 0) throw new PaymentError(`${plan.name} is free — no payment needed`, 400, { free: true });
+  if (amount <= 0) throw new PaymentError(`${plan.name} is free, no payment needed`, 400, { free: true });
   return { plan, amount };
 }
 
@@ -286,7 +286,7 @@ async function initiateMobileMoney(input) {
     console.error(`[payments] ussd push failed for ${phone.mask(msisdn)}: ${e.message}`);
     throw new PaymentError(
       retryable
-        ? 'the payment network did not respond — please try again'
+        ? 'the payment network did not respond, please try again'
         : 'that payment could not be started',
       retryable ? 503 : 400,
       { orderReference, retryable },

@@ -69,7 +69,7 @@ const CHANNELS = [
   {
     id: 'sw_alerts',
     name: 'Advisories and updates',
-    description: 'Standing advisories, all-clears and routine site updates.',
+    description: 'Standing advisories, all clears and routine site updates.',
     importance: 4 as const,
     visibility: 1 as const,
     vibration: true,

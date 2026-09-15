@@ -90,7 +90,7 @@ export function SafeRoutePanel({ alertType, lat, lng, creds, operatorId }: Props
             </span>
             {dest.throughDanger && (
               <span className="route-warn">
-                <Icon name="hazard" /> This route passes near a reported incident — take care.
+                <Icon name="hazard" /> This route passes near a reported incident. Take care.
               </span>
             )}
           </div>

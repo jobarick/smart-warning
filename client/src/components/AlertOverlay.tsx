@@ -112,7 +112,7 @@ export function AlertOverlay({ alert, acknowledged, settings, label, safeConfirm
           </button>
         ) : (
           <span className="acked-note">
-            <Icon name="check-circle" /> Acknowledged — alert still active
+            <Icon name="check-circle" /> Acknowledged: alert still active
           </span>
         )}
         {/* Acknowledge means "I saw it". This means "I am not hurt" — the only
@@ -124,7 +124,7 @@ export function AlertOverlay({ alert, acknowledged, settings, label, safeConfirm
           </button>
         ) : (
           <span className="safe-note">
-            <Icon name="check-circle" /> Reported safe — your Safety Coordinator can see this
+            <Icon name="check-circle" /> Reported safe: your Safety Coordinator can see this
           </span>
         )}
         {/* Raising an alarm by accident is common and the honest correction
@@ -141,7 +141,7 @@ export function AlertOverlay({ alert, acknowledged, settings, label, safeConfirm
               else setConfirmRetract(true);
             }}
           >
-            {confirmRetract ? 'Tap again — this was a false alarm' : 'I raised this by mistake'}
+            {confirmRetract ? 'Tap again: this was a false alarm' : 'I raised this by mistake'}
           </button>
         )}
 
@@ -169,7 +169,7 @@ export function AlertOverlay({ alert, acknowledged, settings, label, safeConfirm
             <span>
               <strong>{responder.supervisor}</strong> is on the way
               {responder.etaS != null && (
-                <> — about <strong>{Math.max(1, Math.round(responder.etaS / 60))} min</strong> away</>
+                <>, about <strong>{Math.max(1, Math.round(responder.etaS / 60))} min</strong> away</>
               )}
               {responder.etaS != null && !responder.routed && ' (estimated)'}
             </span>
