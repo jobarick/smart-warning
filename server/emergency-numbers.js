@@ -37,10 +37,46 @@ const CATEGORIES = [
 const COUNTRIES = {
   TZ: {
     name: 'Tanzania', dial: '+255', bbox: [29.32, -11.75, 40.45, -0.99],
+    // Kept as this entry's fallback and for any caller still using the
+    // generic 7-category shape — richServices below is what the app actually
+    // shows a Tanzanian user, and is far more specific than these 7 buckets.
     numbers: {
       police: ['112', '111'], fire: ['114'], ambulance: ['114', '115'],
       disaster: ['0800110064'], coastguard: ['112'], security: ['112'], utility: ['0800711113'],
     },
+    /**
+     * Tanzania's own published short-code directory — one row per service
+     * rather than the generic 7 categories above, because that is how these
+     * numbers are actually publicised and how a Tanzanian caller thinks about
+     * them (e.g. 111 is Crime Stoppers, not "the police number" — 112 is).
+     *
+     * Supplied directly by the product owner (2026-09-16), not sourced from
+     * an official directory by this codebase. Treat as owner-supplied,
+     * not yet independently verified against an authoritative Tanzanian
+     * source (e.g. TCRA) — the same caution this file's header comment
+     * already asks for everywhere else ("do not invent a number", "verify
+     * official data"). `category` links a row back to the generic buckets
+     * above only so the existing alert-type priority sort keeps working; it
+     * is not shown to anyone.
+     */
+    richServices: [
+      { number: '110', icon: '🌊', category: 'coastguard', sw: { label: 'Maziwa, Bahari & Victoria', description: 'Dharura zinazohusiana na maji au bahari' }, en: { label: 'Lakes, Sea & Victoria', description: 'Water and marine emergencies' } },
+      { number: '111', icon: '🚓', category: 'security', sw: { label: 'Kuzuia Uhalifu', description: 'Toa taarifa za uhalifu (Crime Stoppers)' }, en: { label: 'Crime Stoppers', description: 'Report and help prevent crime' } },
+      { number: '112', icon: '🚨', category: 'police', sw: { label: 'Polisi', description: 'Dharura za kipolisi' }, en: { label: 'Police', description: 'Police emergencies' } },
+      { number: '113', icon: '📢', category: null, sw: { label: 'TAKUKURU', description: 'Kuripoti rushwa' }, en: { label: 'TAKUKURU (Anti-Corruption)', description: 'Report corruption' } },
+      { number: '114', icon: '🚒', category: 'fire', sw: { label: 'Zimamoto na Uokoaji', description: 'Moto na uokoaji' }, en: { label: 'Fire & Rescue', description: 'Fire and rescue emergencies' } },
+      { number: '115', icon: '🚑', category: 'ambulance', sw: { label: 'Gari la Wagonjwa', description: 'Huduma ya ambulansi' }, en: { label: 'Ambulance', description: 'Medical emergencies' } },
+      { number: '116', icon: '👶', category: null, sw: { label: 'Msaada kwa Mtoto', description: 'Dharura na msaada kwa mtoto' }, en: { label: 'Child Helpline', description: 'Child emergencies and support' } },
+      { number: '117', icon: '🩺', category: null, sw: { label: 'Huduma za VVU/UKIMWI', description: 'Huduma za VVU/UKIMWI' }, en: { label: 'HIV/AIDS Services', description: 'HIV/AIDS support and information' } },
+      { number: '119', icon: '💊', category: null, sw: { label: 'Kupambana na Dawa za Kulevya', description: 'Kuripoti masuala ya dawa za kulevya' }, en: { label: 'Anti-Drugs', description: 'Report drug-related emergencies' } },
+      { number: '190', icon: '🏝️', category: 'disaster', sw: { label: 'Zanzibar', description: 'Huduma za maafa Zanzibar' }, en: { label: 'Zanzibar', description: 'Zanzibar disaster services' } },
+      { number: '195', icon: '🚫', category: null, sw: { label: 'Kupinga Usafirishaji Haramu wa Binadamu', description: 'Toa taarifa za usafirishaji haramu wa binadamu' }, en: { label: 'Anti-Trafficking', description: 'Report human trafficking' } },
+      { number: '199', icon: '🏥', category: null, sw: { label: 'Magonjwa ya Mlipuko', description: 'Dharura za magonjwa ya mlipuko' }, en: { label: 'Epidemic Diseases', description: 'Epidemic and outbreak emergencies' } },
+      // Not in the owner's new list, but a real published number this file
+      // already had — kept rather than silently dropped.
+      { number: '0800110064', icon: '🆘', category: 'disaster', sw: { label: 'Maafa (Bara)', description: 'Usimamizi wa maafa Tanzania Bara' }, en: { label: 'Disaster Management (Mainland)', description: 'Mainland Tanzania disaster management' } },
+      { number: '0800711113', icon: '🔧', category: 'utility', sw: { label: 'Huduma za Umeme/Maji', description: 'Dharura za huduma muhimu' }, en: { label: 'Utility Emergency', description: 'Power and water utility emergencies' } },
+    ],
   },
   KE: {
     name: 'Kenya', dial: '+254', bbox: [33.89, -4.72, 41.91, 5.51],
@@ -293,21 +329,40 @@ function countryAt(lat, lng) {
     if (area < bestArea) { bestArea = area; best = { code, ...c }; }
   }
   if (!best) return { ...FALLBACK };
-  return { code: best.code, name: best.name, dial: best.dial, numbers: best.numbers };
+  return { code: best.code, name: best.name, dial: best.dial, numbers: best.numbers, richServices: best.richServices || null };
 }
 
 /** Look a country up by ISO 3166-1 alpha-2 code, for clients that already know it. */
 function countryByCode(code) {
   const c = COUNTRIES[String(code || '').toUpperCase()];
   if (!c) return { ...FALLBACK };
-  return { code: String(code).toUpperCase(), name: c.name, dial: c.dial, numbers: c.numbers };
+  return { code: String(code).toUpperCase(), name: c.name, dial: c.dial, numbers: c.numbers, richServices: c.richServices || null };
 }
 
 /**
  * The shape the client renders: ordered categories, empty ones dropped, so a
  * landlocked country simply has no Coast Guard row rather than an empty one.
+ *
+ * A country with `richServices` (Tanzania today) gets its own per-service
+ * rows instead — see the TZ entry's comment for why. `category` rides along
+ * only so the client's alert-type priority sort keeps working; everything
+ * else it needs (icon, bilingual label/description) is on the row itself.
  */
 function directoryFor(country) {
+  if (country.richServices) {
+    const services = country.richServices.map((s) => ({
+      id: s.number,
+      numbers: [s.number],
+      icon: s.icon,
+      category: s.category || null,
+      label: s.en.label,
+      description: s.en.description,
+      labelSw: s.sw.label,
+      descriptionSw: s.sw.description,
+    }));
+    return { country: { code: country.code, name: country.name, dial: country.dial }, services };
+  }
+
   const services = [];
   for (const cat of CATEGORIES) {
     const numbers = country.numbers[cat.id] || [];

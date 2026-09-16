@@ -52,6 +52,9 @@ export type StringKey =
   | 'settings.language'
   | 'settings.languageEnglish'
   | 'settings.languageSwahili'
+  | 'pocket.heading'
+  | 'pocket.urgentNote'
+  | 'pocket.cannotDial'
   | 'nearby.heading'
   | 'nearby.disclaimer'
   | 'nearby.empty'
@@ -189,6 +192,9 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'settings.language': 'Language',
     'settings.languageEnglish': 'English',
     'settings.languageSwahili': 'Kiswahili',
+    'pocket.heading': 'Emergency numbers',
+    'pocket.urgentNote': 'Call the service you need. This does not replace the alert already sent to your team.',
+    'pocket.cannotDial': "This device can't place calls. Dial these from a phone, or reach your site's emergency contact through the details on the Contact & support page.",
     'nearby.heading': 'Nearby help',
     'nearby.disclaimer': 'From OpenStreetMap, not a verified directory. Always follow official guidance where it is available.',
     'nearby.empty': 'Nothing found nearby',
@@ -323,6 +329,9 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'settings.language': 'Lugha',
     'settings.languageEnglish': 'Kiingereza',
     'settings.languageSwahili': 'Kiswahili',
+    'pocket.heading': 'Namba za dharura',
+    'pocket.urgentNote': 'Piga huduma unayohitaji. Hii haibadilishi tahadhari ambayo tayari imetumwa kwa timu yako.',
+    'pocket.cannotDial': 'Kifaa hiki hakiwezi kupiga simu. Piga namba hizi kutoka kwenye simu, au wasiliana na mtu wa dharura wa eneo lako kupitia maelezo kwenye ukurasa wa Mawasiliano na msaada.',
     'nearby.heading': 'Msaada wa Karibu',
     'nearby.disclaimer': 'Taarifa kutoka OpenStreetMap, si orodha iliyothibitishwa. Fuata maelekezo rasmi pale yanapopatikana.',
     'nearby.empty': 'Hakuna kilichopatikana karibu',
