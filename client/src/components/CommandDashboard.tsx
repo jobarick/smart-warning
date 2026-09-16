@@ -51,9 +51,9 @@ function durationBetween(fromIso: string, toIso: string): string {
   return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
 }
 
-/** Format a seconds count as "2m 5s" / "8s" / "—" (null). */
+/** Format a seconds count as "2m 5s" / "8s" / "N/A" (null). */
 function formatSeconds(sec: number | null): string {
-  if (sec === null) return '—';
+  if (sec === null) return 'N/A';
   const s = Math.max(0, Math.round(sec));
   const m = Math.floor(s / 60);
   return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
@@ -71,7 +71,7 @@ function elapsed(from: number, now: number): string {
 }
 
 function batteryLabel(b: number | null): string {
-  return b === null ? '—' : `${Math.round(b * 100)}%`;
+  return b === null ? 'N/A' : `${Math.round(b * 100)}%`;
 }
 
 function lastSeen(updatedAt: number, now: number): string {
@@ -317,7 +317,7 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
   const bandSub = alert
     ? `${alertLabel(profile, alert.type)} · ${SEVERITY_META[alert.severity].label} · ${alert.sender}`
     : standing === 'watch'
-      ? 'Advisory in effect — no alarm sounding'
+      ? 'Advisory in effect, no alarm sounding'
       : `${roster.length} checked in · ${sos.length ? `${sos.length} needing help` : 'all report safe'}`;
 
   // Without a live alert there is nothing to be accounted for, so the number
@@ -365,12 +365,12 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
                 {alert.message && <p className="mc-inc-msg">{alert.message}</p>}
                 <dl className="mc-facts">
                   <div><dt>From</dt><dd>{alert.sender}</dd></div>
-                  <div><dt>Zone</dt><dd>{sender?.zone || '—'}</dd></div>
+                  <div><dt>Zone</dt><dd>{sender?.zone || 'N/A'}</dd></div>
                   <div>
                     <dt>Position</dt>
                     <dd className="mc-mono">{sender && sender.lat !== null && sender.lng !== null ? `${sender.lat.toFixed(4)}, ${sender.lng.toFixed(4)}` : 'not shared'}</dd>
                   </div>
-                  <div><dt>Battery</dt><dd>{sender ? batteryLabel(sender.battery) : '—'}</dd></div>
+                  <div><dt>Battery</dt><dd>{sender ? batteryLabel(sender.battery) : 'N/A'}</dd></div>
                 </dl>
 
                 {/* The formal record that someone has seen this — separate
@@ -406,7 +406,7 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
                         estimate and a road route are different promises, and a
                         free-flow ETA is not a traffic-aware one. */}
                     <span className="mc-nav-note">
-                      {navRoute.degraded ? 'straight line — routing unavailable' : 'road route, no live traffic'}
+                      {navRoute.degraded ? 'straight line, routing unavailable' : 'road route, no live traffic'}
                     </span>
                   </div>
                 )}
@@ -558,7 +558,7 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
                     const fresh = freshnessOf(worker.updatedAt, now);
                     return (
                       <g key={worker.id} transform={`translate(${x.toFixed(1)},${y.toFixed(1)})`} className={`mc-pin mc-pin-${fresh}`}>
-                        <title>{worker.name} — {fresh === 'unknown' ? 'no position reported' : `updated ${lastSeen(worker.updatedAt, now)} ago`}</title>
+                        <title>{worker.name}: {fresh === 'unknown' ? 'no position reported' : `updated ${lastSeen(worker.updatedAt, now)} ago`}</title>
                         {worker.status === 'sos' && <circle className="cmd-ring" r="10" fill="none" stroke="var(--cmd-crit)" strokeWidth="2" />}
                         <circle r="7" fill={STATUS_COLOR[worker.status] ?? 'var(--cmd-nosig)'} />
                         {fresh === 'stale' && <circle r="7" className="mc-pin-stale-ring" fill="none" />}
@@ -614,7 +614,7 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
                 <span className="mc-h-note">{persistence ? `${history.length} stored` : persistence === false ? 'session' : '…'}</span>
               </h4>
               <div className="mc-list">
-                {persistence && historyError && <p className="mc-quiet">History unavailable — retrying.</p>}
+                {persistence && historyError && <p className="mc-quiet">History unavailable, retrying.</p>}
                 {persistence ? (
                   history.length === 0 ? (
                     <p className="mc-quiet">No incidents recorded yet.</p>

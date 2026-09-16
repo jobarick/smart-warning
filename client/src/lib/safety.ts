@@ -64,7 +64,7 @@ export const SAFETY_GUIDES: SafetyGuide[] = [
     summary: 'Someone is injured, collapsed or seriously unwell.',
     alertType: 'medical',
     before: [
-      'Learn where the nearest first-aid kit and trained first-aider are.',
+      'Learn where the nearest first aid kit and trained first aider are.',
       'Save your local ambulance number in your phone.',
       'Keep any personal medical information somewhere a helper can find it.',
     ],
@@ -78,7 +78,7 @@ export const SAFETY_GUIDES: SafetyGuide[] = [
     after: [
       'Hand over what you saw and what you did to the responders.',
       'Report the incident so it is on record.',
-      'Replace anything you used from the first-aid kit.',
+      'Replace anything you used from the first aid kit.',
     ],
   },
   {
@@ -91,12 +91,12 @@ export const SAFETY_GUIDES: SafetyGuide[] = [
     before: [
       'Wear a seatbelt or helmet on every journey, however short.',
       'Keep a warning triangle and a torch in the vehicle.',
-      'Know the road-rescue and ambulance numbers for your area.',
+      'Know the road rescue and ambulance numbers for your area.',
     ],
     during: [
       'Stop safely and switch on hazard lights.',
       'Do not stand in the traffic lane; warn oncoming vehicles from a safe distance.',
-      'Switch off engines and do not smoke — fuel may be leaking.',
+      'Switch off engines and do not smoke. Fuel may be leaking.',
       'Leave anyone with a possible neck or back injury where they are unless there is fire or flooding.',
       'Call for medical help and give the road name or nearest landmark.',
     ],
@@ -120,7 +120,7 @@ export const SAFETY_GUIDES: SafetyGuide[] = [
     ],
     during: [
       'Move towards people, light and open businesses.',
-      'Do not fight for property — possessions can be replaced.',
+      'Do not fight for property. Possessions can be replaced.',
       'Raise an alert so your location is shared.',
       'If you cannot get away, make yourself noticeable: shout, sound an alarm.',
     ],
@@ -145,12 +145,12 @@ export const SAFETY_GUIDES: SafetyGuide[] = [
       'Get out if there is a safe route, and leave belongings behind.',
       'If you cannot get out, lock or barricade the door and stay out of sight.',
       'Silence your phone but keep it with you.',
-      'Stay quiet and wait for an official all-clear, not a rumour.',
+      'Stay quiet and wait for an official all clear, not a rumour.',
     ],
     after: [
       'Follow the instructions of the responders exactly, including how to exit.',
       'Report yourself safe so nobody is searching for you.',
-      'Ask for support — reactions to this often arrive days later.',
+      'Ask for support. Reactions to this often arrive days later.',
     ],
   },
   {
@@ -166,7 +166,7 @@ export const SAFETY_GUIDES: SafetyGuide[] = [
     ],
     during: [
       'Search the immediate area first, including water, vehicles and enclosed spaces.',
-      'Report to the police straight away — do not wait a fixed number of hours.',
+      'Report to the police straight away. Do not wait a fixed number of hours.',
       'Give a description, what they were wearing, and where they were last seen.',
       'Keep one phone free for callbacks.',
     ],
@@ -188,13 +188,13 @@ export const SAFETY_GUIDES: SafetyGuide[] = [
       'Wear a life jacket on boats regardless of how well you swim.',
     ],
     during: [
-      'Do not enter the water yourself unless you are trained — most would-be rescuers drown.',
+      'Do not enter the water yourself unless you are trained. Most would be rescuers drown.',
       'Reach or throw: hold out a pole or branch, or throw something that floats.',
       'Shout for help and send someone for a lifeguard or rescue service.',
       'Once out, if they are not breathing normally, start rescue breaths and compressions if trained.',
     ],
     after: [
-      'Get medical help even if they seem recovered — water in the lungs can cause harm hours later.',
+      'Get medical help even if they seem recovered. Water in the lungs can cause harm hours later.',
       'Keep them warm and lying on their side.',
     ],
   },
@@ -208,13 +208,13 @@ export const SAFETY_GUIDES: SafetyGuide[] = [
     summary: 'Rising water, or water moving fast across roads and ground.',
     alertType: 'hazard',
     before: [
-      'Know whether where you live, work or travel is low-lying.',
+      'Know whether where you live, work or travel is low lying.',
       'Keep documents and a torch somewhere high and dry.',
       'Agree where your household would go if you had to leave.',
     ],
     during: [
-      'Move to higher ground immediately — do not wait to see how high it gets.',
-      'Never walk, drive or ride through moving water. Ankle-deep water can take you off your feet, and knee-deep water can move a car.',
+      'Move to higher ground immediately. Do not wait to see how high it gets.',
+      'Never walk, drive or ride through moving water. Ankle deep water can take you off your feet, and knee deep water can move a car.',
       'Stay away from drains, culverts and riverbanks.',
       'Switch off electricity at the mains if water is entering the building and it is safe to reach.',
     ],
@@ -238,14 +238,14 @@ export const SAFETY_GUIDES: SafetyGuide[] = [
     ],
     during: [
       'Drop, cover and hold on. Get under a sturdy table if there is one.',
-      'Stay where you are — most injuries happen to people moving during the shaking.',
+      'Stay where you are. Most injuries happen to people moving during the shaking.',
       'If outside, move into the open, away from buildings, walls and power lines.',
       'If in a vehicle, stop clear of bridges and overpasses and stay inside.',
     ],
     after: [
       'Expect aftershocks and be ready to take cover again.',
       'Check yourself, then others, for injuries.',
-      'Leave a damaged building carefully and do not re-enter it.',
+      'Leave a damaged building carefully and do not reenter it.',
       'Do not light a flame until you are sure there is no gas leak.',
     ],
   },
@@ -263,11 +263,11 @@ export const SAFETY_GUIDES: SafetyGuide[] = [
     ],
     during: [
       'Stay inside, in the smallest interior room, away from windows.',
-      'Do not go outside during a lull — it may be the eye of the storm.',
+      'Do not go outside during a lull. It may be the eye of the storm.',
       'Keep away from anything that could fall: trees, poles, loose roofing.',
     ],
     after: [
-      'Wait for an official all-clear before going out.',
+      'Wait for an official all clear before going out.',
       'Treat every fallen cable as live.',
       'Watch for flooding, which often arrives after the wind has passed.',
     ],
@@ -284,14 +284,14 @@ export const SAFETY_GUIDES: SafetyGuide[] = [
       'Plan where you would shelter during outdoor work.',
     ],
     during: [
-      'Go inside a building or a hard-topped vehicle.',
+      'Go inside a building or a hard topped vehicle.',
       'Get off high ground and away from water, trees and metal.',
       'Do not shelter under an isolated tree.',
       'If caught in the open with no shelter, crouch low on the balls of your feet, and do not lie flat.',
     ],
     after: [
       'Wait 30 minutes after the last thunder before going back out.',
-      'Someone struck by lightning carries no charge — it is safe to help them immediately.',
+      'Someone struck by lightning carries no charge. It is safe to help them immediately.',
     ],
   },
   {
@@ -307,7 +307,7 @@ export const SAFETY_GUIDES: SafetyGuide[] = [
     ],
     during: [
       'Drink water regularly, before you feel thirsty.',
-      'Stay in shade or the coolest room, especially between late morning and mid-afternoon.',
+      'Stay in shade or the coolest room, especially between late morning and mid afternoon.',
       'Never leave anyone, or an animal, in a parked vehicle.',
       'Watch for heat exhaustion: heavy sweating, dizziness, cramps, nausea.',
     ],
@@ -334,7 +334,7 @@ export const SAFETY_GUIDES: SafetyGuide[] = [
       'Cover your mouth and nose; smoke harms before flame reaches you.',
     ],
     after: [
-      'Do not return until the area is declared safe — ground can stay hot for days.',
+      'Do not return until the area is declared safe. Ground can stay hot for days.',
       'Watch for falling trees and weakened structures.',
     ],
   },
@@ -355,7 +355,7 @@ export const SAFETY_GUIDES: SafetyGuide[] = [
       'Listen for unusual sounds: cracking trees, boulders knocking together.',
     ],
     after: [
-      'Stay away — further slides often follow.',
+      'Stay away. Further slides often follow.',
       'Report blocked roads and broken utility lines.',
     ],
   },
@@ -372,7 +372,7 @@ export const SAFETY_GUIDES: SafetyGuide[] = [
     during: [
       'Strong shaking near the coast is itself the warning. Do not wait for an official message.',
       'If the sea suddenly draws back, move inland and uphill immediately.',
-      'Go on foot if you can — roads jam.',
+      'Go on foot if you can. Roads jam.',
       'Keep going: the first wave is often not the largest.',
     ],
     after: [
@@ -396,7 +396,7 @@ export const SAFETY_GUIDES: SafetyGuide[] = [
     ],
     during: [
       'Raise the alarm and get out. Do not collect belongings.',
-      'Stay low — smoke kills more people than flame.',
+      'Stay low. Smoke kills more people than flame.',
       'Feel a door before opening it; if it is hot, use the other route.',
       'Never use a lift.',
       'Close doors behind you to slow the fire.',
@@ -421,11 +421,11 @@ export const SAFETY_GUIDES: SafetyGuide[] = [
     during: [
       'Get out if there is a clear route; move away from the structure.',
       'If trapped, cover your mouth and nose against dust.',
-      'Tap on pipes or a wall in a regular rhythm rather than shouting — it carries further and costs less air.',
+      'Tap on pipes or a wall in a regular rhythm rather than shouting. It carries further and costs less air.',
       'Avoid moving debris above you.',
     ],
     after: [
-      'Keep everyone clear — collapses continue.',
+      'Keep everyone clear. Collapses continue.',
       'Tell rescuers where people were last seen.',
     ],
   },
@@ -444,7 +444,7 @@ export const SAFETY_GUIDES: SafetyGuide[] = [
       'Do not touch someone who is in contact with electricity.',
       'Switch off the supply at the mains or breaker first.',
       'Treat every fallen cable as live, and keep everyone at least 10 metres away.',
-      'Use only a dry non-conductive object to move a cable if there is no alternative.',
+      'Use only a dry non conductive object to move a cable if there is no alternative.',
     ],
     after: [
       'Get anyone who received a shock checked medically, even if they seem fine.',
@@ -463,7 +463,7 @@ export const SAFETY_GUIDES: SafetyGuide[] = [
       'Store cylinders upright, outside or in a ventilated space.',
     ],
     during: [
-      'Do not use switches, phones or anything that can spark — including turning lights off.',
+      'Do not use switches, phones or anything that can spark, including turning lights off.',
       'Open doors and windows on your way out.',
       'Turn off the supply at the cylinder or meter if you can reach it safely.',
       'Get everyone out and call for help from a distance.',
@@ -505,13 +505,13 @@ export const SAFETY_GUIDES: SafetyGuide[] = [
     summary: 'Machinery, height, or plant failure at a workplace.',
     alertType: 'hazard',
     before: [
-      'Follow lock-out procedures before working on machinery.',
+      'Follow lock out procedures before working on machinery.',
       'Wear the protective equipment for the task, not the one nearest to hand.',
     ],
     during: [
-      'Make the area safe before approaching — isolate power or moving parts.',
+      'Make the area safe before approaching. Isolate power or moving parts.',
       'Do not move a casualty unless leaving them is more dangerous.',
-      'Send for the site first-aider and for emergency services.',
+      'Send for the site first aider and for emergency services.',
       'Preserve the scene as far as safety allows.',
     ],
     after: [

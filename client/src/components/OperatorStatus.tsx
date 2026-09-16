@@ -48,7 +48,7 @@ export function OperatorStatus({ name, operatorId, telemetry, network, shareLoca
         <div>
           <span className="op-hello">Hello,</span>
           <h2 className="op-name">{name || 'Operator'}</h2>
-          <span className="op-id">ID: {operatorId || '—'}</span>
+          <span className="op-id">ID: {operatorId || 'N/A'}</span>
         </div>
         <span className={`op-badge ${alarmActive ? 'danger' : 'safe'}`}>
           <span className="op-badge-dot" />
@@ -59,11 +59,11 @@ export function OperatorStatus({ name, operatorId, telemetry, network, shareLoca
       <div className="op-tiles">
         <div className="op-tile">
           <span className="op-t-lbl"><Icon name="hazard" /> Latitude</span>
-          <b className="op-mono">{hasLoc ? telemetry.lat!.toFixed(6) : '—'}</b>
+          <b className="op-mono">{hasLoc ? telemetry.lat!.toFixed(6) : 'N/A'}</b>
         </div>
         <div className="op-tile">
           <span className="op-t-lbl"><Icon name="hazard" /> Longitude</span>
-          <b className="op-mono">{hasLoc ? telemetry.lng!.toFixed(6) : '—'}</b>
+          <b className="op-mono">{hasLoc ? telemetry.lng!.toFixed(6) : 'N/A'}</b>
         </div>
 
         <div className="op-tile">

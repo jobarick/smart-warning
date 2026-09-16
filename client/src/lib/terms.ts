@@ -59,7 +59,7 @@ export const TERMS_SECTIONS: TermsSection[] = [
       'Organization configuration',
       'Safety Coordinator availability',
       'Emergency service availability',
-      'Third-party providers',
+      'Third party providers',
     ],
   },
   {
@@ -106,14 +106,14 @@ export const TERMS_SECTIONS: TermsSection[] = [
       'Device malfunction',
       'Maintenance',
       'Power failures',
-      'Third-party service interruptions',
+      'Third party service interruptions',
       'Natural disasters',
       'Events beyond reasonable control',
     ],
   },
   {
-    heading: '7. Third-Party Services',
-    body: ['Smart Warning may rely on third-party services including:'],
+    heading: '7. Third Party Services',
+    body: ['Smart Warning may rely on third party services including:'],
     bullets: [
       'Mapping providers',
       'GPS providers',
@@ -126,12 +126,12 @@ export const TERMS_SECTIONS: TermsSection[] = [
   },
   {
     heading: '',
-    body: ['Smart Warning is not responsible for failures caused solely by third-party services.'],
+    body: ['Smart Warning is not responsible for failures caused solely by third party services.'],
   },
   {
     heading: '8. Safety Guidance',
     body: [
-      'Maps, evacuation routes, recommendations, estimated arrival times, hospitals, police stations, assembly points, and other guidance are provided to assist decision-making.',
+      'Maps, evacuation routes, recommendations, estimated arrival times, hospitals, police stations, assembly points, and other guidance are provided to assist decision making.',
       'Users must always exercise their own judgment and follow official emergency instructions where available.',
     ],
   },
@@ -162,7 +162,7 @@ export const TERMS_SECTIONS: TermsSection[] = [
     body: [
       'You may request access to, correction of, or deletion of your personal data at any time.',
       'A Safety Coordinator who administers an organization may delete that organization from within the application. Deleting an organization permanently removes its account, its members, its incident history, its stored location records and its reports. This cannot be undone.',
-      'A personal account — one that is not part of an organization — may be deleted from within the application by its own holder. Deleting it permanently removes the account, its emergency contacts, its registered devices and its subscription. This cannot be undone.',
+      'A personal account, one that is not part of an organization, may be deleted from within the application by its own holder. Deleting it permanently removes the account, its emergency contacts, its registered devices and its subscription. This cannot be undone.',
       'If you belong to an organization you did not create, your records are part of that organization’s safety record and cannot be removed individually without breaking it. Ask your Safety Coordinator, or contact us using the details in section 16 and we will action the request within 30 days.',
       'Some records may be retained where a law, regulation or a legitimate safety or accounting obligation requires it. Where that applies, only the data covered by that obligation is kept, and only for as long as the obligation lasts.',
     ],
@@ -170,8 +170,8 @@ export const TERMS_SECTIONS: TermsSection[] = [
   {
     heading: '9b. Data retention',
     body: [
-      'Incident records, roll-call answers and location traces recorded during an emergency are retained for as long as the organization holding them keeps its account, because they are that organization’s safety record.',
-      'Location is recorded only between an alert being raised and its all-clear. It is not recorded at other times.',
+      'Incident records, roll call answers and location traces recorded during an emergency are retained for as long as the organization holding them keeps its account, because they are that organization’s safety record.',
+      'Location is recorded only between an alert being raised and its all clear. It is not recorded at other times.',
       'Deleting an organization deletes those records with it.',
     ],
   },
@@ -257,7 +257,7 @@ export const TERMS_SECTIONS: TermsSection[] = [
  *
  * Written to describe what the software actually does. Every claim here is
  * checkable against the code: location is written only between an alert and its
- * all-clear (server/relay.js trackPosition), the roster carries position only
+ * all clear (server/relay.js trackPosition), the roster carries position only
  * to Safety Coordinators (broadcastRoster), and deleting an organization
  * cascades to incidents, location_pings, feedback, mail and device tokens
  * (db.js).
@@ -274,21 +274,21 @@ export const PRIVACY_SECTIONS: TermsSection[] = [
     heading: 'What we collect, and why',
     body: ['We collect only what the Service needs to work:'],
     bullets: [
-      'Account details — name, email address, phone number and password, so Safety Coordinators can sign in. Passwords are stored only as a salted hash and are never readable by us.',
-      'Organization membership — which site or team you belong to, so an emergency reaches the right people and no others.',
-      'Device information — device name, battery level, network status and app version, so a Safety Coordinator can tell a silent phone from a flat one during an incident.',
-      'Location — see the section below.',
-      'Emergency history — the alerts raised, who raised them, when they were resolved and who reported themselves safe. This is the organization’s safety record.',
-      'Incident reports — including reports submitted from a public link, which are held for a Safety Coordinator to review.',
-      'System logs — technical records used to keep the Service running and to investigate faults.',
-      'Payment records — plan, amount, currency and a masked reference. Card and mobile money credentials are handled by the payment provider and never reach our servers.',
+      'Account details: name, email address, phone number and password, so Safety Coordinators can sign in. Passwords are stored only as a salted hash and are never readable by us.',
+      'Organization membership: which site or team you belong to, so an emergency reaches the right people and no others.',
+      'Device information: device name, battery level, network status and app version, so a Safety Coordinator can tell a silent phone from a flat one during an incident.',
+      'Location: see the section below.',
+      'Emergency history: the alerts raised, who raised them, when they were resolved and who reported themselves safe. This is the organization’s safety record.',
+      'Incident reports: including reports submitted from a public link, which are held for a Safety Coordinator to review.',
+      'System logs: technical records used to keep the Service running and to investigate faults.',
+      'Payment records: plan, amount, currency and a masked reference. Card and mobile money credentials are handled by the payment provider and never reach our servers.',
     ],
   },
   {
-    heading: 'Location — when it is and is not collected',
+    heading: 'Location: when it is and is not collected',
     body: [
       'Your live position is shared with your organization’s Safety Coordinators while you are signed in and location sharing is switched on, so that a Safety Coordinator can find you if something happens.',
-      'Your position is written down and kept only between an emergency alert being raised and its all-clear. Outside an active incident, no location history is stored.',
+      'Your position is written down and kept only between an emergency alert being raised and its all clear. Outside an active incident, no location history is stored.',
       'Your position is visible to Safety Coordinators of your own organization only. It is never shared with other organizations, and it is not sold or used for advertising.',
       'You can stop sharing at any time by turning off location sharing in Settings, by signing out, or by revoking the permission in your device settings. The application will keep working; a Safety Coordinator will simply not be able to see where you are.',
       'The app does not collect location in the background when it is closed.',
@@ -299,16 +299,16 @@ export const PRIVACY_SECTIONS: TermsSection[] = [
     body: ['We do not sell personal data. It is shared only with:'],
     bullets: [
       'Safety Coordinators and administrators of your own organization.',
-      'Service providers who host or deliver the Service on our behalf — hosting, database, push notification delivery, mapping and routing, email delivery and payment processing. They may process data only to provide those services to us.',
+      'Service providers who host or deliver the Service on our behalf: hosting, database, push notification delivery, mapping and routing, email delivery and payment processing. They may process data only to provide those services to us.',
       'Authorities, where we are legally required to disclose it.',
     ],
   },
   {
     heading: 'How long we keep it',
     body: [
-      'Incident records, roll-call answers and location traces from an incident are kept for as long as the organization keeps its account, because they are its safety record.',
+      'Incident records, roll call answers and location traces from an incident are kept for as long as the organization keeps its account, because they are its safety record.',
       'Deleting an organization deletes its members, incidents, location records, reports, feedback, queued email and device registrations.',
-      'Records we are required to keep by law — for example payment records for accounting purposes — are retained for the period the law requires and no longer.',
+      'Records we are required to keep by law, for example payment records for accounting purposes, are retained for the period the law requires and no longer.',
     ],
   },
   {
@@ -330,7 +330,7 @@ export const PRIVACY_SECTIONS: TermsSection[] = [
   {
     heading: 'How we protect it',
     body: [
-      'All traffic between the application and our servers uses HTTPS and secure WebSockets. Passwords are stored as salted hashes. Sign-in tokens expire. Every request that reads an organization’s data is checked against that organization, so one site cannot read another’s.',
+      'All traffic between the application and our servers uses HTTPS and secure WebSockets. Passwords are stored as salted hashes. Sign in tokens expire. Every request that reads an organization’s data is checked against that organization, so one site cannot read another’s.',
       'No system is perfectly secure, and we do not claim otherwise.',
     ],
   },

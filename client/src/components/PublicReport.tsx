@@ -149,7 +149,7 @@ export function PublicReport({ publicCode }: Props) {
         </button>
 
         <p className="pub-emergency">
-          In immediate danger? Call your local emergency number — do not wait for this report to be
+          In immediate danger? Call your local emergency number. Do not wait for this report to be
           read.
         </p>
       </div>

@@ -45,7 +45,7 @@ interface Beat {
 
 const SCRIPT: Beat[] = [
   { at: 0, phase: 'calm', line: 'An ordinary Tuesday on site', detail: '12 people signed in' },
-  { at: 1800, phase: 'alarm', line: 'Someone taps SOS', detail: 'Fire — High severity', notified: 0 },
+  { at: 1800, phase: 'alarm', line: 'Someone taps SOS', detail: 'Fire, High severity', notified: 0 },
   { at: 2600, phase: 'alarm', line: 'FIRE', detail: 'Bay 3 · North Site', notified: 4 },
   { at: 3400, phase: 'alarm', line: 'FIRE', detail: 'Every phone on site is alarming', notified: 12 },
   { at: 5200, phase: 'answered', line: 'Ana acknowledged', detail: 'in 3.4 seconds', notified: 12 },
@@ -96,7 +96,7 @@ export function DemoAlert({ onExit, onGetStarted }: Props) {
       {/* Never conditional, never dismissible, always on top. */}
       <div className="demo-flag" role="note">
         <span className="demo-flag-dot" aria-hidden="true" />
-        DEMO — a simulation. No alert is being sent to anyone.
+        DEMO: a simulation. No alert is being sent to anyone.
       </div>
 
       <div className="demo-stage">
@@ -123,7 +123,7 @@ export function DemoAlert({ onExit, onGetStarted }: Props) {
 
           {current.phase === 'done' && (
             <div className="demo-end">
-              <button className="demo-cta" onClick={onGetStarted}>Get started — free for 30 days</button>
+              <button className="demo-cta" onClick={onGetStarted}>Get started, free for 30 days</button>
               <div className="demo-end-row">
                 <button className="demo-quiet" onClick={() => setRunId((n) => n + 1)}>
                   Replay
@@ -144,7 +144,7 @@ export function DemoAlert({ onExit, onGetStarted }: Props) {
       <button className="demo-skip" onClick={onExit}>Skip</button>
 
       <p className="demo-foot">
-        Smart Warning complements emergency services — it does not replace them.
+        Smart Warning complements emergency services. It does not replace them.
       </p>
       <a className="demo-brand" href="/" onClick={(e) => { e.preventDefault(); onExit(); }}>
         <Logo size={18} decorative />

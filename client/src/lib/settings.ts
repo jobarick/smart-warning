@@ -17,7 +17,7 @@ function detectLocale(): Locale {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  deviceName: `Device-${Math.floor(1000 + Math.random() * 9000)}`,
+  deviceName: `Device ${Math.floor(1000 + Math.random() * 9000)}`,
   borderThickness: 32,
   brightness: 0.9,
   flashMode: 'pulse',
@@ -39,7 +39,7 @@ export const DEFAULT_SETTINGS: Settings = {
   locale: detectLocale(),
 };
 
-/** Build a stable operator ID from a name, e.g. "Samirah A." → "SA-2026-0017". */
+/** Build a stable operator ID from a name, e.g. "Samirah A." → "SA.2026.0017". */
 export function makeOperatorId(name: string): string {
   const initials =
     name
@@ -49,7 +49,7 @@ export function makeOperatorId(name: string): string {
       .join('')
       .slice(0, 3) || 'OP';
   const serial = String(Math.floor(1 + Math.random() * 9999)).padStart(4, '0');
-  return `${initials}-${new Date().getFullYear()}-${serial}`;
+  return `${initials}.${new Date().getFullYear()}.${serial}`;
 }
 
 export function loadSettings(): Settings {
