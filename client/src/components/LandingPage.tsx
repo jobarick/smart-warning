@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { track } from '../lib/analytics';
 import { fetchPlans, formatMoney, type Plan, type PaymentMethods } from '../lib/billing';
 import { PROVIDER, SUPPORT_EMAIL } from '../lib/terms';
+import { t } from '../lib/i18n';
+import type { Locale } from '../types';
 import { FeedbackButton } from './FeedbackButton';
 import { Icon } from './Icon';
 import { Logo } from './Logo';
@@ -16,6 +18,16 @@ interface Props {
   onGetStarted: (step?: 'login' | 'worker') => void;
   /** Plays the twelve-second simulation. */
   onWatchDemo: () => void;
+  /**
+   * Device-level, not account-level — the same `Settings.locale` a signed-in
+   * user's language choice already lives on (see `SettingsPanel`), read
+   * before anyone has an account. A stranger who cannot read the page well
+   * enough to trust it never reaches the settings screen where the other
+   * toggle lives, so this is the one place in the product where the choice
+   * has to be reachable with zero prior state.
+   */
+  locale: Locale;
+  onToggleLocale: () => void;
 }
 
 /**
@@ -30,7 +42,7 @@ interface Props {
  * native shell straight to the entry gate, because somebody who has already
  * installed an APK has made the decision this page exists to inform.
  */
-export function LandingPage({ onGetStarted, onWatchDemo }: Props) {
+export function LandingPage({ onGetStarted, onWatchDemo, locale, onToggleLocale }: Props) {
   const billing = useBilling();
   const personal = billing?.plans.find((p) => p.audience === 'individual' && p.chargeable && p.price != null);
   const price = personal?.price != null ? formatMoney(personal.price, personal.currency) : null;
@@ -46,34 +58,39 @@ export function LandingPage({ onGetStarted, onWatchDemo }: Props) {
 
   return (
     <div className="landing" onClick={onLegalLinkClick}>
-      <a className="lp-skip" href="#main">Skip to content</a>
+      <a className="lp-skip" href="#main">{t(locale, 'landing.skipToContent')}</a>
       <header className="lp-nav">
         <a className="lp-brand" href="/">
           <Logo size={22} decorative />
           <span>Smart Warning</span>
         </a>
         <nav className="lp-nav-links">
-          <a href="#how">How it works</a>
-          <a href="#pricing">Pricing</a>
-          <a href="#privacy">Privacy</a>
-          <a href="/legal/">Legal</a>
-          <button className="lp-nav-cta" onClick={() => go('nav_sign_in', 'login')}>Sign in</button>
+          <a href="#how">{t(locale, 'landing.nav.how')}</a>
+          <a href="#pricing">{t(locale, 'landing.nav.pricing')}</a>
+          <a href="#privacy">{t(locale, 'landing.nav.privacy')}</a>
+          <a href="/legal/">{t(locale, 'landing.nav.legal')}</a>
+          <button
+            className="lp-lang-toggle"
+            onClick={onToggleLocale}
+            aria-label={locale === 'en' ? 'Badili kuwa Kiswahili' : 'Switch to English'}
+            title={locale === 'en' ? 'Kiswahili' : 'English'}
+          >
+            {locale === 'en' ? 'SW' : 'EN'}
+          </button>
+          <button className="lp-nav-cta" onClick={() => go('nav_sign_in', 'login')}>{t(locale, 'landing.nav.signin')}</button>
         </nav>
       </header>
 
       <main id="main">
         <section className="lp-hero">
-          <h1>Help arrives faster when everyone knows at once.</h1>
-          <p className="lp-lead">
-            One tap raises the alarm, on every phone on your site, with your live location,
-            in about a second. For one person, or a team of five hundred.
-          </p>
+          <h1>{t(locale, 'landing.hero.heading')}</h1>
+          <p className="lp-lead">{t(locale, 'landing.hero.lead')}</p>
           <div className="lp-cta-row">
             <button className="lp-cta" onClick={() => go('hero_get_started')}>
-              Get started, free for 30 days
+              {t(locale, 'landing.hero.getStarted')}
             </button>
             <button className="lp-cta lp-cta-quiet" onClick={() => go('hero_team_code', 'worker')}>
-              I have a team code
+              {t(locale, 'landing.hero.teamCode')}
             </button>
           </div>
           {/* An emergency product is the one thing nobody can safely try. This
@@ -83,19 +100,19 @@ export function LandingPage({ onGetStarted, onWatchDemo }: Props) {
             onClick={() => { track('click_cta', { cta: 'hero_demo' }); onWatchDemo(); }}
           >
             <span className="lp-demo-pip" aria-hidden="true" />
-            Watch it happen. 12 seconds, no signup
+            {t(locale, 'landing.hero.watchDemo')}
           </button>
 
-          <p className="lp-cta-note">No card required. Works in any phone browser.</p>
+          <p className="lp-cta-note">{t(locale, 'landing.hero.noCard')}</p>
 
           {/* Four claims, each one true of the code as written. Nothing here is
               aspirational — a safety product that oversells its guarantees is
               worse than one that says less. */}
           <ul className="lp-trust">
-            <li>Built by {PROVIDER}</li>
-            <li>Location shared only during an active alert</li>
-            <li>No background tracking</li>
-            <li>Delete your account any time</li>
+            <li>{t(locale, 'landing.hero.trust1', { provider: PROVIDER })}</li>
+            <li>{t(locale, 'landing.hero.trust2')}</li>
+            <li>{t(locale, 'landing.hero.trust3')}</li>
+            <li>{t(locale, 'landing.hero.trust4')}</li>
           </ul>
         </section>
 
@@ -107,131 +124,109 @@ export function LandingPage({ onGetStarted, onWatchDemo }: Props) {
             actually need police, fire, or an ambulance. */}
         <section className="lp-section">
           <div className="lp-honest">
-            <h2>What Smart Warning is not</h2>
+            <h2>{t(locale, 'landing.honest.heading')}</h2>
+            <p>{t(locale, 'landing.honest.p1')}</p>
             <p>
-              Smart Warning complements emergency services. It does not replace them. It cannot
-              dispatch police, fire, or an ambulance, and it is not affiliated with any emergency
-              service or government body.
-            </p>
-            <p>
-              <b>In a life threatening emergency, call your local emergency number first</b>, then
-              use Smart Warning to alert the people around you.
+              <b>{t(locale, 'landing.honest.p2b')}</b>{t(locale, 'landing.honest.p2')}
             </p>
           </div>
         </section>
 
         <section className="lp-section" id="how">
-          <h2>How it works</h2>
+          <h2>{t(locale, 'landing.how.heading')}</h2>
           <ol className="lp-steps">
             <li>
               <span className="lp-step-n">1</span>
-              <h3>Raise it</h3>
-              <p>Pick what is happening and hold the SOS button. Fire, medical, security,
-                hazard, cyber, or evacuation, each at four severities.</p>
+              <h3>{t(locale, 'landing.how.step1Title')}</h3>
+              <p>{t(locale, 'landing.how.step1Body')}</p>
             </li>
             <li>
               <span className="lp-step-n">2</span>
-              <h3>Everyone knows</h3>
-              <p>Phones with Smart Warning open alarm at once: full screen, siren, vibration.
-                Phones that are locked or closed get a push notification. Your location appears
-                on the map either way.</p>
+              <h3>{t(locale, 'landing.how.step2Title')}</h3>
+              <p>{t(locale, 'landing.how.step2Body')}</p>
             </li>
             <li>
               <span className="lp-step-n">3</span>
-              <h3>Someone comes</h3>
-              <p>Your Safety Coordinator acknowledges, and everyone you alerted sees that
-                help is on the way, with an ETA.</p>
+              <h3>{t(locale, 'landing.how.step3Title')}</h3>
+              <p>{t(locale, 'landing.how.step3Body')}</p>
             </li>
           </ol>
         </section>
 
         <section className="lp-section">
-          <h2>Who it is for</h2>
+          <h2>{t(locale, 'landing.who.heading')}</h2>
           <div className="lp-audience">
             <article className="lp-card">
               <Icon name="user" />
-              <h3>On your own</h3>
-              <p>A panic button that actually reaches someone. Your trusted contacts get your
-                live location the moment you raise an alert.</p>
+              <h3>{t(locale, 'landing.who.soloTitle')}</h3>
+              <p>{t(locale, 'landing.who.soloBody')}</p>
               <p className="lp-price">
                 {price
-                  ? <>Free for 30 days, then <b>{price}</b> a month.</>
-                  : <>Free for 30 days.</>}
+                  ? t(locale, 'landing.who.soloPricePaid', { price })
+                  : t(locale, 'landing.who.soloPriceFree')}
               </p>
             </article>
             <article className="lp-card">
               <Icon name="siren" />
-              <h3>For a site or team</h3>
-              <p>Your workers join with a code, no accounts to create. You get a live roster,
-                a map, and an incident record you can hand to an inspector.</p>
-              <p className="lp-price">Team and site plans, billed monthly or yearly.</p>
+              <h3>{t(locale, 'landing.who.teamTitle')}</h3>
+              <p>{t(locale, 'landing.who.teamBody')}</p>
+              <p className="lp-price">{t(locale, 'landing.who.teamPrice')}</p>
             </article>
           </div>
         </section>
 
-        <PricingSection billing={billing} onGetStarted={() => go('pricing_start')} />
+        <PricingSection billing={billing} onGetStarted={() => go('pricing_start')} locale={locale} />
 
         <section className="lp-section" id="privacy">
-          <h2>Your location is yours</h2>
+          <h2>{t(locale, 'landing.privacy.heading')}</h2>
           <div className="lp-privacy">
             <article>
-              <h3>We do not track you in the background</h3>
-              <p>The app asks for your location only while an alert is active. When it is cleared,
-                it stops. There is no background location permission in this app. You can check
-                the permission list yourself.</p>
+              <h3>{t(locale, 'landing.privacy.card1Title')}</h3>
+              <p>{t(locale, 'landing.privacy.card1Body')}</p>
             </article>
             <article>
-              <h3>Your alert goes to your people</h3>
-              <p>Alerts are relayed to the phones in your team or your contact list. We do not sell
-                data and we do not run ads. This website measures page visits with Vercel's cookieless
-                analytics; the Android app and the alerting relay carry no analytics at all.</p>
+              <h3>{t(locale, 'landing.privacy.card2Title')}</h3>
+              <p>{t(locale, 'landing.privacy.card2Body')}</p>
             </article>
             <article>
-              <h3>We cannot read your password</h3>
-              <p>It is stored in a form that cannot be reversed. If you lose it we can help you set a
-                new one. We can never send you the old one. Everything travels over an encrypted
-                connection, on the web and in the app.</p>
+              <h3>{t(locale, 'landing.privacy.card3Title')}</h3>
+              <p>{t(locale, 'landing.privacy.card3Body')}</p>
             </article>
             <article>
-              <h3>You can delete everything</h3>
-              <p>One button deletes your account and everything attached to it: your incidents, your
-                location history, your reports. It happens immediately.</p>
+              <h3>{t(locale, 'landing.privacy.card4Title')}</h3>
+              <p>{t(locale, 'landing.privacy.card4Body')}</p>
             </article>
           </div>
           <p className="lp-privacy-links">
-            <a href="/legal/privacy.html">Full Privacy Policy</a>
-            <a href="/legal/terms.html">Terms &amp; Conditions</a>
-            <a href="/legal/delete.html">How to delete your account</a>
+            <a href="/legal/privacy.html">{t(locale, 'landing.privacy.linkPrivacy')}</a>
+            <a href="/legal/terms.html">{t(locale, 'landing.privacy.linkTerms')}</a>
+            <a href="/legal/delete.html">{t(locale, 'landing.privacy.linkDelete')}</a>
           </p>
         </section>
 
         <section className="lp-section lp-final">
-          <h2>Ready when you are</h2>
-          <p>Set it up before you need it. That is the whole point.</p>
-          <button className="lp-cta" onClick={() => go('footer_get_started')}>Get started, free for 30 days</button>
+          <h2>{t(locale, 'landing.final.heading')}</h2>
+          <p>{t(locale, 'landing.final.body')}</p>
+          <button className="lp-cta" onClick={() => go('footer_get_started')}>{t(locale, 'landing.hero.getStarted')}</button>
         </section>
       </main>
 
       <footer className="lp-footer">
         <div className="lp-footer-about">
-          <h3>About Smart Warning</h3>
+          <h3>{t(locale, 'landing.footer.aboutHeading')}</h3>
+          <p>{t(locale, 'landing.footer.aboutP1', { provider: PROVIDER })}</p>
           <p>
-            Smart Warning is built by <b>{PROVIDER}</b>, an independent software team in Tanzania.
-            We build it because a fire alarm on a wall only helps the people who can hear it, and
-            most emergencies start with one person who needs everyone else to know, now.
-          </p>
-          <p>
-            Questions, problems, or something that did not work when it mattered:{' '}
-            <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>, we answer.
+            {t(locale, 'landing.footer.aboutP2')}{' '}
+            <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>, {t(locale, 'landing.footer.aboutAnswer')}
           </p>
         </div>
         <nav className="lp-footer-links">
-          <a href="/legal/terms.html">Terms</a>
-          <a href="/legal/privacy.html">Privacy</a>
-          <a href="/legal/delete.html">Account deletion</a>
-          <a href={`mailto:${SUPPORT_EMAIL}`}>Support</a>
+          <a href="/legal/terms.html">{t(locale, 'landing.footer.terms')}</a>
+          <a href="/legal/privacy.html">{t(locale, 'landing.footer.privacy')}</a>
+          <a href="/legal/delete.html">{t(locale, 'landing.footer.accountDeletion')}</a>
+          <a href={`mailto:${SUPPORT_EMAIL}`}>{t(locale, 'landing.footer.support')}</a>
         </nav>
-        <p className="lp-copy">© {new Date().getFullYear()} {PROVIDER}. Not an emergency service.</p>
+        <p className="lp-copy">© {new Date().getFullYear()} {PROVIDER}. {t(locale, 'landing.footer.copyright')}</p>
       </footer>
 
       {/* Landing page only. It asks why somebody did not sign up, which is not a
@@ -319,8 +314,14 @@ function useBilling(): { plans: Plan[]; payments: PaymentMethods } | null {
  * Renders nothing at all until the plans arrive. An empty space is a fair thing
  * to show somebody for half a second; a plausible-looking placeholder price is
  * not, and this is the section where being wrong costs the most trust.
+ *
+ * Plan names, taglines and feature lines come from the server (see the header
+ * comment on `useBilling`) and are shown exactly as it states them — those
+ * strings are not translated here, the same way a price is not: this page has
+ * no way to know whether a Swahili tagline the server never sent is accurate,
+ * and a guess in the one section about money is worse than English.
  */
-function PricingSection({ billing, onGetStarted }: { billing: ReturnType<typeof useBilling>; onGetStarted: () => void }) {
+function PricingSection({ billing, onGetStarted, locale }: { billing: ReturnType<typeof useBilling>; onGetStarted: () => void; locale: Locale }) {
   if (!billing) return null;
 
   // Enterprise is quoted, not chosen from a page, so it gets a line underneath
@@ -331,27 +332,28 @@ function PricingSection({ billing, onGetStarted }: { billing: ReturnType<typeof 
 
   return (
     <section className="lp-section" id="pricing">
-      <h2>What it costs</h2>
-      <p className="lp-section-sub">
-        Every plan starts with a 30 day trial. We do not ask for payment details to begin, and
-        nothing charges itself when the trial ends. You choose a plan, or you keep the free one.
-      </p>
+      <h2>{t(locale, 'landing.pricing.heading')}</h2>
+      <p className="lp-section-sub">{t(locale, 'landing.pricing.sub')}</p>
 
       <div className="lp-plans">
         {shown.map((plan) => (
           <article key={plan.id} className={`lp-plan${plan.id === 'personal' ? ' lp-plan-pick' : ''}`}>
-            {plan.id === 'personal' && <span className="lp-plan-tag">Most people start here</span>}
+            {plan.id === 'personal' && <span className="lp-plan-tag">{t(locale, 'landing.pricing.mostPopular')}</span>}
             <h3>{plan.name}</h3>
             <p className="lp-plan-price">
               {plan.price === 0
-                ? <b>Free</b>
-                : <><b>{formatMoney(plan.price, plan.currency)}</b> <small>/ month</small></>}
+                ? <b>{t(locale, 'landing.pricing.free')}</b>
+                : <><b>{formatMoney(plan.price, plan.currency)}</b> <small>{t(locale, 'landing.pricing.perMonth')}</small></>}
             </p>
             {/* What you are buying, in the unit the price is per. Two plans
                 priced differently for 1 seat and 50 needs the 1 and the 50 on
                 screen next to the numbers, or the difference reads as arbitrary. */}
             <p className="lp-plan-seats">
-              {plan.seats === 1 ? 'One person' : plan.seats ? `Up to ${plan.seats} people` : 'Any number of people'}
+              {plan.seats === 1
+                ? t(locale, 'landing.pricing.oneSeat')
+                : plan.seats
+                  ? t(locale, 'landing.pricing.upToSeats', { n: String(plan.seats) })
+                  : t(locale, 'landing.pricing.anySeats')}
             </p>
             <p className="lp-plan-tagline">{plan.tagline}</p>
             <ul className="lp-plan-includes">
@@ -364,18 +366,18 @@ function PricingSection({ billing, onGetStarted }: { billing: ReturnType<typeof 
       {enterprise && (
         <p className="lp-plan-enterprise">
           <b>{enterprise.name}</b>: {enterprise.tagline.toLowerCase()}{' '}
-          <a href={`mailto:${SUPPORT_EMAIL}`}>Talk to us</a>.
+          <a href={`mailto:${SUPPORT_EMAIL}`}>{t(locale, 'landing.pricing.talkToUs')}</a>.
         </p>
       )}
 
       <p className="lp-pay">
-        {mobileMoney.enabled && <>Pay with mobile money: Mixx by Yas, MPesa, Airtel Money, HaloPesa, EzyPesa. </>}
-        {card.enabled && <>Cards accepted. </>}
-        Prices in Tanzanian shillings. Cancel whenever you like; you keep the plan until the month you paid for runs out.
+        {mobileMoney.enabled && <>{t(locale, 'landing.pricing.mobileMoney')} </>}
+        {card.enabled && <>{t(locale, 'landing.pricing.cardsAccepted')} </>}
+        {t(locale, 'landing.pricing.termsNote')}
       </p>
 
       <div className="lp-plans-cta">
-        <button className="lp-cta" onClick={onGetStarted}>Start your 30 days</button>
+        <button className="lp-cta" onClick={onGetStarted}>{t(locale, 'landing.pricing.startTrial')}</button>
       </div>
     </section>
   );

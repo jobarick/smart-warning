@@ -2,8 +2,9 @@ import type { Session } from '../lib/session';
 import type { Incident, OrgProfile } from '../lib/api';
 import type { IndustryProfile } from '../lib/profiles';
 import { alertLabel } from '../lib/profiles';
-import type { AlertType } from '../types';
+import type { AlertType, Locale } from '../types';
 import { Icon } from './Icon';
+import { TrustedCircle } from './TrustedCircle';
 
 interface Props {
   session: Session | null;
@@ -23,6 +24,7 @@ interface Props {
   /** Undefined for a worker holding only a join code — there is no billing
    *  subject to show plans for without an account. */
   onBilling?: () => void;
+  locale: Locale;
 }
 
 /**
@@ -35,7 +37,7 @@ interface Props {
 export function ProfilePanel({
   session, org, workerCode, personal, deviceName, profile,
   incidents, persistence, historyLoading, historyError,
-  onAbout, onSettings, onSupport, onBilling,
+  onAbout, onSettings, onSupport, onBilling, locale,
 }: Props) {
   const name = session?.kind === 'supervisor' ? session.user.name : deviceName;
 
@@ -98,6 +100,10 @@ export function ProfilePanel({
             </ul>
           )}
         </section>
+      )}
+
+      {personal && session?.kind === 'supervisor' && (
+        <TrustedCircle token={session.token} locale={locale} />
       )}
 
       <div className="profile-actions">

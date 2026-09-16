@@ -25,7 +25,15 @@ services:
     name: smart-warning-relay
     runtime: node
     plan: starter
-    buildCommand: cd client && npm ci && npm run build && cd ../server && npm ci
+    # --include=dev on the client install: Render sets NODE_ENV=production for
+    # web services, which makes a plain `npm ci` skip devDependencies — and
+    # vite, typescript and vite-plugin-pwa all live there (correctly; nothing
+    # in client/dist's actual runtime needs them). Without this flag `vite
+    # build` fails with "vite: not found" on every single build regardless of
+    # what changed, which is exactly what happened here for weeks before this
+    # was diagnosed. The server's own `npm ci` needs no such flag — it has no
+    # devDependencies to skip.
+    buildCommand: cd client && npm ci --include=dev && npm run build && cd ../server && npm ci
     startCommand: node server/index.js
     healthCheckPath: /api/health
     envVars:

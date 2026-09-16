@@ -214,6 +214,39 @@ test('the all-clear clears the response, so the next joiner is not told stale ne
   worker.close(); supervisor.close(); latecomer.close();
 });
 
+test('a double-tap does not raise two incidents, but a real second press moments later still does', async () => {
+  const worker = await connect({ kind: 'join', orgCode: JOIN_CODE });
+
+  // Two distinct ids, back to back with no delay — exactly what a double-tap
+  // artifact looks like on the wire, and exactly what the client-side guard
+  // in App.tsx also exists to prevent at the source.
+  worker.send(JSON.stringify({
+    kind: 'alert', id: 'dbl-1', type: 'medical', severity: 'critical', message: '', sender: 'Worker', timestamp: Date.now(),
+  }));
+  worker.send(JSON.stringify({
+    kind: 'alert', id: 'dbl-2', type: 'medical', severity: 'critical', message: '', sender: 'Worker', timestamp: Date.now(),
+  }));
+  await sleep(200);
+  assert.strictEqual(
+    worker.received.filter((m) => m.kind === 'alert').length, 1,
+    'the second, near-simultaneous alert must be dropped, not raised as its own incident',
+  );
+
+  // Past the cooldown window, a genuinely new press from the same worker
+  // must go through — this must never become a delay on a real emergency.
+  await sleep(400);
+  worker.send(JSON.stringify({
+    kind: 'alert', id: 'dbl-3', type: 'fire', severity: 'high', message: '', sender: 'Worker', timestamp: Date.now(),
+  }));
+  await sleep(200);
+  assert.strictEqual(
+    worker.received.filter((m) => m.kind === 'alert').length, 2,
+    'a real second press once the cooldown has passed must not be silently eaten',
+  );
+
+  worker.close();
+});
+
 test('a new emergency does not inherit the previous response', async () => {
   const worker = await connect({ kind: 'join', orgCode: JOIN_CODE });
   const supervisor = await connect({ kind: 'join', token: SUPERVISOR_TOKEN });

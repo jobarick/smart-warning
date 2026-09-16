@@ -137,6 +137,33 @@ export async function fetchIncidents(
   return res.json();
 }
 
+export type PlaceKind = 'hospital' | 'police' | 'fire' | 'shelter' | 'pharmacy';
+
+export interface Place {
+  name: string;
+  lat: number;
+  lng: number;
+  kind: PlaceKind;
+  distanceM: number;
+  phone: string | null;
+  address: string | null;
+}
+
+/**
+ * GET /api/emergency/nearby — server/places.js. Public, unauthenticated
+ * (published-facility data, not incident data), rate-limited server-side
+ * (allowPlaces). The endpoint itself never throws — a bad third-party lookup
+ * degrades to `{ places: [] }`, so the only errors this can surface are a
+ * network failure to our own API or the 429 from that rate limit.
+ */
+export async function fetchNearby(kind: PlaceKind, lat: number, lng: number): Promise<Place[]> {
+  const params = new URLSearchParams({ kind, lat: String(lat), lng: String(lng) });
+  const res = await fetch(`${API_BASE}/api/emergency/nearby?${params.toString()}`);
+  if (!res.ok) throw new Error(res.status === 429 ? 'too many lookups — wait a moment' : `nearby lookup failed (${res.status})`);
+  const body = await res.json();
+  return Array.isArray(body.places) ? body.places : [];
+}
+
 /**
  * A supervisor's formal "I have seen this" — separate from the per-device
  * siren mute, which never leaves the device. `alreadyAcknowledged: true`
@@ -252,6 +279,62 @@ export async function resetPassword(input: { token: string; password: string }):
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(await errorMessage(res, 'could not reset the password'));
+  return res.json();
+}
+
+// --- Team invites ---
+//
+// Adding a second (or third) supervisor to an organization. Every invited
+// account is a full supervisor today — role differentiation is separate,
+// later work.
+
+export interface OrgInvite {
+  id: string;
+  email: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export async function inviteTeammate(email: string, token: string): Promise<{ ok: boolean; mailConfigured: boolean }> {
+  const res = await fetch(`${API_BASE}/api/org/invites`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not send that invite'));
+  return res.json();
+}
+
+export async function fetchOrgInvites(token: string): Promise<OrgInvite[]> {
+  const res = await fetch(`${API_BASE}/api/org/invites`, { headers: authHeaders(token) });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not load invites'));
+  const body = await res.json();
+  return body.invites ?? [];
+}
+
+export async function revokeInvite(id: string, token: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/org/invites/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not revoke that invite'));
+}
+
+/** What the accept-invite screen shows before anyone has typed anything. */
+export async function previewInvite(token: string): Promise<{ email: string; orgName: string }> {
+  const res = await fetch(`${API_BASE}/api/auth/invite/${encodeURIComponent(token)}`);
+  if (!res.ok) throw new Error(await errorMessage(res, 'that invite is not valid'));
+  return res.json();
+}
+
+/** Spend an invite and create the account it names. Returns a signed-in session. */
+export async function acceptInvite(input: { token: string; name: string; password: string }): Promise<AuthResult> {
+  const res = await fetch(`${API_BASE}/api/auth/accept-invite`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not accept that invite'));
   return res.json();
 }
 
@@ -398,6 +481,68 @@ export async function deletePushSubscription(
     headers: { 'Content-Type': 'application/json', ...authHeaders(creds.token) },
     body: JSON.stringify({ endpoint, orgCode: creds.orgCode }),
   }).catch(() => {});
+}
+
+// --- Personal emergency contacts ("Trusted Circle") ---
+//
+// Individual accounts only — server/routes/contacts.js refuses an org
+// account with a 403, because an organization has a roster and Safety
+// Coordinators instead. These are the people told when SOMEONE raises an
+// alarm; today nothing on the alert path actually notifies them yet (the
+// list is stored, but delivery is not wired up).
+
+export interface Contact {
+  id: string;
+  name: string;
+  relation: string | null;
+  phone: string | null;
+  email: string | null;
+  priority: number;
+  notify: boolean;
+  verifiedAt: string | null;
+}
+
+export async function fetchContacts(token: string): Promise<{ contacts: Contact[]; max: number }> {
+  const res = await fetch(`${API_BASE}/api/contacts`, { headers: authHeaders(token) });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not load your trusted circle'));
+  return res.json();
+}
+
+export async function createContact(
+  input: { name: string; relation?: string; phone?: string; email?: string; notify?: boolean },
+  token: string,
+): Promise<Contact> {
+  const res = await fetch(`${API_BASE}/api/contacts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not save this contact'));
+  const body = await res.json();
+  return body.contact;
+}
+
+export async function updateContact(
+  id: string,
+  patch: { name?: string; relation?: string; phone?: string; email?: string; notify?: boolean },
+  token: string,
+): Promise<Contact> {
+  const res = await fetch(`${API_BASE}/api/contacts/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not update this contact'));
+  const body = await res.json();
+  return body.contact;
+}
+
+export async function deleteContact(id: string, token: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/contacts/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not remove this contact'));
 }
 
 // --- Organization profile ---

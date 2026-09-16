@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { track } from '../lib/analytics';
-import { login, signup, signupPersonal, requestPasswordReset, resetPassword } from '../lib/api';
+import { login, signup, signupPersonal, requestPasswordReset, resetPassword, previewInvite, acceptInvite } from '../lib/api';
 import { fetchPlans, formatMoney, type Plan } from '../lib/billing';
 import type { Session } from '../lib/session';
 import { Icon } from './Icon';
 import { Logo } from './Logo';
 import { PasswordField } from './PasswordField';
 
-type Step = 'choose' | 'worker' | 'login' | 'signup' | 'personal' | 'forgot' | 'reset';
+type Step = 'choose' | 'worker' | 'login' | 'signup' | 'personal' | 'forgot' | 'reset' | 'accept-invite';
 
 interface Props {
   onAuthed: (s: Session) => void;
@@ -36,6 +36,23 @@ function clearResetFromUrl() {
   } catch { /* history is not available in every embedding — harmless */ }
 }
 
+/** An invite arrives as ?invite=<token>, same reasoning as resetTokenFromUrl. */
+function inviteTokenFromUrl(): string {
+  try {
+    return new URLSearchParams(window.location.search).get('invite')?.trim() || '';
+  } catch {
+    return '';
+  }
+}
+
+function clearInviteFromUrl() {
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('invite');
+    window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+  } catch { /* history is not available in every embedding — harmless */ }
+}
+
 /**
  * Arrives as `?step=login` or `?step=worker` when the visitor already said
  * which door they want — the landing page's "Sign in" and "I have a team
@@ -48,6 +65,7 @@ function clearResetFromUrl() {
  */
 function initialStepFromUrl(): Step {
   if (resetTokenFromUrl()) return 'reset';
+  if (inviteTokenFromUrl()) return 'accept-invite';
   try {
     const step = new URLSearchParams(window.location.search).get('step');
     if (step === 'login' || step === 'worker') return step;
@@ -107,10 +125,24 @@ function AuthLegalFooter() {
 export function AuthGate({ onAuthed, notice }: Props) {
   const price = usePersonalPrice();
   const [linkToken] = useState(resetTokenFromUrl);
+  const [inviteToken] = useState(inviteTokenFromUrl);
+  const [invitePreview, setInvitePreview] = useState<{ email: string; orgName: string } | null>(null);
   const [step, setStep] = useState<Step>(initialStepFromUrl);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<{ mailConfigured: boolean } | null>(null);
+
+  // Resolved once, on arrival — what the accept screen shows before anyone
+  // has typed anything. A failure here (expired/used/bad link) surfaces as
+  // the same auth-error banner every other step already uses.
+  useEffect(() => {
+    if (step !== 'accept-invite' || !inviteToken) return;
+    let cancelled = false;
+    previewInvite(inviteToken)
+      .then((p) => { if (!cancelled) setInvitePreview(p); })
+      .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : 'that invite is not valid'); });
+    return () => { cancelled = true; };
+  }, [step, inviteToken]);
 
   // shared fields
   const [name, setName] = useState('');
@@ -218,6 +250,21 @@ export function AuthGate({ onAuthed, notice }: Props) {
     try {
       const res = await resetPassword({ token: (linkToken || code).trim(), password });
       clearResetFromUrl();
+      onAuthed({ kind: 'supervisor', token: res.token, user: res.user });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitAcceptInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true); setError(null);
+    try {
+      const res = await acceptInvite({ token: inviteToken.trim(), name: name.trim(), password });
+      clearInviteFromUrl();
+      track('signup_complete', { path: 'invite' });
       onAuthed({ kind: 'supervisor', token: res.token, user: res.user });
     } catch (err) {
       setError((err as Error).message);
@@ -412,6 +459,37 @@ export function AuthGate({ onAuthed, notice }: Props) {
               autoComplete="new-password"
             />
             <button className="auth-submit" type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save and sign in'}</button>
+          </form>
+        )}
+
+        {step === 'accept-invite' && (
+          <form onSubmit={submitAcceptInvite}>
+            <h1 className="auth-title">Join your team</h1>
+            {invitePreview ? (
+              <p className="auth-sub">
+                You've been invited to join <b>{invitePreview.orgName}</b> as a Safety Coordinator,
+                as <b>{invitePreview.email}</b>.
+              </p>
+            ) : !error ? (
+              <p className="auth-sub">Checking your invite…</p>
+            ) : null}
+            {invitePreview && (
+              <>
+                <label className="auth-field">
+                  <span>Your name</span>
+                  <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sam Ops" autoComplete="name" />
+                </label>
+                <PasswordField
+                  label="Password"
+                  value={password}
+                  onChange={setPassword}
+                  placeholder="At least 8 characters"
+                  autoComplete="new-password"
+                />
+                <button className="auth-submit" type="submit" disabled={busy}>{busy ? 'Joining…' : 'Join'}</button>
+              </>
+            )}
+            <p className="auth-alt"><button type="button" onClick={() => go('login')}>I already have an account</button></p>
           </form>
         )}
 

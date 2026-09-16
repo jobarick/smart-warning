@@ -49,6 +49,7 @@ import { hasAcceptedCurrentTerms, saveConsent } from './lib/consent';
 import { TERMS_VERSION } from './lib/terms';
 import { PushToggle } from './components/PushToggle';
 import { EmergencyCallPocket } from './components/EmergencyCallPocket';
+import { NearbyHelp } from './components/NearbyHelp';
 import { SafeRoutePanel } from './components/SafeRoutePanel';
 import { ContactSupport } from './components/ContactSupport';
 import { unsubscribe as unsubscribePush } from './lib/push';
@@ -76,6 +77,7 @@ const MapPanel = lazy(() => import('./components/MapPanel').then((m) => ({ defau
 const CommandDashboard = lazy(() => import('./components/CommandDashboard').then((m) => ({ default: m.CommandDashboard })));
 const FeedbackCenter = lazy(() => import('./components/FeedbackCenter').then((m) => ({ default: m.FeedbackCenter })));
 const DestinationsManager = lazy(() => import('./components/DestinationsManager').then((m) => ({ default: m.DestinationsManager })));
+const TeamInvites = lazy(() => import('./components/TeamInvites').then((m) => ({ default: m.TeamInvites })));
 const BillingPanel = lazy(() => import('./components/BillingPanel').then((m) => ({ default: m.BillingPanel })));
 
 // Deliberately plain: a spinner that appears for one frame is noise, and these
@@ -660,8 +662,25 @@ export default function App() {
     setSafeFor(id);
   }, [alarm.alert]);
 
+  // Guards a double-tap on the SOS button from becoming two incidents. The
+  // button disables once `alarmActive` flips true, but that only happens
+  // after the server echoes the alert back — online, a second tap inside
+  // that round trip would otherwise still go out with its own fresh id
+  // before the button catches up. A ref, not state, because React batches
+  // state updates within one tick, so two synchronous clicks can both still
+  // read the old value (the exact trap PaymentModal's `submitting` ref
+  // exists to avoid, for the same class of double-submit bug on payments).
+  //
+  // Kept deliberately short — this catches a double-tap artifact, not a
+  // worried person pressing SOS again a second later because the first tap
+  // did not seem to register. That second press is a real emergency and
+  // must never be silently swallowed; matches the server's own ALERT_COOLDOWN_MS.
+  const lastTriggerAt = useRef(0);
   const trigger = useCallback(
     (type: AlertType, severity: Severity, message: string) => {
+      const now = Date.now();
+      if (now - lastTriggerAt.current < 500) return;
+      lastTriggerAt.current = now;
       void arm(); // we're inside a user gesture — unlock audio for later sirens
       const alert: AlertMessage = {
         kind: 'alert',
@@ -852,6 +871,8 @@ export default function App() {
       <LandingPage
         onGetStarted={(step) => navigate(step ? `${AUTH_ROUTE}?step=${step}` : AUTH_ROUTE)}
         onWatchDemo={() => navigate(DEMO_ROUTE)}
+        locale={settings.locale}
+        onToggleLocale={() => patchSettings({ locale: settings.locale === 'en' ? 'sw' : 'en' })}
       />
     );
   }
@@ -872,6 +893,8 @@ export default function App() {
       <LandingPage
         onGetStarted={(step) => navigate(step ? `${AUTH_ROUTE}?step=${step}` : AUTH_ROUTE)}
         onWatchDemo={() => navigate(DEMO_ROUTE)}
+        locale={settings.locale}
+        onToggleLocale={() => patchSettings({ locale: settings.locale === 'en' ? 'sw' : 'en' })}
       />
     );
   }
@@ -920,6 +943,8 @@ export default function App() {
         userName={settings.deviceName}
         theme={settings.theme}
         onToggleTheme={() => patchSettings({ theme: settings.theme === 'dark' ? 'light' : 'dark' })}
+        locale={settings.locale}
+        onToggleLocale={() => patchSettings({ locale: settings.locale === 'en' ? 'sw' : 'en' })}
       />
 
       {session && (
@@ -1009,6 +1034,7 @@ export default function App() {
           </button>
           <Suspense fallback={<PanelFallback label="tools" />}>
             <DestinationsManager token={token} roster={roster} />
+            {token && <TeamInvites token={token} />}
             <FeedbackCenter token={token} />
           </Suspense>
         </main>
@@ -1046,7 +1072,7 @@ export default function App() {
         <main className="worker worker-tabbed">
           {tab === 'home' && (
             <>
-              <SosPanel profile={profile} disabled={alarmActive} onTrigger={trigger} />
+              <SosPanel profile={profile} disabled={alarmActive} onTrigger={trigger} locale={settings.locale} />
               {/* Below the SOS, never above it. Billing is the least important
                   thing on this screen and must never push the button that
                   matters further down. Renders nothing unless there is
@@ -1081,6 +1107,11 @@ export default function App() {
                 lat={telemetry.lat}
                 lng={telemetry.lng}
                 alertType={alarm.alert?.type ?? null}
+              />
+              <NearbyHelp
+                lat={settings.shareLocation ? telemetry.lat : null}
+                lng={settings.shareLocation ? telemetry.lng : null}
+                locale={settings.locale}
               />
               <Suspense fallback={<PanelFallback label="map" />}>
                 <MapPanel
@@ -1123,6 +1154,7 @@ export default function App() {
               onSettings={() => navigate('/settings')}
               onSupport={() => navigate('/support')}
               onBilling={token ? () => navigate('/billing') : undefined}
+              locale={settings.locale}
             />
           )}
         </main>

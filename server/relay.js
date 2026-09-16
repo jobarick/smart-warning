@@ -261,7 +261,10 @@ async function raiseAlert(orgId, alert, worker = null, origin = 'unknown', actor
 
   // Two independent channels, deliberately not chained: browsers get Web Push,
   // the Android app gets FCM, and one being unconfigured or failing must never
-  // stop the other. Both are fire-and-forget beside the broadcast above.
+  // stop the other. Both are fire-and-forget beside the broadcast above — but
+  // each outcome is still recorded once it settles, so "was anyone actually
+  // notified" is answerable from incident_events instead of only ever
+  // existing as a console.error nobody queries after the fact.
   const notification = {
     title: `🚨 ${titleCase(alert.type)} alert`,
     body: alert.message || `${titleCase(alert.severity)} severity, raised by ${alert.sender || 'a worker'}`,
@@ -269,8 +272,17 @@ async function raiseAlert(orgId, alert, worker = null, origin = 'unknown', actor
     severity: alert.severity,
     tag: 'sw-alert',
   };
-  push.notifyOrg(orgId, notification).catch((e) => console.error('[push] notifyOrg:', e.message));
-  fcm.notifyOrg(orgId, notification).catch((e) => console.error('[fcm] notifyOrg:', e.message));
+  const recordNotified = (channel, detail) => db.recordIncidentEvent?.({
+    incidentId: alert.id, orgId, kind: 'notified', actorRole: 'system',
+    detail: { channel, ...detail },
+  }).catch((e) => console.error(`[db] recordIncidentEvent(notified/${channel}):`, e.message));
+
+  push.notifyOrg(orgId, notification)
+    .then((result) => recordNotified('web-push', result))
+    .catch((e) => { console.error('[push] notifyOrg:', e.message); recordNotified('web-push', { error: e.message }); });
+  fcm.notifyOrg(orgId, notification)
+    .then((result) => recordNotified('fcm', result))
+    .catch((e) => { console.error('[fcm] notifyOrg:', e.message); recordNotified('fcm', { error: e.message }); });
 }
 
 /**
@@ -278,6 +290,22 @@ async function raiseAlert(orgId, alert, worker = null, origin = 'unknown', actor
  * STALE_REPLAY_MS in the client's outbox.
  */
 const STALE_REPLAY_MS = 10 * 60 * 1000;
+
+/**
+ * A second 'alert' from the SAME connection this soon after the first is a
+ * double-tap artifact (a single physical touch occasionally registers as two
+ * events, well under 300ms apart), not a second real emergency — and it must
+ * stay short enough that it never delays one. A worker who is worried the
+ * first tap did not register and deliberately presses SOS again a second
+ * later is having a real emergency; silently eating that tap would be the
+ * exact harm the confirmation-design rule against "delaying a genuine
+ * emergency" exists to prevent. Scoped to one connection on purpose: it must
+ * never suppress a different device raising a genuinely separate alert
+ * moments later. `db.recordAlert`'s id-based ON CONFLICT already handles an
+ * outbox replay of the same alert id, which this is not — this catches a
+ * second, distinct id from the same tap.
+ */
+const ALERT_COOLDOWN_MS = 500;
 
 /**
  * A device has reconnected carrying an alert raised a long time ago.
@@ -411,6 +439,12 @@ function attach(server) {
             await fileStaleReplay(ws, msg, age);
             return;
           }
+          const sinceLast = Date.now() - (ws.lastAlertAt || 0);
+          if (sinceLast < ALERT_COOLDOWN_MS) {
+            console.warn(`[!] duplicate alert from #${ws.connId} ${sinceLast}ms after the last one — ignored`);
+            return;
+          }
+          ws.lastAlertAt = Date.now();
           await raiseAlert(ws.orgId, msg, ws.worker, `#${ws.connId}`, ws.supervisor ? 'supervisor' : 'worker');
           return; // raiseAlert already broadcast it
         } else {

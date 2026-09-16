@@ -1,4 +1,5 @@
 import type { SocketStatus } from '../hooks/useAlertSocket';
+import type { Locale } from '../types';
 import { Icon } from './Icon';
 import { Logo } from './Logo';
 
@@ -15,6 +16,8 @@ interface Props {
   userName: string;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
+  locale: Locale;
+  onToggleLocale: () => void;
 }
 
 const STATUS_LABEL: Record<SocketStatus, string> = {
@@ -23,7 +26,7 @@ const STATUS_LABEL: Record<SocketStatus, string> = {
   closed: 'Offline, retrying',
 };
 
-export function ConnectionStatus({ status, deviceCount, audioArmed, onArmAudio, view, onViewChange, onLogoClick, userName, theme, onToggleTheme }: Props) {
+export function ConnectionStatus({ status, deviceCount, audioArmed, onArmAudio, view, onViewChange, onLogoClick, userName, theme, onToggleTheme, locale, onToggleLocale }: Props) {
   return (
     <div className="status-bar">
       <button type="button" className="brand" onClick={onLogoClick} aria-label="Smart Warning home">
@@ -39,6 +42,14 @@ export function ConnectionStatus({ status, deviceCount, audioArmed, onArmAudio, 
         </button>
       </div>
       <div className="status-items">
+        <button
+          className="theme-toggle"
+          onClick={onToggleLocale}
+          aria-label={locale === 'en' ? 'Badili kuwa Kiswahili' : 'Switch to English'}
+          title={locale === 'en' ? 'Kiswahili' : 'English'}
+        >
+          {locale === 'en' ? 'SW' : 'EN'}
+        </button>
         <button
           className="theme-toggle"
           onClick={onToggleTheme}

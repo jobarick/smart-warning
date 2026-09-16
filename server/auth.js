@@ -233,7 +233,11 @@ async function requestPasswordReset({ email }) {
     expiresAt: new Date(Date.now() + RESET_TTL_MS),
   });
 
-  const link = `${APP_URL}/?reset=${token}`;
+  // /get-started, not '/': a signed-out visitor at '/' sees the marketing
+  // LandingPage, and only AuthGate (mounted at /get-started) ever reads the
+  // reset token out of the query string. A bare '/' link here would silently
+  // strand the very person this flow exists to unblock.
+  const link = `${APP_URL}/get-started?reset=${token}`;
   const body = [
     `Hello ${user.name || 'there'},`,
     '',
@@ -290,6 +294,120 @@ async function resetPassword({ token, password }) {
   return { token: signToken(updated), user: publicUser(updated, org) };
 }
 
+// --- Organization invites ----------------------------------------------------
+//
+// Until this existed, an organization could only ever have exactly one
+// supervisor account — the one created at signup — with no way to add a
+// second person at all, regardless of what they would be allowed to do once
+// there. This closes that gap; it does not yet differentiate what an invited
+// supervisor can do versus the one who signed up (that is role-model work
+// still to come) — every invited account is a full supervisor today, same as
+// the person who invited them.
+
+const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // a week — long enough to be checked at leisure
+const MAX_PENDING_INVITES = 20; // an org's own runway, not a hard product limit
+
+/**
+ * Invite someone to join an organization as a supervisor.
+ *
+ * Always resolves (mirrors requestPasswordReset): the response does not say
+ * whether the address already has an account elsewhere, only whether this
+ * organization now has an invite outstanding for it. Silently doing nothing
+ * for an address that already belongs to a user would be a worse experience
+ * than telling an inviter their teammate needs to be removed from another
+ * org first, so that case IS reported — the ambiguity password-reset avoids
+ * (does this account exist) is different from this one (can I invite this
+ * specific address to this specific org).
+ */
+async function inviteToOrg({ orgId, orgName, email, invitedByUserId, invitedByName }) {
+  const address = String(email || '').trim().toLowerCase();
+  if (!EMAIL_RE.test(address)) throw httpError(400, 'a valid email is required');
+
+  const existing = await db.getUserByEmail(address);
+  if (existing) throw httpError(409, 'that email already belongs to an account');
+
+  if (await db.countPendingInvites(orgId) >= MAX_PENDING_INVITES) {
+    throw httpError(409, `you can have up to ${MAX_PENDING_INVITES} pending invites at once — revoke an old one first`);
+  }
+
+  const token = crypto.randomBytes(32).toString('base64url');
+  await db.createOrgInvite({
+    orgId,
+    email: address,
+    tokenHash: hashToken(token),
+    invitedBy: invitedByUserId,
+    expiresAt: new Date(Date.now() + INVITE_TTL_MS),
+  });
+
+  // Same reasoning as the reset link above: /get-started, not '/', or a
+  // signed-out visitor sees the marketing LandingPage instead of AuthGate.
+  const link = `${APP_URL}/get-started?invite=${token}`;
+  const body = [
+    `Hello,`,
+    '',
+    `${invitedByName || 'A Safety Coordinator'} has invited you to join "${orgName}" on Smart Warning,`,
+    'as a Safety Coordinator — you will be able to see who is on site and',
+    'manage alerts alongside them.',
+    '',
+    'To accept, open this link within the next 7 days:',
+    '',
+    link,
+    '',
+    'If you were not expecting this, you can ignore this message — nothing',
+    'happens until the link above is used.',
+    '',
+    'Smart Warning — by Idefenda Lab',
+  ].join('\n');
+
+  const res = await mailer.send({
+    to: address,
+    subject: `You're invited to join ${orgName} on Smart Warning`,
+    body,
+    kind: 'org-invite',
+    refId: null,
+    orgId,
+  });
+  console.log(`[auth] invite issued for ${address} to org ${orgId} (delivered: ${res.delivered})`);
+  return { ok: true, mailConfigured: mailer.enabled() };
+}
+
+/** What the accept screen shows before anyone has typed anything. */
+async function previewInvite(token) {
+  if (!token || typeof token !== 'string') throw httpError(400, 'that invite link is not valid');
+  const invite = await db.getOrgInvite(hashToken(token.trim()));
+  if (!invite) throw httpError(400, 'that invite has expired, been used, or does not exist');
+  return { email: invite.email, orgName: invite.org_name };
+}
+
+/**
+ * Spend an invite and create the account it names.
+ *
+ * The email is the invite's, never the caller's to choose — accepting an
+ * invite proves control of that address's inbox, but says nothing about any
+ * other address, so there is no field for one.
+ */
+async function acceptInvite({ token, name, password }) {
+  if (!token || typeof token !== 'string') throw httpError(400, 'that invite link is not valid');
+  if (!name || !name.trim()) throw httpError(400, 'your name is required');
+  if (!password || password.length < 8) throw httpError(400, 'password must be at least 8 characters');
+
+  const consumed = await db.consumeOrgInvite(hashToken(token.trim()));
+  if (!consumed) throw httpError(400, 'that invite has expired, been used, or does not exist');
+
+  // Consumed before this check, deliberately: an invite is one-shot either
+  // way, and re-presenting it after somebody else claimed the address in the
+  // meantime must not look like it is still live.
+  if (await db.getUserByEmail(consumed.email)) {
+    throw httpError(409, 'an account with that email already exists');
+  }
+
+  const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+  const user = await db.createUser({ orgId: consumed.org_id, email: consumed.email, passwordHash, name: name.trim() });
+  const org = await db.getOrgById(consumed.org_id);
+  console.log(`[auth] invite accepted: ${user.email} joined org ${consumed.org_id}`);
+  return { token: signToken(user), user: publicUser(user, org) };
+}
+
 // Resolve the current user from a bearer token (for GET /api/auth/me and guards).
 async function userFromToken(token) {
   const payload = token && verifyToken(token);
@@ -326,4 +444,5 @@ module.exports = {
   signup, signupIndividual, login, updateOrg, userFromToken, verifyToken, publicUser,
   httpError, normalizePhone, billingSubject,
   requestPasswordReset, resetPassword,
+  inviteToOrg, previewInvite, acceptInvite,
 };

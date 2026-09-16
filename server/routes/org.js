@@ -4,7 +4,8 @@ const db = require('../db');
 const auth = require('../auth');
 const relay = require('../relay');
 const { sendJson, readJson } = require('../http');
-const { guardOrg, requireAuth, orgIdFromRequest } = require('../guards');
+const { guardOrg, requireAuth, orgIdFromRequest, allowOrgInvite } = require('../guards');
+const { UUID_RE } = require('../wire');
 
 async function handle({ req, res, path }) {
   // --- Organization profile (supervisor) ---
@@ -50,6 +51,52 @@ async function handle({ req, res, path }) {
     relay.closeOrgClients(ctx.orgId, 4003, 'organization deleted');
     console.warn(`[!] organization ${ctx.orgId} ("${org.name}") deleted by ${ctx.user?.email || 'a supervisor'}: ${JSON.stringify(removed)}`);
     sendJson(res, 200, { ok: true, deleted: removed });
+    return true;
+  }
+
+  // --- Team invites ---
+  //
+  // Adding a second (or third) supervisor to an organization. Every invited
+  // account is a full supervisor today — this does not yet differentiate
+  // what one can do versus another, that is separate role-model work.
+  if (path === '/api/org/invites' && req.method === 'POST') {
+    const ctx = await guardOrg(req, res);
+    if (ctx === false) return true;
+    if (!ctx) { sendJson(res, 501, { error: 'invites require a database' }); return true; }
+    if (!allowOrgInvite(req)) { sendJson(res, 429, { error: 'too many invites sent — please wait a while' }); return true; }
+    const body = await readJson(req);
+    const result = await auth.inviteToOrg({
+      orgId: ctx.orgId,
+      orgName: ctx.org?.name || 'your organization',
+      email: body.email,
+      invitedByUserId: ctx.user.id,
+      invitedByName: ctx.user.name,
+    });
+    sendJson(res, 201, result);
+    return true;
+  }
+
+  if (path === '/api/org/invites' && req.method === 'GET') {
+    const ctx = await guardOrg(req, res);
+    if (ctx === false) return true;
+    if (!ctx) { sendJson(res, 501, { error: 'invites require a database' }); return true; }
+    const rows = await db.listOrgInvites(ctx.orgId);
+    sendJson(res, 200, {
+      invites: rows.map((r) => ({ id: r.id, email: r.email, createdAt: r.created_at, expiresAt: r.expires_at })),
+    });
+    return true;
+  }
+
+  const inviteMatch = path.match(/^\/api\/org\/invites\/([^/]+)$/);
+  if (inviteMatch && req.method === 'DELETE') {
+    const ctx = await guardOrg(req, res);
+    if (ctx === false) return true;
+    if (!ctx) { sendJson(res, 501, { error: 'invites require a database' }); return true; }
+    const id = inviteMatch[1];
+    if (!UUID_RE.test(id)) { sendJson(res, 404, { error: 'no such invite' }); return true; }
+    const gone = await db.deleteOrgInvite(id, ctx.orgId);
+    if (!gone) { sendJson(res, 404, { error: 'no such invite' }); return true; }
+    sendJson(res, 200, { ok: true });
     return true;
   }
 
