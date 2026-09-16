@@ -797,6 +797,13 @@ export interface EmergencyService {
   id: string;
   label: string;
   numbers: string[];
+  /** Present only for a country with its own per-service directory (Tanzania today) — see server/emergency-numbers.js. */
+  icon?: string;
+  description?: string;
+  labelSw?: string;
+  descriptionSw?: string;
+  /** Links back to the generic 7-category model, for the alert-type priority sort only — not shown to anyone. */
+  category?: string | null;
 }
 
 export interface EmergencyDirectory {

@@ -101,7 +101,9 @@
   min-width: 132px;
 }
 .pocket-svc-label svg { width: 14px; height: 14px; }
+.pocket-svc-emoji { font-size: 14px; line-height: 1; }
 .pocket-svc-first .pocket-svc-label { color: var(--accent); }
+.pocket-svc-desc { flex-basis: 100%; color: var(--faint); font-size: 0.78rem; margin-top: -4px; }
 .pocket-numbers { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
 
 .pocket-call {

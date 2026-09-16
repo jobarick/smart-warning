@@ -1139,6 +1139,7 @@ export default function App() {
                 lat={telemetry.lat}
                 lng={telemetry.lng}
                 alertType={alarm.alert?.type ?? null}
+                locale={settings.locale}
               />
               <NearbyHelp
                 lat={settings.shareLocation ? telemetry.lat : null}

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { AlertType } from '../types';
+import type { AlertType, Locale } from '../types';
 import type { EmergencyDirectory } from '../lib/api';
 import { cachedDirectory, canDial, isDialable, resolveDirectory, telHref, SERVICE_ICON } from '../lib/emergency';
+import { t } from '../lib/i18n';
 import { Icon } from './Icon';
 import type { IconName } from './Icon';
 
@@ -12,6 +13,7 @@ interface Props {
   alertType: AlertType | null;
   /** Collapsed by default; an active alert forces it open. */
   defaultOpen?: boolean;
+  locale: Locale;
 }
 
 // Which service a given emergency most likely needs first. During an alert the
@@ -26,7 +28,7 @@ const PRIORITY: Record<AlertType, string> = {
   cyber: 'police',
 };
 
-export function EmergencyCallPocket({ lat, lng, alertType, defaultOpen = false }: Props) {
+export function EmergencyCallPocket({ lat, lng, alertType, defaultOpen = false, locale }: Props) {
   // Start from cache so the list is on screen immediately — including offline,
   // and including the first paint after a cold start.
   const [directory, setDirectory] = useState<EmergencyDirectory | null>(() => cachedDirectory());
@@ -57,7 +59,13 @@ export function EmergencyCallPocket({ lat, lng, alertType, defaultOpen = false }
     if (!directory) return [];
     if (!alertType) return directory.services;
     const first = PRIORITY[alertType];
-    return [...directory.services].sort((a, b) => (a.id === first ? -1 : b.id === first ? 1 : 0));
+    // A rich, per-service directory (Tanzania) has ids that are phone numbers,
+    // not category slugs — `category` is what still links a row back to
+    // 'police'/'fire'/etc. for this sort. The generic directory has no
+    // `category` field at all, so `?? a.id` falls back to the old behavior
+    // there, where the id already IS the category slug.
+    const matches = (s: (typeof directory.services)[number]) => (s.category ?? s.id) === first;
+    return [...directory.services].sort((a, b) => (matches(a) === matches(b) ? 0 : matches(a) ? -1 : 1));
   }, [directory, alertType]);
 
   if (!directory || !services.length) return null;
@@ -73,7 +81,7 @@ export function EmergencyCallPocket({ lat, lng, alertType, defaultOpen = false }
         type="button"
       >
         <span className="pocket-title">
-          <Icon name="phone" /> Emergency numbers
+          <Icon name="phone" /> {t(locale, 'pocket.heading')}
         </span>
         <span className="pocket-where">
           {country}
@@ -84,42 +92,51 @@ export function EmergencyCallPocket({ lat, lng, alertType, defaultOpen = false }
 
       {urgent && (
         <p className="pocket-urgent-note">
-          Call the service you need. This does not replace the alert already sent to your team.
+          {t(locale, 'pocket.urgentNote')}
         </p>
       )}
 
       {open && (
         <ul className="pocket-list">
-          {services.map((svc) => (
-            <li key={svc.id} className={`pocket-svc ${alertType && PRIORITY[alertType] === svc.id ? 'pocket-svc-first' : ''}`}>
-              <span className="pocket-svc-label">
-                <Icon name={(SERVICE_ICON[svc.id] || 'siren') as IconName} />
-                {svc.label}
-              </span>
-              <span className="pocket-numbers">
-                {svc.numbers.map((n) =>
-                  dialable && isDialable(n) ? (
-                    <a key={n} className="pocket-call" href={telHref(n)}>
-                      <Icon name="phone" /> {n}
-                    </a>
+          {services.map((svc) => {
+            const label = (locale === 'sw' && svc.labelSw) ? svc.labelSw : svc.label;
+            const description = (locale === 'sw' && svc.descriptionSw) ? svc.descriptionSw : svc.description;
+            const first = alertType ? (svc.category ?? svc.id) === PRIORITY[alertType] : false;
+            return (
+              <li key={svc.id} className={`pocket-svc ${first ? 'pocket-svc-first' : ''}`}>
+                <span className="pocket-svc-label">
+                  {svc.icon ? (
+                    <span className="pocket-svc-emoji" aria-hidden="true">{svc.icon}</span>
                   ) : (
-                    // No dialler (desktop) or a vanity string: show it as text
-                    // that can be copied rather than a button that does nothing.
-                    <span key={n} className="pocket-num" title={dialable ? 'Not a dialable number' : 'Dial from a phone'}>
-                      {n}
-                    </span>
-                  ),
-                )}
-              </span>
-            </li>
-          ))}
+                    <Icon name={(SERVICE_ICON[svc.id] || 'siren') as IconName} />
+                  )}
+                  {label}
+                </span>
+                {description && <span className="pocket-svc-desc">{description}</span>}
+                <span className="pocket-numbers">
+                  {svc.numbers.map((n) =>
+                    dialable && isDialable(n) ? (
+                      <a key={n} className="pocket-call" href={telHref(n)}>
+                        <Icon name="phone" /> {n}
+                      </a>
+                    ) : (
+                      // No dialler (desktop) or a vanity string: show it as text
+                      // that can be copied rather than a button that does nothing.
+                      <span key={n} className="pocket-num" title={dialable ? 'Not a dialable number' : 'Dial from a phone'}>
+                        {n}
+                      </span>
+                    ),
+                  )}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
 
       {open && !dialable && (
         <p className="pocket-foot">
-          This device can't place calls. Dial these from a phone, or reach your site's
-          emergency contact through the details on the Contact &amp; support page.
+          {t(locale, 'pocket.cannotDial')}
         </p>
       )}
     </section>
