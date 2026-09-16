@@ -27,6 +27,24 @@ export type StringKey =
   | 'sos.severityLabel'
   | 'sos.notePlaceholder'
   | 'sos.hint'
+  | 'sos.personalSending'
+  | 'sos.personalSent'
+  | 'sos.personalSentNone'
+  | 'sos.personalFailed'
+  | 'overlay.titleTemplate'
+  | 'overlay.triggeredBy'
+  | 'overlay.acknowledgeBtn'
+  | 'overlay.acknowledgedNote'
+  | 'overlay.iAmSafeBtn'
+  | 'overlay.safeNote'
+  | 'overlay.retractConfirm'
+  | 'overlay.retractBtn'
+  | 'overlay.seenBy'
+  | 'overlay.onTheWay'
+  | 'overlay.etaAway'
+  | 'overlay.estimated'
+  | 'overlay.allClearConfirm'
+  | 'overlay.allClearBtn'
   | 'severity.low'
   | 'severity.medium'
   | 'severity.high'
@@ -146,6 +164,24 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'sos.severityLabel': '{severity} severity',
     'sos.notePlaceholder': 'Add a location or note (optional)',
     'sos.hint': '{profile} · alerts reach every connected device on your network',
+    'sos.personalSending': 'Sending SOS to your Circle…',
+    'sos.personalSent': 'SOS sent — {count} of your Circle notified',
+    'sos.personalSentNone': 'SOS recorded — nobody in your Circle could be reached. Add an email address in your Circle so they can be.',
+    'sos.personalFailed': 'Could not reach your Circle — call for help directly',
+    'overlay.titleTemplate': '{type} ALERT',
+    'overlay.triggeredBy': 'Triggered by {sender} at {time}',
+    'overlay.acknowledgeBtn': 'Acknowledge (this device)',
+    'overlay.acknowledgedNote': 'Acknowledged: alert still active',
+    'overlay.iAmSafeBtn': 'I am safe',
+    'overlay.safeNote': 'Reported safe: your Safety Coordinator can see this',
+    'overlay.retractConfirm': 'Tap again: this was a false alarm',
+    'overlay.retractBtn': 'I raised this by mistake',
+    'overlay.seenBy': '{name} has seen this alert',
+    'overlay.onTheWay': '{name} is on the way',
+    'overlay.etaAway': 'about {min} min away',
+    'overlay.estimated': '(estimated)',
+    'overlay.allClearConfirm': 'Tap again to confirm all clear',
+    'overlay.allClearBtn': 'All clear (all devices)',
     'severity.low': 'Low',
     'severity.medium': 'Medium',
     'severity.high': 'High',
@@ -262,6 +298,24 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'sos.severityLabel': 'Kiwango cha {severity}',
     'sos.notePlaceholder': 'Ongeza eneo au maelezo (si lazima)',
     'sos.hint': '{profile} · tahadhari hufika kwenye kila kifaa kilichounganishwa kwenye mtandao wako',
+    'sos.personalSending': 'Inatuma SOS kwa Circle yako…',
+    'sos.personalSent': 'SOS imetumwa — watu {count} wa Circle yako wamearifiwa',
+    'sos.personalSentNone': 'SOS imehifadhiwa — hakuna aliyeweza kuarifiwa katika Circle yako. Ongeza barua pepe kwenye Circle yako ili waweze kuarifiwa.',
+    'sos.personalFailed': 'Imeshindwa kuwasiliana na Circle yako — piga simu kuomba msaada moja kwa moja',
+    'overlay.titleTemplate': 'DHARURA YA {type}',
+    'overlay.triggeredBy': 'Imeanzishwa na {sender} saa {time}',
+    'overlay.acknowledgeBtn': 'Nimeona (kifaa hiki)',
+    'overlay.acknowledgedNote': 'Imeonekana: dharura bado inaendelea',
+    'overlay.iAmSafeBtn': 'Niko salama',
+    'overlay.safeNote': 'Umeripoti uko salama: Msimamizi wa Usalama anaweza kuona hili',
+    'overlay.retractConfirm': 'Gusa tena: hii ilikuwa taarifa ya uongo',
+    'overlay.retractBtn': 'Nimeleta hii kwa makosa',
+    'overlay.seenBy': '{name} ameona dharura hii',
+    'overlay.onTheWay': '{name} anakuja',
+    'overlay.etaAway': 'takriban dakika {min}',
+    'overlay.estimated': '(makadirio)',
+    'overlay.allClearConfirm': 'Gusa tena kuthibitisha hali salama',
+    'overlay.allClearBtn': 'Hali salama (vifaa vyote)',
     'severity.low': 'Chini',
     'severity.medium': 'Wastani',
     'severity.high': 'Juu',

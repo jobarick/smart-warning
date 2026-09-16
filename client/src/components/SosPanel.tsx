@@ -5,16 +5,25 @@ import type { IndustryProfile } from '../lib/profiles';
 import { t, SEVERITY_KEY } from '../lib/i18n';
 import { Icon } from './Icon';
 
+/** Shown after a personal (no-organisation) account's SOS — the only account
+ *  kind for which this component's own onTrigger cannot, by itself, prove
+ *  anyone else was told. See App.tsx's isPersonal / sendPersonalAlert. */
+export interface PersonalSendStatus {
+  phase: 'sending' | 'sent' | 'failed';
+  contactedCount?: number;
+}
+
 interface Props {
   profile: IndustryProfile;
   disabled: boolean;
   onTrigger: (type: AlertType, severity: Severity, message: string) => void;
   locale: Locale;
+  personalStatus?: PersonalSendStatus | null;
 }
 
 const SEVERITIES: Severity[] = ['low', 'medium', 'high', 'critical'];
 
-export function SosPanel({ profile, disabled, onTrigger, locale }: Props) {
+export function SosPanel({ profile, disabled, onTrigger, locale, personalStatus }: Props) {
   const [selected, setSelected] = useState<AlertType | null>(null);
   const [severity, setSeverity] = useState<Severity>('high');
   const [message, setMessage] = useState('');
@@ -26,15 +35,23 @@ export function SosPanel({ profile, disabled, onTrigger, locale }: Props) {
   const chosen = selected ? profile.alerts.find((a) => a.type === selected) ?? null : null;
   const chosenMeta = selected ? ALERT_META[selected] : null;
 
+  /**
+   * Section 13 of the product brief: a person must never be blocked from
+   * sending SOS for lack of a chosen category. Nothing chosen falls back to
+   * the profile's first alert type — an existing, already-configured value,
+   * not a new wire-protocol category — and the picker briefly highlights it
+   * so the assumption is visible rather than silent.
+   */
   const fire = () => {
     if (disabled) return;
+    const type = selected ?? profile.alerts[0]?.type;
+    if (!type) return; // no alert types configured at all — nothing sane to send
     if (!selected) {
-      // Nudge the user to pick a type first instead of doing nothing silently.
+      setSelected(type);
       setFlash(true);
       setTimeout(() => setFlash(false), 1200);
-      return;
     }
-    onTrigger(selected, severity, message.trim());
+    onTrigger(type, severity, message.trim());
     setMessage('');
   };
 
@@ -67,6 +84,22 @@ export function SosPanel({ profile, disabled, onTrigger, locale }: Props) {
           ? t(locale, 'sos.alertActiveLong')
           : chosen ? t(locale, 'sos.severityLabel', { severity: t(locale, SEVERITY_KEY[severity]) }) : t(locale, 'sos.choosePrompt')}
       </p>
+
+      {/* Section 11 of the product brief: the person must always know whether
+          help was actually told, never be left guessing. Only meaningful for
+          a personal account — see App.tsx's isPersonal / sendPersonalAlert;
+          an org account's own delivery signal is SystemFooter's sync state. */}
+      {personalStatus && (
+        <p className={`sos-personal-status sos-personal-status-${personalStatus.phase}`} role="status" aria-live="polite">
+          {personalStatus.phase === 'sending' && t(locale, 'sos.personalSending')}
+          {personalStatus.phase === 'sent' && (
+            personalStatus.contactedCount
+              ? t(locale, 'sos.personalSent', { count: String(personalStatus.contactedCount) })
+              : t(locale, 'sos.personalSentNone')
+          )}
+          {personalStatus.phase === 'failed' && t(locale, 'sos.personalFailed')}
+        </p>
+      )}
 
       <div className={`sos-types ${flash ? 'flash' : ''}`} role="group" aria-label="Emergency type">
         {profile.alerts.map((a) => {

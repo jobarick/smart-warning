@@ -182,6 +182,12 @@ const allowOrgInvite = rateLimiter({ windowMs: 60 * 60 * 1000, max: 30, name: 'o
 // come back later — not an emergency going unreported.
 const allowVisitorFeedback = rateLimiter({ windowMs: 60 * 60 * 1000, max: 5, name: 'visitor-feedback' });
 
+// A personal account alerting its own Trusted Circle. Generous — a real
+// emergency can mean several genuine alerts in a short window (a fall, then
+// a worse fall) — but bounded so one account cannot turn this into a mail
+// bomb against the handful of people in its contact list.
+const allowPersonalAlert = rateLimiter({ windowMs: 10 * 60 * 1000, max: 10, name: 'personal-alert' });
+
 // Mail-bombing ONE address, which the IP limiter above cannot stop on its own
 // — an attacker rotating IPs is still hitting a single mailbox. Keyed by the
 // address itself rather than the requester, so it applies identically whether
@@ -214,5 +220,5 @@ function allowPasswordResetForAddress(email) {
 module.exports = {
   requireAuth, guardOrg, orgContext, orgIdFromRequest, deviceOwnerFromRequest, allowFeature,
   allowReport, allowPlaces, allowWebhook, allowPasswordReset, allowPasswordResetForAddress,
-  allowVisitorFeedback, allowLogin, allowSignup, allowOrgInvite,
+  allowVisitorFeedback, allowLogin, allowSignup, allowOrgInvite, allowPersonalAlert,
 };

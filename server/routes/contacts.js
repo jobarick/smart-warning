@@ -14,11 +14,13 @@
 // Individual accounts only. An organisation has a roster and coordinators; a
 // coordinator reaching this route would be a sign that the two models had been
 // confused, so it is refused rather than quietly serving an empty list.
+const crypto = require('crypto');
 const db = require('../db');
 const auth = require('../auth');
+const mailer = require('../mailer');
 const { sendJson, readJson } = require('../http');
-const { requireAuth } = require('../guards');
-const { UUID_RE } = require('../wire');
+const { requireAuth, allowPersonalAlert } = require('../guards');
+const { UUID_RE, ALERT_TYPES, SEVERITIES, numOrNull, titleCase } = require('../wire');
 
 // Enough for a household and then some. A cap exists so one account cannot
 // turn an alarm into a bulk-mail run.
@@ -123,6 +125,92 @@ async function handle({ req, res, path }) {
     const updated = await db.updateContact(id, user.id, parsed);
     if (!updated) { sendJson(res, 404, { error: 'no such contact' }); return true; }
     sendJson(res, 200, { contact: updated });
+    return true;
+  }
+
+  // A personal account's own SOS.
+  //
+  // This is the one place a personal alert actually reaches anyone: an
+  // individual has no organisation and no relay room to broadcast into (see
+  // App.tsx's isPersonal/runSocket), so without this route, raising SOS on a
+  // personal account has always sounded the alarm on that one device and gone
+  // no further. This records the incident (org_id null, user_id set — kept out
+  // of the org escalation sweep, see listEscalationDue) and emails every
+  // notify=true contact who has an email address. Nothing else exists yet to
+  // reach a phone-only contact: no SMS gateway is wired up, so one is neither
+  // attempted nor claimed. The response says exactly who was actually told,
+  // so the client can show that truth rather than a bare "sent".
+  if (path === '/api/contacts/alert' && req.method === 'POST') {
+    if (!allowPersonalAlert(req)) { sendJson(res, 429, { error: 'too many alerts, please wait a moment' }); return true; }
+    const user = await personalUser(req, res);
+    if (!user) return true;
+
+    const body = await readJson(req);
+    const type = ALERT_TYPES.has(body.type) ? body.type : 'hazard';
+    const severity = SEVERITIES.has(body.severity) ? body.severity : 'high';
+    const message = body.message ? String(body.message).trim().slice(0, 500) : null;
+    const lat = numOrNull(body.lat);
+    const lng = numOrNull(body.lng);
+    const incidentId = crypto.randomUUID();
+    const raisedAt = Date.now();
+
+    try {
+      await db.recordAlert(
+        { id: incidentId, type, severity, message, sender: user.name || null, timestamp: raisedAt },
+        { lat, lng },
+        null,
+        user.id,
+      );
+    } catch (e) {
+      console.error('[db] recordAlert (personal):', e.message);
+    }
+
+    const contacts = await db.listNotifiableContacts(user.id);
+    const mapsLink = lat != null && lng != null ? `https://maps.google.com/?q=${lat},${lng}` : null;
+    const raiser = user.name || 'Mtumiaji wa Smart Warning';
+
+    const contacted = [];
+    const skipped = [];
+    for (const contact of contacts) {
+      if (!contact.email) {
+        // No SMS/voice channel exists yet — recorded honestly as unreachable
+        // rather than silently dropped or falsely claimed as notified.
+        skipped.push({ id: contact.id, name: contact.name, reason: 'no-email' });
+        continue;
+      }
+      const subject = `DHARURA — ${raiser} anahitaji msaada / needs help`;
+      const body2 = [
+        `${raiser} ametuma taarifa ya dharura kupitia Smart Warning.`,
+        `${raiser} has raised an emergency alert on Smart Warning.`,
+        '',
+        `Aina / Type: ${titleCase(type)}`,
+        `Kiwango / Severity: ${severity}`,
+        message ? `Ujumbe / Message: ${message}` : null,
+        `Mahali / Location: ${mapsLink || 'haipatikani / not available'}`,
+        `Muda / Time: ${new Date(raisedAt).toISOString()}`,
+        '',
+        `Umeorodheshwa kama mtu wa kuaminika (Trusted Circle) wa ${raiser}.`,
+        `You are listed as one of ${raiser}'s trusted contacts.`,
+        'Hii SI huduma ya dharura — haiwezi kutuma polisi, zimamoto au ambulansi.',
+        'This is not an emergency service and cannot dispatch police, fire or ambulance.',
+        'Piga namba za dharura ikiwa unahitaji msaada wa haraka.',
+        'Call the local emergency number if immediate help is needed.',
+        '',
+        '— Smart Warning',
+      ].filter((line) => line !== null).join('\n');
+
+      const result = await mailer.send({
+        to: contact.email,
+        subject,
+        body: body2,
+        kind: 'personal-alert',
+        refId: `${incidentId}:${contact.id}`,
+        orgId: null,
+      });
+      contacted.push({ id: contact.id, name: contact.name, delivered: result.delivered === true });
+    }
+
+    sendJson(res, 201, { incidentId, contacted, skipped });
     return true;
   }
 

@@ -4,15 +4,21 @@ const STORAGE_KEY = 'alert-system-settings-v1';
 
 /**
  * A one-time guess for a first-time visitor, not a claim about who they are —
- * every screen that reads it has a switcher right there to override it. Only
- * `sw` is detected explicitly; everything else falls back to English rather
- * than guessing at a language this build does not ship yet.
+ * every screen that reads it has a switcher right there to override it.
+ *
+ * Kiswahili-first: this build serves Tanzania, not a general audience picking
+ * a language among many, so the default is `sw` regardless of device
+ * language — guessing English for a Tanzanian on a device set to English
+ * (common, and not evidence of an English preference for THIS product) is a
+ * worse first impression than one tap on the toggle. The one browser
+ * language actively steered away from Swahili is a device already explicitly
+ * set to English, which is read as an intentional signal, not a default.
  */
 function detectLocale(): Locale {
   try {
-    return navigator.language?.toLowerCase().startsWith('sw') ? 'sw' : 'en';
+    return navigator.language?.toLowerCase().startsWith('en') ? 'en' : 'sw';
   } catch {
-    return 'en';
+    return 'sw';
   }
 }
 

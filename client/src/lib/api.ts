@@ -545,6 +545,35 @@ export async function deleteContact(id: string, token: string): Promise<void> {
   if (!res.ok) throw new Error(await errorMessage(res, 'could not remove this contact'));
 }
 
+/**
+ * A personal account's own SOS.
+ *
+ * An individual has no organisation and no relay room to broadcast an alert
+ * into, so this REST call — not the WebSocket — is the only thing that can
+ * reach anyone besides the device that raised it. It emails every
+ * notify=true contact who has an email address; a phone-only contact comes
+ * back under `skipped`, never silently or falsely as delivered — there is no
+ * SMS gateway in this codebase to reach them with yet.
+ */
+export interface PersonalAlertResult {
+  incidentId: string;
+  contacted: { id: string; name: string; delivered: boolean }[];
+  skipped: { id: string; name: string; reason: 'no-email' }[];
+}
+
+export async function sendPersonalAlert(
+  input: { type: string; severity: string; message?: string; lat?: number | null; lng?: number | null },
+  token: string,
+): Promise<PersonalAlertResult> {
+  const res = await fetch(`${API_BASE}/api/contacts/alert`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not reach your trusted circle'));
+  return res.json();
+}
+
 // --- Organization profile ---
 
 export async function updateOrg(
