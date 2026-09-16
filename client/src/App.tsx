@@ -23,7 +23,7 @@ import { useSelfTelemetry } from './hooks/useSelfTelemetry';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
 import { AlertOverlay } from './components/AlertOverlay';
 import { OperatorStatus } from './components/OperatorStatus';
-import { SosPanel } from './components/SosPanel';
+import { SosPanel, type PersonalSendStatus } from './components/SosPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 import { ConnectionStatus, type AppView } from './components/ConnectionStatus';
 import { AlertLog } from './components/AlertLog';
@@ -56,7 +56,7 @@ import { unsubscribe as unsubscribePush } from './lib/push';
 import { nativePushSupported, registerForPush, unregisterFromPush, attachHandlers } from './lib/nativePush';
 import { STALE_REPLAY_MS } from './lib/outbox';
 import * as trackBuffer from './lib/trackBuffer';
-import { fetchHealth, fetchMe, fetchReports, escalateReport, dismissReport, recordConsent, type Report } from './lib/api';
+import { fetchHealth, fetchMe, fetchReports, escalateReport, dismissReport, recordConsent, sendPersonalAlert, type Report } from './lib/api';
 
 // ---------------------------------------------------------------------------
 // Deferred surfaces
@@ -162,6 +162,10 @@ export default function App() {
   const [showAbout, setShowAbout] = useState(() => window.location.pathname === '/about');
   const [responder, setResponder] = useState<RespondingMessage | null>(null);
   const [ackNotice, setAckNotice] = useState<AcknowledgedMessage | null>(null);
+  // A personal account's own delivery signal — see isPersonal/sendPersonalAlert
+  // below. An org account never sets this; SystemFooter's sync state already
+  // answers "did this reach anyone" for that path.
+  const [personalSendStatus, setPersonalSendStatus] = useState<PersonalSendStatus | null>(null);
   const [lastAlert, setLastAlert] = useState<number | null>(null);
   const [lastSync, setLastSync] = useState<number | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
@@ -691,10 +695,31 @@ export default function App() {
         sender: settings.deviceName,
         timestamp: Date.now(),
       };
-      // Server echoes to everyone including us; if offline, fire locally anyway.
-      if (!send(alert)) handleWire(alert);
+      // The local siren/overlay must fire immediately either way — it must
+      // never wait on a network round trip for the one thing this device can
+      // do entirely on its own.
+      if (isPersonal) {
+        handleWire(alert);
+        setPersonalSendStatus({ phase: 'sending' });
+        void sendPersonalAlert(
+          {
+            type, severity, message: message || undefined,
+            lat: settings.shareLocation ? telemetry.lat : null,
+            lng: settings.shareLocation ? telemetry.lng : null,
+          },
+          token || '',
+        )
+          .then((result) => setPersonalSendStatus({ phase: 'sent', contactedCount: result.contacted.filter((c) => c.delivered).length }))
+          .catch((e) => {
+            console.error('[personal-alert]', e.message);
+            setPersonalSendStatus({ phase: 'failed' });
+          });
+      } else {
+        // Server echoes to everyone including us; if offline, fire locally anyway.
+        if (!send(alert)) handleWire(alert);
+      }
     },
-    [arm, send, handleWire, settings.deviceName],
+    [arm, send, handleWire, settings.deviceName, isPersonal, token, settings.shareLocation, telemetry.lat, telemetry.lng],
   );
 
   const allClear = useCallback(
@@ -707,6 +732,7 @@ export default function App() {
         reason,
       };
       if (!send(msg)) handleWire(msg);
+      setPersonalSendStatus(null);
     },
     [send, handleWire, settings.deviceName],
   );
@@ -1072,7 +1098,13 @@ export default function App() {
         <main className="worker worker-tabbed">
           {tab === 'home' && (
             <>
-              <SosPanel profile={profile} disabled={alarmActive} onTrigger={trigger} locale={settings.locale} />
+              <SosPanel
+                profile={profile}
+                disabled={alarmActive}
+                onTrigger={trigger}
+                locale={settings.locale}
+                personalStatus={isPersonal ? personalSendStatus : undefined}
+              />
               {/* Below the SOS, never above it. Billing is the least important
                   thing on this screen and must never push the button that
                   matters further down. Renders nothing unless there is
@@ -1169,6 +1201,7 @@ export default function App() {
           alert={alarm.alert}
           acknowledged={alarm.acknowledged}
           settings={settings}
+          locale={settings.locale}
           label={alertLabel(profile, alarm.alert.type)}
           safeConfirmed={safeFor === alarm.alert.id}
           onConfirmSafe={confirmSafe}

@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
-import type { AcknowledgedMessage, AlertMessage, RespondingMessage, Settings } from '../types';
-import { ALERT_META, SEVERITY_META, severityWants } from '../types';
+import type { AcknowledgedMessage, AlertMessage, Locale, RespondingMessage, Settings } from '../types';
+import { ALERT_META, severityWants } from '../types';
 import { effectiveFlashRate, SAFE_FLASH_RATE } from '../lib/settings';
+import { t, SEVERITY_KEY } from '../lib/i18n';
 import { Icon } from './Icon';
 
 interface Props {
   alert: AlertMessage;
   acknowledged: boolean;
   settings: Settings;
+  locale: Locale;
   label?: string; // sector wording for the alert type (from the active profile)
   /** Whether this person has already answered the roll call for THIS alert. */
   safeConfirmed: boolean;
@@ -23,31 +25,31 @@ interface Props {
   onFalseAlarm?: () => void;
 }
 
-export function AlertOverlay({ alert, acknowledged, settings, label, safeConfirmed, onConfirmSafe, onAcknowledge, onAllClear, responder, ackNotice, canRetract, onFalseAlarm }: Props) {
+export function AlertOverlay({ alert, acknowledged, settings, locale, label, safeConfirmed, onConfirmSafe, onAcknowledge, onAllClear, responder, ackNotice, canRetract, onFalseAlarm }: Props) {
   // Retracting also stops every siren on site, so it takes a second tap the
   // same way all-clear does — but it is worded as taking the alarm back, not
   // as declaring an emergency over.
   const [confirmRetract, setConfirmRetract] = useState(false);
   useEffect(() => {
     if (!confirmRetract) return;
-    const t = setTimeout(() => setConfirmRetract(false), 3500);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setConfirmRetract(false), 3500);
+    return () => clearTimeout(timer);
   }, [confirmRetract]);
   // Ignore clicks for a moment after the overlay appears so a double-tap on a
   // trigger button can't accidentally acknowledge or all-clear the alert.
   const [armed, setArmed] = useState(false);
   useEffect(() => {
     setArmed(false);
-    const t = setTimeout(() => setArmed(true), 700);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setArmed(true), 700);
+    return () => clearTimeout(timer);
   }, [alert.id]);
 
   // All clear stops the alarm on EVERY device — require a second confirming tap.
   const [confirmClear, setConfirmClear] = useState(false);
   useEffect(() => {
     if (!confirmClear) return;
-    const t = setTimeout(() => setConfirmClear(false), 3500);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setConfirmClear(false), 3500);
+    return () => clearTimeout(timer);
   }, [confirmClear]);
 
   const handleClearClick = () => {
@@ -97,22 +99,24 @@ export function AlertOverlay({ alert, acknowledged, settings, label, safeConfirm
       <div className="overlay-card" role="alert" style={{ borderColor: meta.color }}>
         <Icon name={meta.icon} className="overlay-icon" style={{ color: meta.color }} />
         <div className="overlay-title" style={{ color: meta.color }}>
-          {(label ?? meta.label).toUpperCase()} ALERT
+          {t(locale, 'overlay.titleTemplate', { type: (label ?? meta.label).toUpperCase() })}
         </div>
-        <div className={`sev-badge sev-${alert.severity}`}>{SEVERITY_META[alert.severity].label} severity</div>
+        <div className={`sev-badge sev-${alert.severity}`}>
+          {t(locale, 'sos.severityLabel', { severity: t(locale, SEVERITY_KEY[alert.severity]) })}
+        </div>
         {alert.message && <p className="overlay-message">{alert.message}</p>}
         <p className="overlay-meta">
-          Triggered by <strong>{alert.sender}</strong> at {new Date(alert.timestamp).toLocaleTimeString()}
+          {t(locale, 'overlay.triggeredBy', { sender: alert.sender, time: new Date(alert.timestamp).toLocaleTimeString() })}
         </p>
       </div>
       <div className="overlay-actions">
         {!acknowledged ? (
           <button className="btn btn-ack" disabled={!armed} onClick={onAcknowledge}>
-            <Icon name="check" /> Acknowledge (this device)
+            <Icon name="check" /> {t(locale, 'overlay.acknowledgeBtn')}
           </button>
         ) : (
           <span className="acked-note">
-            <Icon name="check-circle" /> Acknowledged: alert still active
+            <Icon name="check-circle" /> {t(locale, 'overlay.acknowledgedNote')}
           </span>
         )}
         {/* Acknowledge means "I saw it". This means "I am not hurt" — the only
@@ -120,11 +124,11 @@ export function AlertOverlay({ alert, acknowledged, settings, label, safeConfirm
             roll call is counting. */}
         {!safeConfirmed ? (
           <button className="btn btn-safe" disabled={!armed} onClick={onConfirmSafe}>
-            <Icon name="check-circle" /> I am safe
+            <Icon name="check-circle" /> {t(locale, 'overlay.iAmSafeBtn')}
           </button>
         ) : (
           <span className="safe-note">
-            <Icon name="check-circle" /> Reported safe: your Safety Coordinator can see this
+            <Icon name="check-circle" /> {t(locale, 'overlay.safeNote')}
           </span>
         )}
         {/* Raising an alarm by accident is common and the honest correction
@@ -141,7 +145,7 @@ export function AlertOverlay({ alert, acknowledged, settings, label, safeConfirm
               else setConfirmRetract(true);
             }}
           >
-            {confirmRetract ? 'Tap again: this was a false alarm' : 'I raised this by mistake'}
+            {confirmRetract ? t(locale, 'overlay.retractConfirm') : t(locale, 'overlay.retractBtn')}
           </button>
         )}
 
@@ -153,9 +157,7 @@ export function AlertOverlay({ alert, acknowledged, settings, label, safeConfirm
         {ackNotice && !responder && (
           <div className="responder-note" role="status" aria-live="polite">
             <Icon name="check-circle" />
-            <span>
-              <strong>{ackNotice.by}</strong> has seen this alert
-            </span>
+            <span>{t(locale, 'overlay.seenBy', { name: ackNotice.by })}</span>
           </div>
         )}
 
@@ -167,11 +169,11 @@ export function AlertOverlay({ alert, acknowledged, settings, label, safeConfirm
           <div className="responder-note" role="status" aria-live="polite">
             <Icon name="check-circle" />
             <span>
-              <strong>{responder.supervisor}</strong> is on the way
+              {t(locale, 'overlay.onTheWay', { name: responder.supervisor })}
               {responder.etaS != null && (
-                <>, about <strong>{Math.max(1, Math.round(responder.etaS / 60))} min</strong> away</>
+                <>, {t(locale, 'overlay.etaAway', { min: String(Math.max(1, Math.round(responder.etaS / 60))) })}</>
               )}
-              {responder.etaS != null && !responder.routed && ' (estimated)'}
+              {responder.etaS != null && !responder.routed && ` ${t(locale, 'overlay.estimated')}`}
             </span>
           </div>
         )}
@@ -182,11 +184,11 @@ export function AlertOverlay({ alert, acknowledged, settings, label, safeConfirm
         >
           {confirmClear ? (
             <>
-              <Icon name="hazard" /> Tap again to confirm all clear
+              <Icon name="hazard" /> {t(locale, 'overlay.allClearConfirm')}
             </>
           ) : (
             <>
-              <Icon name="stop" /> All clear (all devices)
+              <Icon name="stop" /> {t(locale, 'overlay.allClearBtn')}
             </>
           )}
         </button>

@@ -107,6 +107,13 @@ async function init() {
       status       TEXT NOT NULL DEFAULT 'active'
     );
     ALTER TABLE incidents ADD COLUMN IF NOT EXISTS org_id UUID;
+    -- Set only for a personal account's own SOS (org_id stays null there, same
+    -- as legacy single-room mode — this column is what tells the two apart).
+    -- Kept off the escalation sweep entirely (see listEscalationDue): a
+    -- personal alert has no acknowledge/resolve flow yet, so a repeat sweep
+    -- would just re-notify a Trusted Circle forever instead of once.
+    ALTER TABLE incidents ADD COLUMN IF NOT EXISTS user_id UUID;
+    CREATE INDEX IF NOT EXISTS incidents_user_idx ON incidents (user_id) WHERE user_id IS NOT NULL;
     -- 'resolved' | 'false-alarm'. Nullable: rows that predate the distinction
     -- genuinely do not know which they were, and inventing a value for them
     -- would be worse than admitting it.
@@ -1044,16 +1051,17 @@ async function countContacts(userId) {
  * lets the caller avoid pushing the same emergency to everyone's lock screen a
  * second time.
  */
-async function recordAlert(alert, worker, orgId) {
+async function recordAlert(alert, worker, orgId, userId = null) {
   if (!pool) return false;
   const ts = numOrNull(alert.timestamp) ?? Date.now();
   const res = await pool.query(
-    `INSERT INTO incidents (id, org_id, type, severity, message, sender, zone, lat, lng, raised_at, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, to_timestamp($10 / 1000.0), 'active')
+    `INSERT INTO incidents (id, org_id, user_id, type, severity, message, sender, zone, lat, lng, raised_at, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, to_timestamp($11 / 1000.0), 'active')
      ON CONFLICT (id) DO NOTHING`,
     [
       String(alert.id),
       orgId || null,
+      userId || null,
       String(alert.type),
       String(alert.severity),
       alert.message || null,
@@ -1175,6 +1183,7 @@ async function listEscalationDue({ afterMs, maxLevel }) {
   const { rows } = await pool.query(
     `SELECT * FROM incidents
       WHERE status = 'active' AND acknowledged_at IS NULL
+        AND user_id IS NULL
         AND escalation_level < $2
         AND COALESCE(last_escalated_at, raised_at) < now() - ($1 || ' milliseconds')::interval
       ORDER BY raised_at ASC
