@@ -201,7 +201,8 @@
 }
 .eg-cell:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--panel-border)); }
 .eg-cell.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
-.eg-cell-icon { font-size: 1.5rem; line-height: 1; }
+.eg-cell-icon { line-height: 1; color: var(--accent); }
+.eg-cell-icon svg { width: 26px; height: 26px; }
 .eg-cell-label { font-size: 0.78rem; font-weight: 600; line-height: 1.25; }
 .eg-detail {
   margin-top: 16px; padding: 18px 20px;

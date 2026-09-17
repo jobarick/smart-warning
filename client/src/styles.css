@@ -1432,6 +1432,53 @@ body {
 .sos-personal-status-failed { color: var(--cmd-crit, #c62828); }
 .sos-types.flash { box-shadow: 0 0 0 2px var(--accent); border-radius: 14px; }
 
+/* Authenticated Home's emergency grid (AuthEmergencyGrid) — same visual
+   language as .sos so the two feel like one continuous "emergency help"
+   surface, not two unrelated widgets stacked on a page. */
+.aeg {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.aeg-heading { font-size: 1.05rem; font-weight: 700; text-align: center; letter-spacing: 0.01em; }
+.aeg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.aeg-cell {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  min-height: 88px; padding: 12px 8px; text-align: center;
+  background: var(--panel-2); border: 1.5px solid var(--panel-border); border-radius: 13px;
+  color: var(--text); font: inherit; font-size: 0.82rem; font-weight: 600; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.05s;
+}
+.aeg-cell:hover { background: var(--panel-hover); }
+.aeg-cell:active { transform: scale(0.98); }
+.aeg-cell.active { border-color: var(--accent); background: var(--panel-hover); }
+.aeg-cell-icon svg { width: 24px; height: 24px; }
+.aeg-detail {
+  padding: 16px; text-align: center;
+  background: var(--panel-2); border: 1px solid var(--panel-border); border-radius: 13px;
+}
+.aeg-detail-label { margin: 0 0 10px; font-size: 0.98rem; font-weight: 650; }
+.aeg-call-now {
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  width: 100%; padding: 13px; cursor: pointer;
+  font: inherit; font-size: 1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;
+  color: #fff; background: var(--accent-fill); border: none; border-radius: 12px;
+}
+.aeg-call-now:hover { filter: brightness(1.08); }
+.aeg-call-now-static { cursor: default; }
+.aeg-detail-note { margin: 10px 0 0; font-size: 0.8rem; color: var(--muted); }
+.aeg-report-btn {
+  width: 100%; margin-top: 10px; padding: 11px;
+  cursor: pointer; font: inherit; font-size: 0.86rem; font-weight: 650; color: var(--text);
+  background: var(--panel); border: 1px solid var(--panel-border); border-radius: 11px;
+}
+.aeg-report-btn:hover { border-color: var(--accent); }
+
 @media (prefers-reduced-motion: no-preference) {
   .sos-hero:not(:disabled) .sos-hero-ring { animation: sos-ring 1.9s ease-out infinite; }
 }
@@ -1453,6 +1500,13 @@ body {
 .profile-id-name svg { color: var(--muted); }
 .profile-id-line { display: block; font-size: 0.85rem; color: var(--text); }
 .profile-id-line.profile-id-muted { color: var(--muted); margin-top: 2px; }
+.profile-prefs { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.profile-prefs-label { font-size: 0.9rem; font-weight: 600; color: var(--muted); }
+.profile-lang-toggle {
+  padding: 8px 14px; cursor: pointer; font: inherit; font-size: 0.86rem; font-weight: 650;
+  color: var(--text); background: var(--panel-2); border: 1px solid var(--panel-border); border-radius: 10px;
+}
+.profile-lang-toggle:hover { border-color: var(--accent); }
 .back-btn {
   align-self: flex-start;
   background: var(--panel-2);
@@ -2671,6 +2725,41 @@ body {
   margin: 4px 0 0; padding-top: 14px; border-top: 1px solid var(--panel-border);
   font-size: 12px; line-height: 1.55; color: var(--muted);
 }
+
+/* Premium safety briefing (SafetyBriefingCard) — sits above the guide list. */
+.briefing {
+  display: flex; flex-direction: column; gap: 14px; padding: 16px;
+  background: var(--panel); border: 1px solid var(--panel-border); border-radius: 14px;
+}
+.briefing-heading {
+  display: flex; align-items: center; gap: 8px; margin: 0; font-size: 1.02rem; font-weight: 700;
+}
+.briefing-heading svg { color: var(--accent); }
+.briefing-week {
+  margin-left: auto; font-family: var(--mono); font-size: 11px; letter-spacing: 0.05em;
+  color: var(--faint); text-transform: uppercase;
+}
+.briefing-locked { background: var(--panel-2); }
+.briefing-teaser { margin: 0; font-size: 13px; line-height: 1.55; color: var(--muted); }
+.briefing-block { padding: 12px; border-radius: 11px; background: var(--panel-2); }
+/* The two sources are never allowed to look alike — see SafetyBriefingCard's
+   header comment on why they must stay distinguishable at a glance. */
+.briefing-tma { border-left: 3px solid var(--cmd-warn, #d97706); }
+.briefing-sw { border-left: 3px solid var(--accent); }
+.briefing-source {
+  display: block; margin-bottom: 6px; font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint);
+}
+.briefing-headline { margin: 0 0 4px; font-size: 14px; font-weight: 650; }
+.briefing-attribution { margin: 0; font-size: 12px; color: var(--muted); }
+.briefing-attribution a { color: inherit; }
+.briefing-empty { margin: 0; font-size: 13px; color: var(--muted); font-style: italic; }
+.briefing-sub {
+  margin: 8px 0 6px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--faint);
+}
+.briefing-steps { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: 6px; }
+.briefing-steps li { font-size: 13px; line-height: 1.5; }
 /* ---------- trial / subscription banner ----------
    Sits below the SOS on Home. Quiet by design: billing is the least important
    thing on an emergency screen. */

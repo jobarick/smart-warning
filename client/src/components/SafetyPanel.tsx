@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import { SAFETY_GROUPS, SAFETY_GUIDES, findGuide, guidesInGroup, type SafetyGuide } from '../lib/safety';
 import { Icon } from './Icon';
+import { SafetyBriefingCard } from './SafetyBriefingCard';
+
+interface Props {
+  /** Any tier other than 'free' — see App.tsx's tier fetch and SafetyBriefingCard. */
+  premium: boolean;
+}
 
 /**
  * Safety & preparedness.
@@ -12,7 +18,7 @@ import { Icon } from './Icon';
  * Master and detail live in the same tab rather than a route, so returning to
  * the list is one obvious control and never leaves the screen the person is on.
  */
-export function SafetyPanel() {
+export function SafetyPanel({ premium }: Props) {
   const [openId, setOpenId] = useState<string | null>(null);
   const guide = openId ? findGuide(openId) : undefined;
 
@@ -20,6 +26,8 @@ export function SafetyPanel() {
 
   return (
     <section className="safety">
+      <SafetyBriefingCard premium={premium} />
+
       <header className="safety-head">
         <h2>Safety &amp; preparedness</h2>
         <p>{SAFETY_GUIDES.length} guides. All of this works without a connection.</p>

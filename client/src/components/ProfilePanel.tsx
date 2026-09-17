@@ -2,7 +2,8 @@ import type { Session } from '../lib/session';
 import type { Incident, OrgProfile } from '../lib/api';
 import type { IndustryProfile } from '../lib/profiles';
 import { alertLabel } from '../lib/profiles';
-import type { AlertType, Locale } from '../types';
+import type { AlertType, Locale, LogEntry } from '../types';
+import { AlertLog } from './AlertLog';
 import { Icon } from './Icon';
 import { TrustedCircle } from './TrustedCircle';
 
@@ -18,6 +19,10 @@ interface Props {
   persistence: boolean | null;
   historyLoading: boolean;
   historyError: string | null;
+  /** This device's own local alert log — see AlertLog. Combined here with the
+   *  server-fetched org history below it: this tab is "your safety identity",
+   *  and both are history about it, just from different sources. */
+  log: LogEntry[];
   onAbout: () => void;
   onSettings: () => void;
   onSupport: () => void;
@@ -25,6 +30,9 @@ interface Props {
    *  subject to show plans for without an account. */
   onBilling?: () => void;
   locale: Locale;
+  /** Inlined here rather than only in Settings — language is one of the two
+   *  or three things everyone in this tab actually comes to change. */
+  onToggleLocale: () => void;
 }
 
 /**
@@ -36,8 +44,8 @@ interface Props {
  */
 export function ProfilePanel({
   session, org, workerCode, personal, deviceName, profile,
-  incidents, persistence, historyLoading, historyError,
-  onAbout, onSettings, onSupport, onBilling, locale,
+  incidents, persistence, historyLoading, historyError, log,
+  onAbout, onSettings, onSupport, onBilling, locale, onToggleLocale,
 }: Props) {
   const name = session?.kind === 'supervisor' ? session.user.name : deviceName;
 
@@ -62,6 +70,8 @@ export function ProfilePanel({
           <span className="profile-id-line profile-id-muted">Team {workerCode}</span>
         )}
       </section>
+
+      <AlertLog entries={log} />
 
       {org && (
         <section className="panel">
@@ -105,6 +115,13 @@ export function ProfilePanel({
       {personal && session?.kind === 'supervisor' && (
         <TrustedCircle token={session.token} locale={locale} />
       )}
+
+      <section className="panel profile-prefs">
+        <span className="profile-prefs-label">Language</span>
+        <button type="button" className="profile-lang-toggle" onClick={onToggleLocale}>
+          {locale === 'en' ? 'English' : 'Kiswahili'}
+        </button>
+      </section>
 
       <div className="profile-actions">
         {onBilling && (

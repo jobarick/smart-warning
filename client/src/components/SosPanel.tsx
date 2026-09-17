@@ -19,11 +19,19 @@ interface Props {
   onTrigger: (type: AlertType, severity: Severity, message: string) => void;
   locale: Locale;
   personalStatus?: PersonalSendStatus | null;
+  /**
+   * Pre-selects a type from outside — the authenticated emergency grid's
+   * "Report through Smart Warning" button uses this to hand off into the
+   * existing two-step flow (pick category, then press SOS) rather than firing
+   * an alert straight from a grid tap. A bump on every set (not just a plain
+   * value) so picking the same type twice in a row still re-focuses.
+   */
+  focusType?: { type: AlertType; nonce: number } | null;
 }
 
 const SEVERITIES: Severity[] = ['low', 'medium', 'high', 'critical'];
 
-export function SosPanel({ profile, disabled, onTrigger, locale, personalStatus }: Props) {
+export function SosPanel({ profile, disabled, onTrigger, locale, personalStatus, focusType }: Props) {
   const [selected, setSelected] = useState<AlertType | null>(null);
   const [severity, setSeverity] = useState<Severity>('high');
   const [message, setMessage] = useState('');
@@ -31,6 +39,17 @@ export function SosPanel({ profile, disabled, onTrigger, locale, personalStatus 
 
   // Reset the selection when the profile changes so stale labels never show.
   useEffect(() => setSelected(null), [profile.id]);
+
+  useEffect(() => {
+    if (!focusType) return;
+    if (!profile.alerts.some((a) => a.type === focusType.type)) return;
+    setSelected(focusType.type);
+    setFlash(true);
+    const timer = setTimeout(() => setFlash(false), 1200);
+    document.getElementById('sos-heading')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusType]);
 
   const chosen = selected ? profile.alerts.find((a) => a.type === selected) ?? null : null;
   const chosenMeta = selected ? ALERT_META[selected] : null;

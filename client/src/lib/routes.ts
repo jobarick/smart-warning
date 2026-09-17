@@ -28,9 +28,8 @@ export const SPA_PATHS = [
   '/get-started',
   '/demo',
   // worker tabs
-  '/emergency',
   '/safety',
-  '/alerts',
+  '/help',
   '/profile',
   // overlays
   '/settings',

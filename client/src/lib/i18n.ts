@@ -55,6 +55,10 @@ export type StringKey =
   | 'pocket.heading'
   | 'pocket.urgentNote'
   | 'pocket.cannotDial'
+  | 'aeg.heading'
+  | 'aeg.callNow'
+  | 'aeg.cannotDial'
+  | 'aeg.reportButton'
   | 'emergencyGrid.heading'
   | 'emergencyGrid.sub'
   | 'emergencyGrid.cannotDial'
@@ -252,6 +256,10 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'pocket.heading': 'Emergency numbers',
     'pocket.urgentNote': 'Call the service you need. This does not replace the alert already sent to your team.',
     'pocket.cannotDial': "This device can't place calls. Dial these from a phone, or reach your site's emergency contact through the details on the Contact & support page.",
+    'aeg.heading': 'Emergency help',
+    'aeg.callNow': 'Call now',
+    'aeg.cannotDial': "This device can't place calls. Dial this number from a phone.",
+    'aeg.reportButton': 'Report through Smart Warning',
     'emergencyGrid.heading': 'Get help now',
     'emergencyGrid.sub': "Tap what's happening to see who to call in Tanzania — no account needed.",
     'emergencyGrid.cannotDial': "This device can't place calls. Dial these numbers from a phone.",
@@ -446,6 +454,10 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'pocket.heading': 'Namba za dharura',
     'pocket.urgentNote': 'Piga huduma unayohitaji. Hii haibadilishi tahadhari ambayo tayari imetumwa kwa timu yako.',
     'pocket.cannotDial': 'Kifaa hiki hakiwezi kupiga simu. Piga namba hizi kutoka kwenye simu, au wasiliana na mtu wa dharura wa eneo lako kupitia maelezo kwenye ukurasa wa Mawasiliano na msaada.',
+    'aeg.heading': 'Msaada wa Dharura',
+    'aeg.callNow': 'Piga sasa',
+    'aeg.cannotDial': 'Kifaa hiki hakiwezi kupiga simu. Piga namba hii kutoka kwenye simu.',
+    'aeg.reportButton': 'Ripoti kupitia Smart Warning',
     'emergencyGrid.heading': 'Pata Msaada Sasa',
     'emergencyGrid.sub': 'Gusa kinachotokea ili kuona wa kumpigia Tanzania — hauitaji akaunti.',
     'emergencyGrid.cannotDial': 'Kifaa hiki hakiwezi kupiga simu. Piga namba hizi kutoka kwenye simu.',

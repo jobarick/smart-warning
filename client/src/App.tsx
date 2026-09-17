@@ -26,12 +26,12 @@ import { OperatorStatus } from './components/OperatorStatus';
 import { SosPanel, type PersonalSendStatus } from './components/SosPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 import { ConnectionStatus, type AppView } from './components/ConnectionStatus';
-import { AlertLog } from './components/AlertLog';
 import { SystemStatusBar } from './components/SystemStatusBar';
 import { SystemFooter } from './components/SystemFooter';
 import { TabBar, type UserTab } from './components/TabBar';
 import { SafetyPanel } from './components/SafetyPanel';
 import { ProfilePanel } from './components/ProfilePanel';
+import { AuthEmergencyGrid } from './components/AuthEmergencyGrid';
 import { TrialBanner } from './components/TrialBanner';
 import { Icon } from './components/Icon';
 import { Logo } from './components/Logo';
@@ -57,6 +57,7 @@ import { nativePushSupported, registerForPush, unregisterFromPush, attachHandler
 import { STALE_REPLAY_MS } from './lib/outbox';
 import * as trackBuffer from './lib/trackBuffer';
 import { fetchHealth, fetchMe, fetchReports, escalateReport, dismissReport, recordConsent, sendPersonalAlert, type Report } from './lib/api';
+import { fetchSubscription } from './lib/billing';
 
 // ---------------------------------------------------------------------------
 // Deferred surfaces
@@ -100,9 +101,8 @@ import { loadSession, saveSession, joinCredentials, sessionToken, sessionName, t
 
 const TAB_PATHS: Record<UserTab, string> = {
   home: '/',
-  emergency: '/emergency',
   safety: '/safety',
-  alerts: '/alerts',
+  help: '/help',
   profile: '/profile',
 };
 
@@ -110,9 +110,8 @@ const TAB_PATHS: Record<UserTab, string> = {
  *  because unlike these it must not force `view` — it is also the landing
  *  path used while nothing has been asked for yet, worker or command. */
 const TAB_ROUTES: Record<string, UserTab> = {
-  '/emergency': 'emergency',
   '/safety': 'safety',
-  '/alerts': 'alerts',
+  '/help': 'help',
   '/profile': 'profile',
 };
 
@@ -136,10 +135,9 @@ const ROUTE_TITLE: Record<string, string> = {
   [AUTH_ROUTE]: 'Get started: Smart Warning',
   [DEMO_ROUTE]: 'See it in action: Smart Warning',
   '/dashboard': 'Command Centre: Smart Warning',
-  '/emergency': 'Emergency: Smart Warning',
   '/safety': 'Safety: Smart Warning',
-  '/alerts': 'Alerts: Smart Warning',
-  '/profile': 'Profile: Smart Warning',
+  '/help': 'Help: Smart Warning',
+  '/profile': 'Safety Profile: Smart Warning',
   '/settings': 'Settings: Smart Warning',
   '/about': 'About: Smart Warning',
   '/support': 'Support: Smart Warning',
@@ -166,6 +164,11 @@ export default function App() {
   // below. An org account never sets this; SystemFooter's sync state already
   // answers "did this reach anyone" for that path.
   const [personalSendStatus, setPersonalSendStatus] = useState<PersonalSendStatus | null>(null);
+  // Home's emergency grid hands off into SosPanel's own two-step flow rather
+  // than firing an alert itself — see AuthEmergencyGrid and SosPanel's
+  // `focusType` prop. The nonce makes picking the same category twice in a
+  // row still re-focus and re-flash.
+  const [focusType, setFocusType] = useState<{ type: AlertType; nonce: number } | null>(null);
   const [lastAlert, setLastAlert] = useState<number | null>(null);
   const [lastSync, setLastSync] = useState<number | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
@@ -439,6 +442,22 @@ export default function App() {
   const runApp = orgsMode === false || !!session;
   const joinCreds = useMemo(() => joinCredentials(session), [session]);
   const token = sessionToken(session);
+
+  // Just the tier, for gating the Safety tab's premium briefing (see
+  // SafetyPanel's `premium` prop) — reuses the same endpoint BillingPanel
+  // itself calls for the full picture, rather than adding a second one.
+  // Fetched once per session rather than lifted into shared state: a tier
+  // change mid-session is rare enough that "current as of opening the app"
+  // is an honest trade against fetching this on every render everywhere.
+  const [tier, setTier] = useState<string | null>(null);
+  useEffect(() => {
+    if (!token) { setTier(null); return; }
+    let cancelled = false;
+    fetchSubscription(token)
+      .then((r) => { if (!cancelled) setTier(r.entitlements?.tier ?? 'free'); })
+      .catch(() => { if (!cancelled) setTier(null); });
+    return () => { cancelled = true; };
+  }, [token]);
 
   /**
    * A personal account has no organisation, so it has no relay room to join.
@@ -1098,12 +1117,22 @@ export default function App() {
         <main className="worker worker-tabbed">
           {tab === 'home' && (
             <>
+              {/* Emergency numbers first and most prominent — never gated on
+                  anything below. "Report through Smart Warning" hands off into
+                  the SOS panel's own two-step flow rather than firing an alert
+                  by itself. */}
+              <AuthEmergencyGrid
+                locale={settings.locale}
+                profile={profile}
+                onReport={(type) => setFocusType({ type, nonce: Date.now() })}
+              />
               <SosPanel
                 profile={profile}
                 disabled={alarmActive}
                 onTrigger={trigger}
                 locale={settings.locale}
                 personalStatus={isPersonal ? personalSendStatus : undefined}
+                focusType={focusType}
               />
               {/* Below the SOS, never above it. Billing is the least important
                   thing on this screen and must never push the button that
@@ -1123,11 +1152,16 @@ export default function App() {
             </>
           )}
 
-          {tab === 'emergency' && (
+          {tab === 'safety' && <SafetyPanel premium={!!tier && tier !== 'free'} />}
+
+          {tab === 'help' && (
             <>
               {/* Both of these are quiet until they matter: the route panel
                   renders nothing without a live alert, and the call pocket sits
-                  collapsed until one opens it. */}
+                  collapsed until one opens it. EmergencyCallPocket stays here
+                  (rather than duplicating Home's grid) because it follows the
+                  device across borders — the grid on Home is fixed to
+                  Tanzania on purpose. */}
               <SafeRoutePanel
                 alertType={alarm.alert?.type ?? null}
                 lat={settings.shareLocation ? telemetry.lat : null}
@@ -1167,10 +1201,6 @@ export default function App() {
             </>
           )}
 
-          {tab === 'safety' && <SafetyPanel />}
-
-          {tab === 'alerts' && <AlertLog entries={log} />}
-
           {tab === 'profile' && (
             <ProfilePanel
               session={session}
@@ -1183,11 +1213,13 @@ export default function App() {
               persistence={history.persistence}
               historyLoading={history.loading}
               historyError={history.error}
+              log={log}
               onAbout={() => navigate('/about')}
               onSettings={() => navigate('/settings')}
               onSupport={() => navigate('/support')}
               onBilling={token ? () => navigate('/billing') : undefined}
               locale={settings.locale}
+              onToggleLocale={() => patchSettings({ locale: settings.locale === 'en' ? 'sw' : 'en' })}
             />
           )}
         </main>

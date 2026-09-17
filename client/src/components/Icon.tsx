@@ -34,7 +34,11 @@ export type IconName =
   | 'help'
   | 'maximize'
   | 'minimize'
-  | 'mic';
+  | 'mic'
+  | 'child'
+  | 'utility'
+  | 'epidemic'
+  | 'coastguard';
 
 const PATHS: Record<IconName, React.ReactNode> = {
   phone: (
@@ -224,6 +228,45 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
       <line x1="12" y1="19" x2="12" y2="23" />
       <line x1="8" y1="23" x2="16" y2="23" />
+    </>
+  ),
+  // Guardian + child: a smaller figure sheltered by a larger one, rather than
+  // reusing `user` (already the Safety Profile tab's own icon) for the Child
+  // Helpline category.
+  child: (
+    <>
+      <circle cx="8" cy="6" r="3" />
+      <path d="M2.5 21a5.5 5.5 0 0 1 11 0" />
+      <circle cx="17" cy="12" r="2" />
+      <path d="M13.2 21a4 4 0 0 1 7.6 0" />
+    </>
+  ),
+  // A plug, for utility/power/water emergencies — distinct from the hazard
+  // triangle so it doesn't read as the same category in a 3x3 grid.
+  utility: (
+    <>
+      <path d="M9 2v4" />
+      <path d="M15 2v4" />
+      <path d="M7 8h10v4a5 5 0 0 1-10 0Z" />
+      <path d="M12 17v5" />
+    </>
+  ),
+  // A pathogen glyph — deliberately not the medical cross (already Ambulance's
+  // icon in the same grid).
+  epidemic: (
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+      <path d="M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" />
+    </>
+  ),
+  // A boat on a wave line — Coast Guard / lakes & marine emergencies.
+  coastguard: (
+    <>
+      <path d="M3 18c1.5 1.3 3 1.3 4.5 0s3-1.3 4.5 0 3 1.3 4.5 0 3-1.3 4.5 0" />
+      <path d="M5 14l1-5h5l2 5" />
+      <path d="M12 9V4" />
+      <path d="M12 4h3l-1.5 2.5Z" />
     </>
   ),
 };
