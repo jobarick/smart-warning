@@ -12,29 +12,24 @@ interface Props {
   locale: Locale;
 }
 
-// The nine categories a stranger landing on this page is most likely to need,
-// picked from Tanzania's own published directory (server/emergency-numbers.js,
-// `richServices`). Ids are the numbers themselves — see that file's directoryFor().
-//
-// Ordered most-called first: Police/Fire/Ambulance (top row), then
-// Disaster/Child Helpline/Utility (middle), then the less frequently needed
-// Anti-Trafficking/Epidemic/Coast Guard (bottom row).
-const GRID_IDS = ['112', '114', '115', '0800110064', '116', '0800711113', '195', '199', '110'];
+// Tanzania's own short-code directory (server/emergency-numbers.js,
+// `richServices`), corrected and confirmed by the product owner
+// (2026-09-17) as the exact set and order to show on the front page. Ids are
+// the numbers themselves — see that file's directoryFor().
+const GRID_IDS = ['111', '112', '113', '114', '115', '116', '117'];
 
 // Ships in the bundle so the grid is never empty — not while the fetch below is
 // in flight, and not if it fails outright. Mirrors lib/emergency.ts's LAST_RESORT,
 // scoped to Tanzania since that is what this grid is for regardless of where a
 // visitor's own device happens to be.
 const FALLBACK: Record<string, EmergencyService> = {
+  '111': { id: '111', numbers: ['111'], icon: '🚓', label: 'Crime Stoppers', labelSw: 'Kuzuia Uhalifu' },
   '112': { id: '112', numbers: ['112'], icon: '🚨', label: 'Police', labelSw: 'Polisi' },
-  '114': { id: '114', numbers: ['114'], icon: '🚒', label: 'Fire & Rescue', labelSw: 'Zimamoto na Uokoaji' },
+  '113': { id: '113', numbers: ['113'], icon: '📢', label: 'TAKUKURU (Anti-Corruption)', labelSw: 'TAKUKURU' },
+  '114': { id: '114', numbers: ['114'], icon: '🚒', label: 'Fire & Rescue', labelSw: 'Zimamoto' },
   '115': { id: '115', numbers: ['115'], icon: '🚑', label: 'Ambulance', labelSw: 'Gari la Wagonjwa' },
-  '0800110064': { id: '0800110064', numbers: ['0800110064'], icon: '🆘', label: 'Disaster Management', labelSw: 'Maafa (Bara)' },
-  '116': { id: '116', numbers: ['116'], icon: '👶', label: 'Child Helpline', labelSw: 'Msaada kwa Mtoto' },
-  '195': { id: '195', numbers: ['195'], icon: '🚫', label: 'Anti-Trafficking', labelSw: 'Kupinga Usafirishaji Haramu' },
-  '199': { id: '199', numbers: ['199'], icon: '🏥', label: 'Epidemic Diseases', labelSw: 'Magonjwa ya Mlipuko' },
-  '0800711113': { id: '0800711113', numbers: ['0800711113'], icon: '🔧', label: 'Utility Emergency', labelSw: 'Huduma za Umeme/Maji' },
-  '110': { id: '110', numbers: ['110'], icon: '🌊', label: 'Lakes, Sea & Coast Guard', labelSw: 'Maziwa, Bahari' },
+  '116': { id: '116', numbers: ['116'], icon: '👶', label: 'Child Helpline', labelSw: 'Msaada wa Watoto' },
+  '117': { id: '117', numbers: ['117'], icon: '🩺', label: 'Health', labelSw: 'Afya' },
 };
 
 /**

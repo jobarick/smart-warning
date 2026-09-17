@@ -146,13 +146,15 @@ export type StringKey =
   | 'landing.hero.heading'
   | 'landing.hero.lead'
   | 'landing.hero.getStarted'
-  | 'landing.hero.teamCode'
   | 'landing.hero.watchDemo'
   | 'landing.hero.noCard'
   | 'landing.hero.trust1'
   | 'landing.hero.trust2'
   | 'landing.hero.trust3'
   | 'landing.hero.trust4'
+  | 'landing.pitch.withPrice'
+  | 'landing.pitch.free'
+  | 'landing.pitch.seeMore'
   | 'landing.honest.heading'
   | 'landing.honest.p1'
   | 'landing.honest.p2b'
@@ -341,13 +343,15 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'landing.hero.heading': 'Help arrives faster when everyone knows at once.',
     'landing.hero.lead': 'One tap raises the alarm, on every phone on your site, with your live location, in about a second. For one person, or a team of five hundred.',
     'landing.hero.getStarted': 'Get started, free for 30 days',
-    'landing.hero.teamCode': 'I have a team code',
     'landing.hero.watchDemo': 'Watch it happen. 12 seconds, no signup',
     'landing.hero.noCard': 'No card required. Works in any phone browser.',
     'landing.hero.trust1': 'Built by {provider}',
     'landing.hero.trust2': 'Location shared only during an active alert',
     'landing.hero.trust3': 'No background tracking',
     'landing.hero.trust4': 'Delete your account any time',
+    'landing.pitch.withPrice': 'For just {price}/month, Premium adds a medical profile, a trusted circle, and priority support — good for you, your family, and the people around you.',
+    'landing.pitch.free': 'Premium adds a medical profile, a trusted circle, and priority support — good for you, your family, and the people around you.',
+    'landing.pitch.seeMore': 'See what’s included →',
     'landing.honest.heading': 'What Smart Warning is not',
     'landing.honest.p1': 'Smart Warning complements emergency services. It does not replace them. It cannot dispatch police, fire, or an ambulance, and it is not affiliated with any emergency service or government body.',
     'landing.honest.p2b': 'In a life threatening emergency, call your local emergency number first',
@@ -533,13 +537,15 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'landing.hero.heading': 'Msaada hufika haraka zaidi wakati kila mtu anajua kwa wakati mmoja.',
     'landing.hero.lead': 'Mguso mmoja huwasha kengele, kwenye kila simu eneo lako, ukiwa na eneo lako la moja kwa moja, ndani ya sekunde moja. Kwa mtu mmoja, au timu ya watu mia tano.',
     'landing.hero.getStarted': 'Anza, bure kwa siku 30',
-    'landing.hero.teamCode': 'Nina msimbo wa timu',
     'landing.hero.watchDemo': 'Tazama jinsi inavyofanya kazi. Sekunde 12, hakuna usajili',
     'landing.hero.noCard': 'Hakuna kadi inayohitajika. Inafanya kazi kwenye kivinjari chochote cha simu.',
     'landing.hero.trust1': 'Imetengenezwa na {provider}',
     'landing.hero.trust2': 'Eneo hushirikiwa tu wakati wa tahadhari inayoendelea',
     'landing.hero.trust3': 'Hakuna ufuatiliaji wa nyuma',
     'landing.hero.trust4': 'Futa akaunti yako wakati wowote',
+    'landing.pitch.withPrice': 'Kwa {price}/mwezi tu, Premium huongeza wasifu wa kiafya, Mzunguko wa Uaminifu, na msaada wa kipaumbele — nzuri kwako, familia yako, na watu walio karibu nawe.',
+    'landing.pitch.free': 'Premium huongeza wasifu wa kiafya, Mzunguko wa Uaminifu, na msaada wa kipaumbele — nzuri kwako, familia yako, na watu walio karibu nawe.',
+    'landing.pitch.seeMore': 'Ona kilichomo →',
     'landing.honest.heading': 'Smart Warning si nini',
     'landing.honest.p1': 'Smart Warning huongeza huduma za dharura. Haichukui nafasi yao. Haiwezi kutuma polisi, zimamoto, au gari la wagonjwa, na haihusiani na huduma yoyote ya dharura au taasisi ya serikali.',
     'landing.honest.p2b': 'Katika dharura inayohatarisha maisha, piga simu namba yako ya dharura kwanza',

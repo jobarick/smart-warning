@@ -255,21 +255,41 @@ function extFor(mime) {
  * A text-only report (no voice note) still goes through the normal queue, so
  * it gets the retry-on-outage behaviour every other queued message gets.
  */
-async function sendEmergencyReport(row, { audioBase64, audioMime } = {}) {
-  const body = [
-    `Category: ${row.category}`,
-    `Location: ${row.lat != null && row.lng != null ? `${row.lat}, ${row.lng}` : 'not shared'}`,
+async function sendEmergencyReport(row, { audioBase64, audioMime, nearbyPlaces = [], nearbySearched = false } = {}) {
+  const hasLocation = row.lat != null && row.lng != null;
+  // What kind of help in words, then the number to call for it — in that
+  // order, so whoever reads this on their phone sees the incident before the
+  // digits. `row.category` IS the emergency number (see GRID_IDS in
+  // EmergencyGrid.tsx), not a separate lookup.
+  const lines = [
+    `Incident: ${row.label || 'Unspecified'}`,
+    `Call:     ${row.category}`,
+    `Location: ${hasLocation ? `${row.lat}, ${row.lng}` : 'not shared'}`,
+  ];
+  // Named places only ever appear alongside the coordinates they were found
+  // from, never instead of them — and only when a lookup was actually
+  // possible, never a fabricated "none found" for a category with no mapped
+  // facility kind (see CATEGORY_PLACE_KIND in routes/emergency.js).
+  if (nearbySearched) {
+    lines.push(
+      nearbyPlaces.length
+        ? `Nearby:   ${nearbyPlaces.map((p) => `${p.name} (~${Math.round(p.distanceM)}m)`).join(', ')}`
+        : 'Nearby:   none found within 3km',
+    );
+  }
+  lines.push(
     `Contact:  ${row.contact_email || 'anonymous'}`,
     `Logged:   ${row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString()}`,
     `Ref:      ${row.id}`,
     '',
     row.message || '(no text — see attached voice note)',
-  ].join('\n');
+  );
+  const body = lines.join('\n');
 
   const message = {
     to: FEEDBACK_TO,
     replyTo: row.contact_email || null,
-    subject: `[Smart Warning] Emergency report: ${row.category}`,
+    subject: `[Smart Warning] Emergency report: ${row.label || row.category}`,
     body,
   };
 

@@ -259,6 +259,11 @@ async function init() {
     CREATE TABLE IF NOT EXISTS emergency_reports (
       id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       category       TEXT NOT NULL,
+      -- The category's human label at submission time (e.g. "Police"), so the
+      -- email can say what kind of help is needed in words, not just the
+      -- category id (which is the emergency number itself — see GRID_IDS in
+      -- EmergencyGrid.tsx).
+      label          TEXT,
       message        TEXT,
       contact_email  TEXT,
       lat            DOUBLE PRECISION,
@@ -268,6 +273,10 @@ async function init() {
       created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS emergency_reports_created_idx ON emergency_reports (created_at DESC);
+    -- 'label' shipped after 'emergency_reports' itself — CREATE TABLE IF NOT
+    -- EXISTS above does nothing for a table an earlier deploy already created,
+    -- so an already-existing install needs this too.
+    ALTER TABLE emergency_reports ADD COLUMN IF NOT EXISTS label TEXT;
 
     -- Outbound mail, queued before it is attempted.
     --
@@ -1100,11 +1109,15 @@ async function countContacts(userId) {
 async function listDirectoryNearby(category, lat, lng, radiusM = 15000) {
   if (!pool || !Number.isFinite(lat) || !Number.isFinite(lng)) return [];
   const deg = radiusM / 111000; // ~111km per degree of latitude; a generous box, not the true radius
+  // Explicit casts: with both sides of BETWEEN's arithmetic coming from
+  // placeholders, Postgres has no column type to infer from and refuses the
+  // query ("operator is not unique") — every lookup was silently failing
+  // (caught below by this function's own try/catch in places.js) until this.
   const { rows } = await pool.query(
     `SELECT * FROM directory_entries
       WHERE category = $1
-        AND lat BETWEEN $2 - $4 AND $2 + $4
-        AND lng BETWEEN $3 - $4 AND $3 + $4`,
+        AND lat BETWEEN $2::double precision - $4::double precision AND $2::double precision + $4::double precision
+        AND lng BETWEEN $3::double precision - $4::double precision AND $3::double precision + $4::double precision`,
     [category, lat, lng, deg],
   );
   return rows;
@@ -1666,12 +1679,12 @@ async function markFeedbackDelivered(id) {
 
 // --- Emergency reports (public, unauthenticated; see routes/emergency.js) --
 
-async function createEmergencyReport({ category, message, contactEmail, lat, lng, hasVoiceNote }) {
+async function createEmergencyReport({ category, label, message, contactEmail, lat, lng, hasVoiceNote }) {
   if (!pool) throw new Error('persistence disabled');
   const { rows } = await pool.query(
-    `INSERT INTO emergency_reports (category, message, contact_email, lat, lng, has_voice_note)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [category, message || null, contactEmail || null, lat ?? null, lng ?? null, hasVoiceNote === true],
+    `INSERT INTO emergency_reports (category, label, message, contact_email, lat, lng, has_voice_note)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [category, label || null, message || null, contactEmail || null, lat ?? null, lng ?? null, hasVoiceNote === true],
   );
   return rows[0];
 }

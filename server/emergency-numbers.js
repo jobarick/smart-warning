@@ -66,8 +66,12 @@ const COUNTRIES = {
       { number: '113', icon: '📢', category: null, sw: { label: 'TAKUKURU', description: 'Kuripoti rushwa' }, en: { label: 'TAKUKURU (Anti-Corruption)', description: 'Report corruption' } },
       { number: '114', icon: '🚒', category: 'fire', sw: { label: 'Zimamoto na Uokoaji', description: 'Moto na uokoaji' }, en: { label: 'Fire & Rescue', description: 'Fire and rescue emergencies' } },
       { number: '115', icon: '🚑', category: 'ambulance', sw: { label: 'Gari la Wagonjwa', description: 'Huduma ya ambulansi' }, en: { label: 'Ambulance', description: 'Medical emergencies' } },
-      { number: '116', icon: '👶', category: null, sw: { label: 'Msaada kwa Mtoto', description: 'Dharura na msaada kwa mtoto' }, en: { label: 'Child Helpline', description: 'Child emergencies and support' } },
-      { number: '117', icon: '🩺', category: null, sw: { label: 'Huduma za VVU/UKIMWI', description: 'Huduma za VVU/UKIMWI' }, en: { label: 'HIV/AIDS Services', description: 'HIV/AIDS support and information' } },
+      { number: '116', icon: '👶', category: null, sw: { label: 'Msaada wa Watoto', description: 'Dharura na msaada kwa mtoto' }, en: { label: 'Child Helpline', description: 'Child emergencies and support' } },
+      // Relabelled from "HIV/AIDS Services" to the broader "Afya" (Health) per
+      // the product owner's correction (2026-09-17) — same caution as the rest
+      // of this file's owner-supplied data: not independently verified against
+      // an authoritative source.
+      { number: '117', icon: '🩺', category: null, sw: { label: 'Afya', description: 'Huduma na dharura za afya' }, en: { label: 'Health', description: 'Health services and emergencies' } },
       { number: '119', icon: '💊', category: null, sw: { label: 'Kupambana na Dawa za Kulevya', description: 'Kuripoti masuala ya dawa za kulevya' }, en: { label: 'Anti-Drugs', description: 'Report drug-related emergencies' } },
       { number: '190', icon: '🏝️', category: 'disaster', sw: { label: 'Zanzibar', description: 'Huduma za maafa Zanzibar' }, en: { label: 'Zanzibar', description: 'Zanzibar disaster services' } },
       { number: '195', icon: '🚫', category: null, sw: { label: 'Kupinga Usafirishaji Haramu wa Binadamu', description: 'Toa taarifa za usafirishaji haramu wa binadamu' }, en: { label: 'Anti-Trafficking', description: 'Report human trafficking' } },

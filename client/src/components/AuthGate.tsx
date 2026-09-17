@@ -313,14 +313,11 @@ export function AuthGate({ onAuthed, notice }: Props) {
               <Icon name="user" />
               <span><b>Start my free trial</b><small>Just me, looking after myself. 30 days free, no card</small></span>
             </button>
-            <button
-              className="auth-choice"
-              onClick={() => go('worker')}
-              aria-label="Join my team. Someone gave me a team code. No account needed."
-            >
-              <Icon name="check-circle" />
-              <span><b>Join my team</b><small>Someone gave me a team code. No account needed</small></span>
-            </button>
+            {/* "Join my team" (the worker/team-code entry) was removed from this
+                choice screen at the product owner's request (2026-09-17) — a
+                better flow for company/team members to join is coming
+                separately. The underlying step itself is untouched: a direct
+                link with ?step=worker (e.g. from a QR code) still reaches it. */}
             {/* Creating a team used to be reachable only by opening the sign-in
                 screen and then noticing "New here?" underneath a login form.
                 Somebody setting up a site for the first time has no reason to

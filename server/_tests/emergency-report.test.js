@@ -15,6 +15,9 @@ const BASE = `http://127.0.0.1:${PORT}`;
 const written = [];
 let mailed = 0;
 let mailedWith = null;
+/** Every places.nearby(kind, lat, lng, opts) call the route made. */
+const nearbyCalls = [];
+let nearbyResult = [];
 
 let app;
 
@@ -61,7 +64,10 @@ before(() => {
     sendFeedback: async () => true,
     sendEmergencyReport: async (row, opts) => { mailed += 1; mailedWith = { row, opts }; return true; },
   });
-  stub('places.js', { nearby: async () => [], safeDestination: async () => ({ destination: null, alternatives: [] }) });
+  stub('places.js', {
+    nearby: async (kind, lat, lng, opts) => { nearbyCalls.push({ kind, lat, lng, opts }); return nearbyResult; },
+    safeDestination: async () => ({ destination: null, alternatives: [] }),
+  });
 
   app = require('../index.js');
 });
@@ -155,6 +161,47 @@ test('location is optional, and passes through only when both coordinates are fi
   await post({ category: '112', message: 'half a location', lat: -6.8, lng: 'nonsense' });
   assert.strictEqual(written.at(-1).lat, null, 'a non-finite partner coordinate voids the pair');
   assert.strictEqual(written.at(-1).lng, null);
+});
+
+test('the category label is stored and passed to the mailer in words', async () => {
+  await post({ category: '112', label: 'Police', message: 'need help' });
+  assert.strictEqual(written.at(-1).label, 'Police');
+  assert.strictEqual(mailedWith.row.label, 'Police');
+});
+
+test('a missing label is stored as null, never as an empty string', async () => {
+  await post({ category: '112', message: 'no label given' });
+  assert.strictEqual(written.at(-1).label, null);
+});
+
+test('nearby places are looked up only for a mapped category with a shared location', async () => {
+  nearbyResult = [{ name: 'Oysterbay Police Post', lat: -6.77, lng: 39.28, distanceM: 420 }];
+  const before = nearbyCalls.length;
+
+  // Mapped category (police) + location → a lookup happens, scoped to the
+  // reported point, and the result reaches the mailer.
+  await post({ category: '112', message: 'armed robbery', lat: -6.77, lng: 39.28 });
+  assert.strictEqual(nearbyCalls.length, before + 1);
+  assert.strictEqual(nearbyCalls.at(-1).kind, 'police');
+  assert.strictEqual(nearbyCalls.at(-1).lat, -6.77);
+  assert.strictEqual(nearbyCalls.at(-1).lng, 39.28);
+  assert.strictEqual(mailedWith.opts.nearbySearched, true);
+  assert.deepStrictEqual(mailedWith.opts.nearbyPlaces, nearbyResult);
+
+  // Mapped category, no location → nothing to search from, so no lookup —
+  // and the mailer must not be told a search happened.
+  await post({ category: '112', message: 'no gps this time' });
+  assert.strictEqual(nearbyCalls.length, before + 1, 'no location means no lookup, not a lookup with null coordinates');
+  assert.strictEqual(mailedWith.opts.nearbySearched, false);
+  assert.deepStrictEqual(mailedWith.opts.nearbyPlaces, []);
+
+  // Unmapped category (Crime Stoppers), even with a location → an irrelevant
+  // "nearby hospital" guess is worse than none, so this must not search either.
+  await post({ category: '111', message: 'saw something', lat: -6.77, lng: 39.28 });
+  assert.strictEqual(nearbyCalls.length, before + 1);
+  assert.strictEqual(mailedWith.opts.nearbySearched, false);
+
+  nearbyResult = [];
 });
 
 test('category and message length are capped, so one request cannot write an unbounded row', async () => {

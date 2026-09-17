@@ -17,6 +17,21 @@ const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 // and generous for a spoken description of what is happening.
 const MAX_AUDIO_B64 = 650_000;
 
+// Which OSM facility kind is worth naming in the report email for a given
+// category (the category id is the Tanzania emergency number itself — see
+// GRID_IDS in EmergencyGrid.tsx). Categories with no obvious facility kind
+// (Crime Stoppers, TAKUKURU, Child Helpline) are left unmapped rather than
+// guessing — an irrelevant "nearby hospital" is worse than nothing.
+const CATEGORY_PLACE_KIND = {
+  '112': 'police', // Police
+  '114': 'fire',   // Fire & Rescue
+  '115': 'hospital', // Ambulance
+  '117': 'hospital', // Afya / Health
+};
+// Tight radius for the email — this is "what's near the reported point right
+// now", not the 15km default places.nearby() uses for a device planning a trip.
+const NEARBY_EMAIL_RADIUS_M = 3000;
+
 async function handle({ req, res, url, path }) {
   // --- Emergency call directory ---
   // Deliberately unauthenticated: published emergency numbers are public
@@ -49,6 +64,10 @@ async function handle({ req, res, url, path }) {
     const body = await readJson(req);
     const category = String(body.category || '').trim().slice(0, 60);
     if (!category) { sendJson(res, 400, { error: 'a category is required' }); return true; }
+    // What kind of help in words, for the email — see mailer.sendEmergencyReport.
+    // Trusted only as display text: never used for routing or matched against
+    // CATEGORY_PLACE_KIND, which keys off `category` alone.
+    const label = String(body.label || '').trim().slice(0, 80);
 
     const message = String(body.message || '').trim().slice(0, 2000);
     const contactEmail = String(body.email || '').trim().slice(0, 200);
@@ -71,17 +90,31 @@ async function handle({ req, res, url, path }) {
     }
 
     const row = await db.createEmergencyReport({
-      category, message: message || null, contactEmail: contactEmail || null, lat, lng,
+      category, label: label || null, message: message || null, contactEmail: contactEmail || null, lat, lng,
       hasVoiceNote: Boolean(audio),
     });
 
     // Not awaited — same reasoning as the feedback routes: the report is
-    // already safely stored, and an SMTP host that stops answering must not
-    // hang this request over a submission that is already saved.
-    void mailer
-      .sendEmergencyReport(row, audio ? { audioBase64: audio, audioMime } : {})
-      .then((delivered) => (delivered ? db.markEmergencyReportDelivered(row.id) : null))
-      .catch((e) => console.error(`[mail] emergency report not delivered: ${e.message}`));
+    // already safely stored, and neither a slow Overpass lookup nor an SMTP
+    // host that stops answering may hang this request over a submission that
+    // is already saved.
+    void (async () => {
+      let nearbyPlaces = [];
+      const kind = lat != null && lng != null ? CATEGORY_PLACE_KIND[category] : null;
+      if (kind) {
+        try {
+          nearbyPlaces = await places.nearby(kind, lat, lng, { radius: NEARBY_EMAIL_RADIUS_M, limit: 3 });
+        } catch (e) {
+          console.warn(`[places] nearby lookup for report ${row.id} failed: ${e.message}`);
+        }
+      }
+      const delivered = await mailer.sendEmergencyReport(row, {
+        ...(audio ? { audioBase64: audio, audioMime } : {}),
+        nearbyPlaces,
+        nearbySearched: Boolean(kind),
+      });
+      if (delivered) await db.markEmergencyReportDelivered(row.id);
+    })().catch((e) => console.error(`[mail] emergency report not delivered: ${e.message}`));
 
     console.log(`[!] emergency report received: ${category}${audio ? ' (+voice note)' : ''}`);
     sendJson(res, 201, { ok: true });

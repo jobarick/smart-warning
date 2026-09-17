@@ -90,9 +90,6 @@ export function LandingPage({ onGetStarted, onWatchDemo, locale, onToggleLocale 
             <button className="lp-cta" onClick={() => go('hero_get_started')}>
               {t(locale, 'landing.hero.getStarted')}
             </button>
-            <button className="lp-cta lp-cta-quiet" onClick={() => go('hero_team_code', 'worker')}>
-              {t(locale, 'landing.hero.teamCode')}
-            </button>
           </div>
           {/* An emergency product is the one thing nobody can safely try. This
               is the only honest way to show it before somebody commits. */}
@@ -103,25 +100,43 @@ export function LandingPage({ onGetStarted, onWatchDemo, locale, onToggleLocale 
             <span className="lp-demo-pip" aria-hidden="true" />
             {t(locale, 'landing.hero.watchDemo')}
           </button>
+        </section>
 
-          <p className="lp-cta-note">{t(locale, 'landing.hero.noCard')}</p>
-
+        {/* Reachable with zero sign-in, by design — see EmergencyGrid.tsx.
+            A stranger who needs a number right now should never have to decide
+            whether to trust this product with an account first. Deliberately
+            the SECOND thing on the page, right after a one-line intro — this is
+            the "get help now" content the whole page exists to lead with,
+            before anything else, including the trust claims and pricing pitch
+            that used to sit above it. */}
+        <section className="lp-section lp-eg-section">
+          <EmergencyGrid locale={locale} />
           {/* Four claims, each one true of the code as written. Nothing here is
               aspirational — a safety product that oversells its guarantees is
-              worse than one that says less. */}
-          <ul className="lp-trust">
+              worse than one that says less. Kept short and directly under the
+              numbers rather than in the hero, so the first thing a visitor sees
+              is the numbers, not a bullet list. */}
+          <ul className="lp-trust lp-trust-compact">
             <li>{t(locale, 'landing.hero.trust1', { provider: PROVIDER })}</li>
             <li>{t(locale, 'landing.hero.trust2')}</li>
             <li>{t(locale, 'landing.hero.trust3')}</li>
             <li>{t(locale, 'landing.hero.trust4')}</li>
           </ul>
+          <p className="lp-cta-note">{t(locale, 'landing.hero.noCard')}</p>
         </section>
 
-        {/* Reachable with zero sign-in, by design — see EmergencyGrid.tsx.
-            A stranger who needs a number right now should never have to decide
-            whether to trust this product with an account first. */}
-        <section className="lp-section lp-eg-section">
-          <EmergencyGrid locale={locale} />
+        {/* The persuasion pitch — deliberately short and placed right after the
+            free emergency numbers, not before them: a visitor should see that
+            help is free and immediate before being asked to pay for anything.
+            The full plan comparison stays further down at #pricing; this is
+            just the one-line hook, kept the page from getting long here. */}
+        <section className="lp-section lp-pitch-section">
+          <p className="lp-pitch-text">
+            {price
+              ? t(locale, 'landing.pitch.withPrice', { price })
+              : t(locale, 'landing.pitch.free')}
+          </p>
+          <a href="#pricing" className="lp-pitch-link">{t(locale, 'landing.pitch.seeMore')}</a>
         </section>
 
         {/* Deliberately the second thing on the page, not the fourth. This used
