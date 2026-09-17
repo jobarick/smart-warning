@@ -108,6 +108,11 @@
 .pocket-svc-label svg { width: 14px; height: 14px; }
 .pocket-svc-emoji { font-size: 14px; line-height: 1; }
 .pocket-svc-first .pocket-svc-label { color: var(--accent); }
+/* NearbyHelp's per-row provenance tag: same look as SafeRoutePanel's
+   route-tag, but without its margin-left:auto — here it sits inline between
+   the label and pocket-numbers (which already claims auto-margin), not
+   alone in a single-item header row. */
+.pocket-svc .route-tag { margin-left: 0; }
 .pocket-svc-desc {
   flex-basis: 100%;
   /* Also --text rather than --faint, for the same readability reason as the
