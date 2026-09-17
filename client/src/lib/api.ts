@@ -147,6 +147,8 @@ export interface Place {
   distanceM: number;
   phone: string | null;
   address: string | null;
+  /** True for an entry someone actually confirmed (server/db.js's directory_entries); false for a raw OpenStreetMap result. */
+  verified?: boolean;
 }
 
 /**

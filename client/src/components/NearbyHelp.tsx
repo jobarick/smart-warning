@@ -108,12 +108,16 @@ export function NearbyHelp({ lat, lng, locale }: Props) {
                       </small>
                     </span>
                   </span>
-                  {/* Every result here comes from the same OSM source (see
-                      places.js) — this repeats that trust signal at the point
-                      of decision, the way SafeRoutePanel's "Site plan" /
-                      "Nearest public" tags already do, rather than leaving it
-                      to the one disclaimer line at the bottom of the list. */}
-                  <span className="route-tag route-tag-public">{t(locale, 'nearby.communitySourced')}</span>
+                  {/* Most results come from OSM (see places.js) and repeat
+                      that trust signal at the point of decision, the way
+                      SafeRoutePanel's "Site plan" / "Nearest public" tags
+                      already do, rather than leaving it to the one disclaimer
+                      line at the bottom. A `verified` entry (server/db.js's
+                      directory_entries — someone actually confirmed it) gets
+                      its own distinct tag instead. */}
+                  <span className={`route-tag ${p.verified ? 'route-tag-verified' : 'route-tag-public'}`}>
+                    {t(locale, p.verified ? 'nearby.verified' : 'nearby.communitySourced')}
+                  </span>
                   <span className="pocket-numbers">
                     {p.phone && dialable && isDialable(p.phone) && (
                       <a className="pocket-call" href={telHref(p.phone)}>
