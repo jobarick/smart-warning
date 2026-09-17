@@ -4,6 +4,7 @@ import { fetchPlans, formatMoney, type Plan, type PaymentMethods } from '../lib/
 import { PROVIDER, SUPPORT_EMAIL } from '../lib/terms';
 import { t } from '../lib/i18n';
 import type { Locale } from '../types';
+import { EmergencyGrid } from './EmergencyGrid';
 import { FeedbackButton } from './FeedbackButton';
 import { Icon } from './Icon';
 import { Logo } from './Logo';
@@ -114,6 +115,13 @@ export function LandingPage({ onGetStarted, onWatchDemo, locale, onToggleLocale 
             <li>{t(locale, 'landing.hero.trust3')}</li>
             <li>{t(locale, 'landing.hero.trust4')}</li>
           </ul>
+        </section>
+
+        {/* Reachable with zero sign-in, by design — see EmergencyGrid.tsx.
+            A stranger who needs a number right now should never have to decide
+            whether to trust this product with an account first. */}
+        <section className="lp-section lp-eg-section">
+          <EmergencyGrid locale={locale} />
         </section>
 
         {/* Deliberately the second thing on the page, not the fourth. This used

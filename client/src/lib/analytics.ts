@@ -45,7 +45,13 @@ export type AnalyticsEvent =
   | 'feedback_sent'
   // The simulation — the only way to show an emergency product without one.
   // Worth knowing how many people watch it and whether they then sign up.
-  | 'view_demo';
+  | 'view_demo'
+  // Which category a signed-out visitor tapped in the landing page's
+  // emergency grid. The category id only — never their location.
+  | 'click_emergency_category'
+  // Whether the emergency-grid report form was actually used, and whether it
+  // included a voice note. Never the message, the recording, or the location.
+  | 'submit_emergency_report';
 
 type Params = Record<string, string | number | boolean>;
 

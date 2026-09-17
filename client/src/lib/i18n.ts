@@ -55,6 +55,59 @@ export type StringKey =
   | 'pocket.heading'
   | 'pocket.urgentNote'
   | 'pocket.cannotDial'
+  | 'emergencyGrid.heading'
+  | 'emergencyGrid.sub'
+  | 'emergencyGrid.cannotDial'
+  | 'emergencyGrid.callNow'
+  | 'emergencyGrid.reportButton'
+  | 'emergencyReport.heading'
+  | 'emergencyReport.messagePlaceholder'
+  | 'emergencyReport.emailLabel'
+  | 'emergencyReport.emailHint'
+  | 'emergencyReport.recordStart'
+  | 'emergencyReport.recordStop'
+  | 'emergencyReport.recordAgain'
+  | 'emergencyReport.recordDiscard'
+  | 'emergencyReport.recording'
+  | 'emergencyReport.recorded'
+  | 'emergencyReport.recordUnsupported'
+  | 'emergencyReport.recordDenied'
+  | 'emergencyReport.shareLocation'
+  | 'emergencyReport.locationShared'
+  | 'emergencyReport.locStatusNotShared'
+  | 'emergencyReport.locStatusRequesting'
+  | 'emergencyReport.locStatusShared'
+  | 'emergencyReport.locStatusDenied'
+  | 'emergencyReport.locStatusUnavailable'
+  | 'emergencyReport.anonymous'
+  | 'emergencyReport.addContact'
+  | 'emergencyReport.soundLabel'
+  | 'emergencyReport.soundOn'
+  | 'emergencyReport.soundOff'
+  | 'emergencyReport.stopSound'
+  | 'emergencyReport.cancel'
+  | 'emergencyReport.submit'
+  | 'emergencyReport.sending'
+  | 'emergencyReport.sent'
+  | 'emergencyReport.failed'
+  | 'emergencyReport.sentHeading'
+  | 'emergencyReport.sentSub'
+  | 'emergencyReport.fieldIncident'
+  | 'emergencyReport.fieldDescription'
+  | 'emergencyReport.descBoth'
+  | 'emergencyReport.descText'
+  | 'emergencyReport.descVoice'
+  | 'emergencyReport.fieldLocation'
+  | 'emergencyReport.valShared'
+  | 'emergencyReport.valNotShared'
+  | 'emergencyReport.fieldContact'
+  | 'emergencyReport.fieldIdefenda'
+  | 'emergencyReport.idefendaReceived'
+  | 'emergencyReport.fieldOrg'
+  | 'emergencyReport.orgPending'
+  | 'emergencyReport.fieldNearby'
+  | 'emergencyReport.nearbyUnavailable'
+  | 'emergencyReport.newReport'
   | 'nearby.heading'
   | 'nearby.disclaimer'
   | 'nearby.communitySourced'
@@ -197,6 +250,59 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'pocket.heading': 'Emergency numbers',
     'pocket.urgentNote': 'Call the service you need. This does not replace the alert already sent to your team.',
     'pocket.cannotDial': "This device can't place calls. Dial these from a phone, or reach your site's emergency contact through the details on the Contact & support page.",
+    'emergencyGrid.heading': 'Get help now',
+    'emergencyGrid.sub': "Tap what's happening to see who to call in Tanzania — no account needed.",
+    'emergencyGrid.cannotDial': "This device can't place calls. Dial these numbers from a phone.",
+    'emergencyGrid.callNow': 'Call now',
+    'emergencyGrid.reportButton': 'Report through Idefenda',
+    'emergencyReport.heading': "Describe what's happening",
+    'emergencyReport.messagePlaceholder': "What's happening, and where? (optional if you record a voice note)",
+    'emergencyReport.emailLabel': 'Email',
+    'emergencyReport.emailHint': 'optional, only if you want a reply',
+    'emergencyReport.recordStart': 'Record a voice note',
+    'emergencyReport.recordStop': 'Stop recording',
+    'emergencyReport.recordAgain': 'Record again',
+    'emergencyReport.recordDiscard': 'Discard',
+    'emergencyReport.recording': 'Recording… {sec}s',
+    'emergencyReport.recorded': 'Voice note recorded ({sec}s)',
+    'emergencyReport.recordUnsupported': "This browser can't record audio here — you can still write a description.",
+    'emergencyReport.recordDenied': 'Microphone access was denied — you can still write a description.',
+    'emergencyReport.shareLocation': 'Share my location',
+    'emergencyReport.locationShared': 'Location shared',
+    'emergencyReport.locStatusNotShared': 'Location: not shared',
+    'emergencyReport.locStatusRequesting': 'Location: requesting…',
+    'emergencyReport.locStatusShared': 'Location: shared',
+    'emergencyReport.locStatusDenied': 'Location: not shared (permission denied)',
+    'emergencyReport.locStatusUnavailable': 'Location: not shared (unavailable on this device)',
+    'emergencyReport.anonymous': 'Anonymous',
+    'emergencyReport.addContact': '+ Add contact info',
+    'emergencyReport.soundLabel': 'Alert sound',
+    'emergencyReport.soundOn': 'Sound',
+    'emergencyReport.soundOff': 'Silent',
+    'emergencyReport.stopSound': 'Stop sound',
+    'emergencyReport.cancel': 'Cancel',
+    'emergencyReport.submit': 'Send Alert',
+    'emergencyReport.sending': 'Sending…',
+    'emergencyReport.sent': "Sent. We'll pass this to the right responders.",
+    'emergencyReport.failed': 'Could not send — please call the number above directly.',
+    'emergencyReport.sentHeading': 'Alert sent',
+    'emergencyReport.sentSub': 'Your report has been received and is being passed on.',
+    'emergencyReport.fieldIncident': 'Incident',
+    'emergencyReport.fieldDescription': 'Description',
+    'emergencyReport.descBoth': 'Text and voice note',
+    'emergencyReport.descText': 'Text',
+    'emergencyReport.descVoice': 'Voice note',
+    'emergencyReport.fieldLocation': 'Location',
+    'emergencyReport.valShared': 'Shared',
+    'emergencyReport.valNotShared': 'Not shared',
+    'emergencyReport.fieldContact': 'Contact',
+    'emergencyReport.fieldIdefenda': 'Idefenda',
+    'emergencyReport.idefendaReceived': 'Received',
+    'emergencyReport.fieldOrg': 'Organization',
+    'emergencyReport.orgPending': 'Not yet assigned',
+    'emergencyReport.fieldNearby': 'Nearby help',
+    'emergencyReport.nearbyUnavailable': 'Not available yet',
+    'emergencyReport.newReport': 'Report something else',
     'nearby.heading': 'Nearby help',
     'nearby.disclaimer': 'From OpenStreetMap, not a verified directory. Always follow official guidance where it is available.',
     'nearby.communitySourced': 'Community-sourced',
@@ -252,7 +358,7 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'landing.how.step2Title': 'Everyone knows',
     'landing.how.step2Body': 'Phones with Smart Warning open alarm at once: full screen, siren, vibration. Phones that are locked or closed get a push notification. Your location appears on the map either way.',
     'landing.how.step3Title': 'Someone comes',
-    'landing.how.step3Body': 'Your Safety Coordinator acknowledges, and everyone you alerted sees that help is on the way, with an ETA.',
+    'landing.how.step3Body': 'Whoever is on duty acknowledges, and everyone you alerted sees that help is on the way, with an ETA.',
     'landing.who.heading': 'Who it is for',
     'landing.who.soloTitle': 'On your own',
     'landing.who.soloBody': 'A panic button that actually reaches someone. Your trusted contacts get your live location the moment you raise an alert.',
@@ -336,6 +442,59 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'pocket.heading': 'Namba za dharura',
     'pocket.urgentNote': 'Piga huduma unayohitaji. Hii haibadilishi tahadhari ambayo tayari imetumwa kwa timu yako.',
     'pocket.cannotDial': 'Kifaa hiki hakiwezi kupiga simu. Piga namba hizi kutoka kwenye simu, au wasiliana na mtu wa dharura wa eneo lako kupitia maelezo kwenye ukurasa wa Mawasiliano na msaada.',
+    'emergencyGrid.heading': 'Pata Msaada Sasa',
+    'emergencyGrid.sub': 'Gusa kinachotokea ili kuona wa kumpigia Tanzania — hauitaji akaunti.',
+    'emergencyGrid.cannotDial': 'Kifaa hiki hakiwezi kupiga simu. Piga namba hizi kutoka kwenye simu.',
+    'emergencyGrid.callNow': 'Piga sasa',
+    'emergencyGrid.reportButton': 'Ripoti kupitia Idefenda',
+    'emergencyReport.heading': 'Eleza kinachotokea',
+    'emergencyReport.messagePlaceholder': 'Nini kinatokea, na wapi? (si lazima ukirekodi ujumbe wa sauti)',
+    'emergencyReport.emailLabel': 'Barua pepe',
+    'emergencyReport.emailHint': 'si lazima, isipokuwa unataka jibu',
+    'emergencyReport.recordStart': 'Rekodi ujumbe wa sauti',
+    'emergencyReport.recordStop': 'Simamisha kurekodi',
+    'emergencyReport.recordAgain': 'Rekodi tena',
+    'emergencyReport.recordDiscard': 'Futa',
+    'emergencyReport.recording': 'Inarekodi… sekunde {sec}',
+    'emergencyReport.recorded': 'Ujumbe wa sauti umerekodiwa (sekunde {sec})',
+    'emergencyReport.recordUnsupported': 'Kivinjari hiki hakiwezi kurekodi sauti hapa — bado unaweza kuandika maelezo.',
+    'emergencyReport.recordDenied': 'Ruhusa ya maikrofoni ilikataliwa — bado unaweza kuandika maelezo.',
+    'emergencyReport.shareLocation': 'Shiriki eneo langu',
+    'emergencyReport.locationShared': 'Eneo limeshirikiwa',
+    'emergencyReport.locStatusNotShared': 'Eneo: halijashirikiwa',
+    'emergencyReport.locStatusRequesting': 'Eneo: inaomba…',
+    'emergencyReport.locStatusShared': 'Eneo: limeshirikiwa',
+    'emergencyReport.locStatusDenied': 'Eneo: halijashirikiwa (ruhusa ilikataliwa)',
+    'emergencyReport.locStatusUnavailable': 'Eneo: halijashirikiwa (haipatikani kwenye kifaa hiki)',
+    'emergencyReport.anonymous': 'Bila jina',
+    'emergencyReport.addContact': '+ Ongeza mawasiliano',
+    'emergencyReport.soundLabel': 'Sauti ya tahadhari',
+    'emergencyReport.soundOn': 'Sauti',
+    'emergencyReport.soundOff': 'Kimya',
+    'emergencyReport.stopSound': 'Zima sauti',
+    'emergencyReport.cancel': 'Ghairi',
+    'emergencyReport.submit': 'Tuma Tahadhari',
+    'emergencyReport.sending': 'Inatuma…',
+    'emergencyReport.sent': 'Imetumwa. Tutawasilisha kwa wahusika sahihi.',
+    'emergencyReport.failed': 'Imeshindwa kutuma — tafadhali piga namba iliyo hapo juu moja kwa moja.',
+    'emergencyReport.sentHeading': 'Tahadhari imetumwa',
+    'emergencyReport.sentSub': 'Taarifa yako imepokelewa na inawasilishwa.',
+    'emergencyReport.fieldIncident': 'Tukio',
+    'emergencyReport.fieldDescription': 'Maelezo',
+    'emergencyReport.descBoth': 'Maandishi na ujumbe wa sauti',
+    'emergencyReport.descText': 'Maandishi',
+    'emergencyReport.descVoice': 'Ujumbe wa sauti',
+    'emergencyReport.fieldLocation': 'Eneo',
+    'emergencyReport.valShared': 'Limeshirikiwa',
+    'emergencyReport.valNotShared': 'Halijashirikiwa',
+    'emergencyReport.fieldContact': 'Mawasiliano',
+    'emergencyReport.fieldIdefenda': 'Idefenda',
+    'emergencyReport.idefendaReceived': 'Imepokelewa',
+    'emergencyReport.fieldOrg': 'Shirika',
+    'emergencyReport.orgPending': 'Bado halijapangwa',
+    'emergencyReport.fieldNearby': 'Msaada wa karibu',
+    'emergencyReport.nearbyUnavailable': 'Bado haipatikani',
+    'emergencyReport.newReport': 'Ripoti jambo lingine',
     'nearby.heading': 'Msaada wa Karibu',
     'nearby.disclaimer': 'Taarifa kutoka OpenStreetMap, si orodha iliyothibitishwa. Fuata maelekezo rasmi pale yanapopatikana.',
     'nearby.communitySourced': 'Chanzo cha jamii',
@@ -391,7 +550,7 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'landing.how.step2Title': 'Kila mtu anajua',
     'landing.how.step2Body': 'Simu zenye Smart Warning huwasha kengele mara moja: skrini nzima, kengele, mtetemo. Simu zilizofungwa au zilizozimwa hupokea arifa. Eneo lako huonekana kwenye ramani kwa hali zote mbili.',
     'landing.how.step3Title': 'Mtu anakuja',
-    'landing.how.step3Body': 'Msimamizi wako wa Usalama hukiri, na kila uliyemjulisha huona kuwa msaada unakuja, pamoja na muda wa kufika.',
+    'landing.how.step3Body': 'Aliye zamu hukiri, na kila uliyemjulisha huona kuwa msaada unakuja, pamoja na muda wa kufika.',
     'landing.who.heading': 'Ni kwa ajili ya nani',
     'landing.who.soloTitle': 'Peke yako',
     'landing.who.soloBody': 'Kitufe cha hofu kinachomfikia mtu kweli. Anwani zako za kuaminika hupokea eneo lako la moja kwa moja mara tu unapotoa tahadhari.',

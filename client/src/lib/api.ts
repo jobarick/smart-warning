@@ -826,6 +826,31 @@ export async function fetchDirectory(lat: number | null, lng: number | null, cou
   return res.json();
 }
 
+// --- Emergency reports (Tanzania-wide, no account — see EmergencyGrid) ---
+
+export interface EmergencyReportInput {
+  category: string;
+  /** English label of the category, for a readable email subject/body only. */
+  label?: string;
+  message?: string;
+  email?: string;
+  lat?: number;
+  lng?: number;
+  /** Base64-encoded recording, no data: URI prefix. */
+  audio?: string;
+  audioMime?: string;
+}
+
+/** Unauthenticated by design — see server/routes/emergency.js. */
+export async function submitEmergencyReport(input: EmergencyReportInput): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/emergency/report`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not send your report'));
+}
+
 // --- Feedback ---
 
 export type FeedbackKind = 'suggestion' | 'recommendation' | 'feature' | 'bug' | 'general';

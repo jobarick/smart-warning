@@ -11,6 +11,7 @@ module.exports = {
   enabled: mail.enabled,
   destination: mail.destination,
   sendFeedback: mail.sendFeedback,
+  sendEmergencyReport: mail.sendEmergencyReport,
   // Newer surface, for callers that want the queue directly.
   init: mail.init,
   send: mail.send,

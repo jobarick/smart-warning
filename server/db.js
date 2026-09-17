@@ -250,6 +250,25 @@ async function init() {
     CREATE INDEX IF NOT EXISTS feedback_org_idx     ON feedback (org_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS feedback_created_idx ON feedback (created_at DESC);
 
+    -- Tanzania-wide, no-account incident reports (see routes/emergency.js) —
+    -- distinct from 'reports', which is scoped to one organisation's own public
+    -- QR code. Stored first, mailed second, same reasoning as feedback above: a
+    -- voice note is mailed as an attachment rather than through outbound_mail
+    -- (that queue has no column for binary content), so this row is the only
+    -- durable record of a submission if that one send attempt fails.
+    CREATE TABLE IF NOT EXISTS emergency_reports (
+      id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      category       TEXT NOT NULL,
+      message        TEXT,
+      contact_email  TEXT,
+      lat            DOUBLE PRECISION,
+      lng            DOUBLE PRECISION,
+      has_voice_note BOOLEAN NOT NULL DEFAULT false,
+      delivered      BOOLEAN NOT NULL DEFAULT false,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS emergency_reports_created_idx ON emergency_reports (created_at DESC);
+
     -- Outbound mail, queued before it is attempted.
     --
     -- Mail is the one delivery channel whose configuration lives entirely
@@ -1645,6 +1664,23 @@ async function markFeedbackDelivered(id) {
   await pool.query(`UPDATE feedback SET delivered = true WHERE id = $1`, [id]);
 }
 
+// --- Emergency reports (public, unauthenticated; see routes/emergency.js) --
+
+async function createEmergencyReport({ category, message, contactEmail, lat, lng, hasVoiceNote }) {
+  if (!pool) throw new Error('persistence disabled');
+  const { rows } = await pool.query(
+    `INSERT INTO emergency_reports (category, message, contact_email, lat, lng, has_voice_note)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [category, message || null, contactEmail || null, lat ?? null, lng ?? null, hasVoiceNote === true],
+  );
+  return rows[0];
+}
+
+async function markEmergencyReportDelivered(id) {
+  if (!pool) return;
+  await pool.query(`UPDATE emergency_reports SET delivered = true WHERE id = $1`, [id]);
+}
+
 // --- Billing: subscriptions & transactions ---------------------------------
 
 // Shape a subscriptions row for the billing code, which thinks in camelCase and
@@ -2237,6 +2273,8 @@ module.exports = {
   createFeedback,
   listFeedback,
   markFeedbackDelivered,
+  createEmergencyReport,
+  markEmergencyReportDelivered,
   createReport,
   listReports,
   countPendingReports,

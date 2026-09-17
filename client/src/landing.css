@@ -183,6 +183,156 @@
 .lp-price { margin-top: 14px !important; padding-top: 14px; border-top: 1px solid var(--panel-border); font-size: 0.88rem !important; }
 .lp-price b { color: var(--text); }
 
+/* --- emergency grid: the 3x3 "get help now" panel, reachable with zero
+   sign-in (see EmergencyGrid.tsx and the section comment in LandingPage.tsx) --- */
+.lp-eg-section { max-width: 42rem; padding-top: 8px; }
+.eg-heading { margin: 0 0 8px; font-size: 1.4rem; font-weight: 700; letter-spacing: -0.01em; text-align: center; }
+.eg-sub { margin: 0 0 22px; text-align: center; font-size: 0.92rem; line-height: 1.5; color: var(--muted); }
+.eg-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+  margin: 0; padding: 0;
+}
+.eg-cell {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 16px 8px; cursor: pointer; font: inherit; text-align: center;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--panel-border); border-radius: 14px; color: var(--text);
+  transition: border-color 0.15s, background 0.15s;
+}
+.eg-cell:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--panel-border)); }
+.eg-cell.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
+.eg-cell-icon { font-size: 1.5rem; line-height: 1; }
+.eg-cell-label { font-size: 0.78rem; font-weight: 600; line-height: 1.25; }
+.eg-detail {
+  margin-top: 16px; padding: 18px 20px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-radius: 14px; text-align: center;
+}
+.eg-detail-label { margin: 0 0 4px; font-size: 1.02rem; font-weight: 650; }
+.eg-detail-desc { margin: 0 0 12px; font-size: 0.88rem; color: var(--muted); }
+.eg-detail-numbers { justify-content: center; margin: 10px 0 0; }
+.eg-detail-note { margin: 10px 0 0; font-size: 0.82rem; color: var(--muted); }
+
+/* The fast path: always the first thing under a category's label, never
+   gated behind the report form opening. */
+.eg-call-now {
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  width: 100%; margin-top: 4px; padding: 13px; cursor: pointer;
+  font: inherit; font-size: 1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;
+  color: #fff; background: var(--accent-fill); border: none; border-radius: 12px;
+}
+.eg-call-now:hover { filter: brightness(1.08); }
+.eg-call-now-static { cursor: default; }
+.eg-report-btn {
+  width: 100%; margin-top: 12px; padding: 11px;
+  cursor: pointer; font: inherit; font-size: 0.86rem; font-weight: 650; color: var(--text);
+  background: var(--panel); border: 1px solid var(--panel-border); border-radius: 11px;
+}
+.eg-report-btn:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--panel-border)); }
+
+/* --- emergency report form, nested inside .eg-detail (see EmergencyReportForm.tsx) --- */
+.egr { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--panel-border); text-align: left; }
+.egr-heading { margin: 0 0 10px; font-size: 0.92rem; font-weight: 650; }
+.egr-text {
+  width: 100%; padding: 10px 12px; resize: vertical;
+  font: inherit; font-size: 0.9rem; color: var(--text);
+  background: var(--bg-2); border: 1px solid var(--panel-border); border-radius: 10px; outline: none;
+}
+.egr-text:focus { border-color: var(--accent); }
+.egr-voice { margin-top: 10px; }
+.egr-voice-btn {
+  display: inline-flex; align-items: center; gap: 7px; padding: 9px 14px;
+  cursor: pointer; font: inherit; font-size: 0.86rem; font-weight: 600; color: var(--text);
+  background: var(--panel); border: 1px solid var(--panel-border); border-radius: 10px;
+}
+.egr-voice-btn:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--panel-border)); }
+.egr-voice-active { border-color: var(--accent); color: var(--accent); }
+.egr-rec-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
+  animation: egr-pulse 1.1s ease-in-out infinite;
+}
+@keyframes egr-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.egr-voice-note { font-size: 0.82rem; color: var(--muted); }
+.egr-voice-recorded { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.egr-audio { height: 32px; max-width: 220px; }
+.egr-voice-discard {
+  padding: 6px 11px; cursor: pointer; font: inherit; font-size: 0.8rem; font-weight: 600;
+  color: var(--muted); background: transparent; border: 1px solid var(--panel-border); border-radius: 8px;
+}
+.egr-voice-discard:hover { color: var(--text); }
+
+/* Explicit anonymous/contact choice — a toggle, not an implied default from an
+   empty field. */
+.egr-toggle-row { display: flex; gap: 8px; margin-top: 12px; }
+.egr-toggle {
+  padding: 8px 13px; cursor: pointer; font: inherit; font-size: 0.82rem; font-weight: 600;
+  color: var(--muted); background: transparent; border: 1px solid var(--panel-border); border-radius: 9px;
+}
+.egr-toggle.active { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.egr-toggle-sm { padding: 6px 10px; font-size: 0.76rem; }
+
+.egr-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+.egr-field { display: flex; flex-direction: column; gap: 5px; flex: 1 1 200px; margin-top: 10px; }
+.egr-field span { font-size: 0.76rem; font-weight: 600; color: var(--muted); }
+.egr-field span small { font-weight: 500; opacity: 0.8; margin-left: 5px; }
+.egr-field input {
+  padding: 9px 11px; font: inherit; font-size: 0.88rem; color: var(--text);
+  background: var(--bg-2); border: 1px solid var(--panel-border); border-radius: 10px; outline: none;
+}
+.egr-field input:focus { border-color: var(--accent); }
+.egr-loc-btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 9px 12px;
+  cursor: pointer; font: inherit; font-size: 0.82rem; font-weight: 600; color: var(--muted);
+  background: transparent; border: 1px solid var(--panel-border); border-radius: 10px;
+}
+.egr-loc-btn:disabled { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--panel-border)); cursor: default; }
+.egr-sound-toggle { display: flex; align-items: center; gap: 6px; }
+.egr-sound-label { font-size: 0.76rem; font-weight: 600; color: var(--muted); margin-right: 2px; }
+
+.egr-actions { display: flex; gap: 10px; margin-top: 16px; }
+.egr-cancel {
+  flex: 1 1 0; padding: 11px; cursor: pointer; font: inherit; font-size: 0.9rem; font-weight: 600;
+  color: var(--muted); background: transparent; border: 1px solid var(--panel-border); border-radius: 11px;
+}
+.egr-cancel:hover { color: var(--text); }
+.egr-submit {
+  flex: 2 1 0; padding: 11px; cursor: pointer;
+  font: inherit; font-size: 0.92rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: #fff;
+  background: var(--accent-fill); border: none; border-radius: 11px;
+}
+.egr-submit:disabled { opacity: 0.55; cursor: default; }
+.egr-failed { margin: 10px 0 0; font-size: 0.84rem; color: var(--cmd-warn); }
+
+/* --- confirmation panel: only ever shown after an actual submitted report
+   (see the sendState==='sent' effect in EmergencyReportForm.tsx) — never
+   merely because the form is open. The pulsing border is the "edge flashing"
+   requirement, scoped to this card rather than the whole viewport: nothing
+   here implies another device or a human has acknowledged anything. */
+.egr-sent {
+  margin-top: 18px; padding: 18px 20px; text-align: left;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-radius: 14px;
+  box-shadow: 0 0 0 2px var(--accent);
+  animation: egr-edge-flash 1.1s ease-in-out infinite;
+}
+@keyframes egr-edge-flash {
+  0%, 100% { box-shadow: 0 0 0 2px var(--accent), 0 0 18px 2px color-mix(in srgb, var(--accent) 55%, transparent); }
+  50% { box-shadow: 0 0 0 2px var(--accent), 0 0 4px 0 transparent; }
+}
+.egr-sent-heading { margin: 0 0 4px; font-size: 1.15rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: var(--accent); }
+.egr-sent-sub { margin: 0 0 14px; font-size: 0.88rem; color: var(--muted); }
+.egr-sent-facts {
+  display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0 0 16px;
+  font-size: 0.86rem;
+}
+.egr-sent-facts dt { font-weight: 600; color: var(--muted); }
+.egr-sent-facts dd { margin: 0; color: var(--text); }
+@media (prefers-reduced-motion: reduce) {
+  .egr-sent { animation: none; }
+  .egr-rec-dot { animation: none; }
+}
+
 .lp-honest {
   padding: 26px 24px;
   background: color-mix(in srgb, var(--cmd-warn) 8%, transparent);

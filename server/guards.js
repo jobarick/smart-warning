@@ -123,6 +123,13 @@ async function allowFeature(res, ctx, feature) {
 
 const allowReport = rateLimiter({ windowMs: 10 * 60 * 1000, max: 5, name: 'public-report' });
 
+// /api/emergency/report: the Tanzania-wide, no-account incident report (see
+// routes/emergency.js) — its own bucket rather than sharing allowReport's,
+// since that one is scoped to a single org's public QR code and this one is
+// open to anyone. Voice notes make each submission heavier to mail out, so
+// this stays tighter than allowPlaces.
+const allowEmergencyReport = rateLimiter({ windowMs: 10 * 60 * 1000, max: 5, name: 'emergency-report' });
+
 // /api/emergency/nearby forwards to OpenStreetMap's public Overpass service,
 // unauthenticated and free. Without a limit this server is an open proxy to it:
 // anyone could drive arbitrary query volume through us, and Overpass blocks by
@@ -221,4 +228,5 @@ module.exports = {
   requireAuth, guardOrg, orgContext, orgIdFromRequest, deviceOwnerFromRequest, allowFeature,
   allowReport, allowPlaces, allowWebhook, allowPasswordReset, allowPasswordResetForAddress,
   allowVisitorFeedback, allowLogin, allowSignup, allowOrgInvite, allowPersonalAlert,
+  allowEmergencyReport,
 };

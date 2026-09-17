@@ -1,12 +1,21 @@
 // Getting to help, and getting away from danger: the published emergency
 // numbers, nearby facilities, road routes, and where to go for one alert type.
 const db = require('../db');
+const mailer = require('../mailer');
 const emergencyNumbers = require('../emergency-numbers');
 const places = require('../places');
 const routing = require('../routing');
-const { sendJson } = require('../http');
-const { orgContext, allowPlaces } = require('../guards');
+const { sendJson, readJson } = require('../http');
+const { orgContext, allowPlaces, allowEmergencyReport } = require('../guards');
 const { ALERT_TYPES } = require('../wire');
+
+// Base64 characters only (with optional padding) — a voice note that fails
+// this was not produced by the recorder on the other end of this request.
+const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
+// ~650KB of base64 decodes to ~480KB of audio — comfortably inside the 1MB
+// request-body cap in http.js's readJson, with room for the rest of the JSON,
+// and generous for a spoken description of what is happening.
+const MAX_AUDIO_B64 = 650_000;
 
 async function handle({ req, res, url, path }) {
   // --- Emergency call directory ---
@@ -20,6 +29,62 @@ async function handle({ req, res, url, path }) {
       ? emergencyNumbers.countryByCode(code)
       : emergencyNumbers.countryAt(lat, lng);
     sendJson(res, 200, emergencyNumbers.directoryFor(country));
+    return true;
+  }
+
+  // --- Tanzania-wide, no-account incident report ---
+  //
+  // Unauthenticated by design, same reasoning as the directory above: the
+  // person this exists for has not signed up and should never have to. Stored
+  // in emergency_reports first, then mailed to Idefenda Lab — see
+  // mailer.sendEmergencyReport for why a voice note can't go through the
+  // durable outbound_mail queue the way a text-only report does.
+  if (path === '/api/emergency/report' && req.method === 'POST') {
+    if (!db.enabled()) { sendJson(res, 501, { error: 'reporting requires a database' }); return true; }
+    if (!allowEmergencyReport(req)) {
+      sendJson(res, 429, { error: 'too many reports, please wait a few minutes' });
+      return true;
+    }
+
+    const body = await readJson(req);
+    const category = String(body.category || '').trim().slice(0, 60);
+    if (!category) { sendJson(res, 400, { error: 'a category is required' }); return true; }
+
+    const message = String(body.message || '').trim().slice(0, 2000);
+    const contactEmail = String(body.email || '').trim().slice(0, 200);
+    // Both or neither: a lone coordinate with no partner is not a location.
+    const rawLat = Number(body.lat);
+    const rawLng = Number(body.lng);
+    const hasLocation = Number.isFinite(rawLat) && Number.isFinite(rawLng);
+    const lat = hasLocation ? rawLat : null;
+    const lng = hasLocation ? rawLng : null;
+    const audio = typeof body.audio === 'string' ? body.audio.trim() : '';
+    const audioMime = typeof body.audioMime === 'string' ? body.audioMime.slice(0, 60) : null;
+
+    if (!message && !audio) {
+      sendJson(res, 400, { error: 'describe what is happening, or record a voice note' });
+      return true;
+    }
+    if (audio && (audio.length > MAX_AUDIO_B64 || !BASE64_RE.test(audio))) {
+      sendJson(res, 413, { error: 'voice note is too long or not valid audio — please keep it under a minute' });
+      return true;
+    }
+
+    const row = await db.createEmergencyReport({
+      category, message: message || null, contactEmail: contactEmail || null, lat, lng,
+      hasVoiceNote: Boolean(audio),
+    });
+
+    // Not awaited — same reasoning as the feedback routes: the report is
+    // already safely stored, and an SMTP host that stops answering must not
+    // hang this request over a submission that is already saved.
+    void mailer
+      .sendEmergencyReport(row, audio ? { audioBase64: audio, audioMime } : {})
+      .then((delivered) => (delivered ? db.markEmergencyReportDelivered(row.id) : null))
+      .catch((e) => console.error(`[mail] emergency report not delivered: ${e.message}`));
+
+    console.log(`[!] emergency report received: ${category}${audio ? ' (+voice note)' : ''}`);
+    sendJson(res, 201, { ok: true });
     return true;
   }
 

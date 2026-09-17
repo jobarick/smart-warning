@@ -234,6 +234,68 @@ async function sendFeedback(row) {
   return res.delivered;
 }
 
+/** File extension for a voice-note attachment, guessed from its MIME type. */
+function extFor(mime) {
+  if (mime === 'audio/mp4' || mime === 'audio/aac') return 'm4a';
+  if (mime === 'audio/ogg') return 'ogg';
+  if (mime === 'audio/wav' || mime === 'audio/wave') return 'wav';
+  return 'webm';
+}
+
+/**
+ * Compose and send one Tanzania-wide emergency report (see routes/emergency.js).
+ *
+ * A voice note travels as a mail attachment, not through the outbound_mail
+ * queue: that table has no column for binary content, and queuing a message
+ * that would retry without its attachment is worse than not queuing it at all.
+ * This is therefore a single best-effort attempt — the report itself is
+ * already durable in `emergency_reports` regardless of whether this send
+ * succeeds, the same honesty `sendFeedback` already practises for `delivered`.
+ *
+ * A text-only report (no voice note) still goes through the normal queue, so
+ * it gets the retry-on-outage behaviour every other queued message gets.
+ */
+async function sendEmergencyReport(row, { audioBase64, audioMime } = {}) {
+  const body = [
+    `Category: ${row.category}`,
+    `Location: ${row.lat != null && row.lng != null ? `${row.lat}, ${row.lng}` : 'not shared'}`,
+    `Contact:  ${row.contact_email || 'anonymous'}`,
+    `Logged:   ${row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString()}`,
+    `Ref:      ${row.id}`,
+    '',
+    row.message || '(no text — see attached voice note)',
+  ].join('\n');
+
+  const message = {
+    to: FEEDBACK_TO,
+    replyTo: row.contact_email || null,
+    subject: `[Smart Warning] Emergency report: ${row.category}`,
+    body,
+  };
+
+  if (audioBase64) {
+    if (!enabled()) return false;
+    try {
+      await provider.send({
+        ...message,
+        attachments: [{ filename: `voice-note.${extFor(audioMime)}`, content: audioBase64, encoding: 'base64' }],
+      });
+      return true;
+    } catch (e) {
+      recordMailFailure(e);
+      console.error(`[mail] emergency report not delivered (${e.code || 'no code'}): ${e.message}`);
+      return false;
+    }
+  }
+
+  const res = await send({
+    ...message,
+    kind: 'emergency-report',
+    refId: String(row.id),
+  });
+  return res.delivered;
+}
+
 module.exports = {
   init,
   stop,
@@ -246,5 +308,6 @@ module.exports = {
   stats,
   queueSnapshot,
   sendFeedback,
+  sendEmergencyReport,
   providers,
 };

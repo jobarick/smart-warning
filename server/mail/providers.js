@@ -37,8 +37,11 @@ function logProvider(log = console.log) {
     name: 'log',
     describe: () => 'development — messages are printed, not sent',
     async send(message) {
+      const attachNote = message.attachments?.length
+        ? ` (+${message.attachments.length} attachment${message.attachments.length > 1 ? 's' : ''})`
+        : '';
       log(
-        `[mail] (log provider) to=${message.to} subject=${JSON.stringify(message.subject)}\n`
+        `[mail] (log provider) to=${message.to} subject=${JSON.stringify(message.subject)}${attachNote}\n`
         + message.body.split('\n').map((l) => `      | ${l}`).join('\n'),
       );
       return { accepted: true, id: `log-${Date.now()}` };
@@ -152,6 +155,7 @@ function smtpProvider(url, { from }) {
           replyTo: message.replyTo || undefined,
           subject: message.subject,
           text: message.body,
+          attachments: message.attachments || undefined,
         });
         return { accepted: true, id: info.messageId };
       } catch (e) {
