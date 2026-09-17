@@ -177,6 +177,7 @@
   font-size: 9px;
 }
 .route-tag-public { color: var(--muted); }
+.route-tag-verified { color: var(--cmd-safe); border-color: var(--cmd-safe); }
 .route-muted { margin: 0; padding: 12px 14px; font-size: 13px; color: var(--muted); line-height: 1.5; }
 
 .route-dest { display: flex; flex-direction: column; gap: 3px; padding: 12px 14px 10px; }

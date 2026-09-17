@@ -12,6 +12,7 @@
 // slow third party can never delay an alert. Configured destinations still work
 // with no network at all.
 const geo = require('./geo');
+const db = require('./db');
 
 const OVERPASS_URL = process.env.OVERPASS_URL || 'https://overpass-api.de/api/interpreter';
 const OVERPASS_TIMEOUT_MS = Number(process.env.OVERPASS_TIMEOUT_MS || 7000);
@@ -69,17 +70,48 @@ function cacheSet(key, places) {
 }
 
 /**
+ * Entries someone actually confirmed (see db.js's directory_entries), ranked
+ * and capped the same way the OSM results below are. Never lets a database
+ * hiccup take down the whole lookup — a missing verified result still leaves
+ * the OSM fallback below.
+ */
+async function verifiedNearby(kind, lat, lng, radius, limit) {
+  try {
+    const rows = await db.listDirectoryNearby(kind, lat, lng, radius);
+    return rank(
+      rows.map((r) => ({
+        name: r.name, lat: Number(r.lat), lng: Number(r.lng), kind,
+        phone: r.phone || null, address: r.address || null, verified: true,
+      })),
+      lat, lng, limit,
+    );
+  } catch (e) {
+    console.warn(`[places] verified-directory lookup failed: ${e.message}`);
+    return [];
+  }
+}
+
+/**
  * Nearest public facilities of one kind. Never throws and never blocks for
  * long — on any failure the caller simply has no public suggestions.
- * @returns {Promise<Array<{name:string, lat:number, lng:number, kind:string, distanceM:number, phone:string|null, address:string|null}>>}
+ *
+ * Verified entries (see verifiedNearby above) are listed first and never
+ * pushed out by OSM results; OSM only fills whatever room is left up to
+ * `limit`. `verified` distinguishes the two on every returned row so a
+ * client can show the right trust signal instead of guessing from the shape.
+ * @returns {Promise<Array<{name:string, lat:number, lng:number, kind:string, distanceM:number, phone:string|null, address:string|null, verified:boolean}>>}
  */
 async function nearby(kind, lat, lng, { radius = SEARCH_RADIUS_M, limit = 5 } = {}) {
   const filter = OSM_QUERY[kind];
   if (!filter || !Number.isFinite(lat) || !Number.isFinite(lng)) return [];
 
+  const verified = await verifiedNearby(kind, lat, lng, radius, limit);
+  const remaining = limit - verified.length;
+  if (remaining <= 0) return verified;
+
   const key = cacheKey(kind, lat, lng);
   const cached = cacheGet(key);
-  if (cached) return rank(cached, lat, lng, limit);
+  if (cached) return [...verified, ...rank(cached, lat, lng, remaining).map((p) => ({ ...p, verified: false }))];
 
   // node/way/relation so buildings mapped as areas are found too; `out center`
   // gives an area a single representative point.
@@ -89,7 +121,7 @@ async function nearby(kind, lat, lng, { radius = SEARCH_RADIUS_M, limit = 5 } = 
   way${filter}(around:${radius},${lat},${lng});
   relation${filter}(around:${radius},${lat},${lng});
 );
-out center ${Math.max(limit * 4, 20)};`;
+out center ${Math.max(remaining * 4, 20)};`;
 
   let places = [];
   try {
@@ -126,11 +158,12 @@ out center ${Math.max(limit * 4, 20)};`;
     cacheSet(key, places);
   } catch (e) {
     // Deliberately swallowed: a missing suggestion is survivable, a hung alert
-    // screen is not.
+    // screen is not. Whatever verified results already came back are real,
+    // confirmed results — an OSM hiccup is not a reason to withhold them too.
     console.warn(`[places] ${kind} lookup failed: ${e.message}`);
-    return [];
+    return verified;
   }
-  return rank(places, lat, lng, limit);
+  return [...verified, ...rank(places, lat, lng, remaining).map((p) => ({ ...p, verified: false }))];
 }
 
 function defaultName(kind) {

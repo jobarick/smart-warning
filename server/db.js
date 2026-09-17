@@ -544,6 +544,35 @@ async function init() {
     );
     CREATE INDEX IF NOT EXISTS emergency_contacts_user_idx
       ON emergency_contacts (user_id, priority, created_at);
+
+    -- Verified public-service directory — hospitals, police posts, and the
+    -- like that are NOT Smart Warning customers, shown in Nearby Help ahead
+    -- of the unverified OpenStreetMap results for the same category.
+    --
+    -- No submission or admin-UI path exists yet: every row here was entered
+    -- because someone actually confirmed it, so verification_status stays
+    -- 'verified' for now. The column exists so a future community-submission
+    -- or "needs re-verification" flow has somewhere to land without a
+    -- migration — it must never default to 'verified' once such a path
+    -- exists, or an unconfirmed submission would look exactly as trustworthy
+    -- as one a person actually checked.
+    CREATE TABLE IF NOT EXISTS directory_entries (
+      id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      category            TEXT NOT NULL,
+      name                TEXT NOT NULL,
+      phone               TEXT,
+      lat                 DOUBLE PRECISION NOT NULL,
+      lng                 DOUBLE PRECISION NOT NULL,
+      address             TEXT,
+      verification_status TEXT NOT NULL DEFAULT 'verified',
+      verified_at         TIMESTAMPTZ,
+      -- Free text: who confirmed it and how ("called 2026-09-17", "TCRA list").
+      -- Never shown to a user — an internal note for whoever adds the next one.
+      source              TEXT,
+      created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS directory_entries_category_idx
+      ON directory_entries (category, lat, lng);
   `);
   await backfillPublicCodes();
   await linkOrphanTables();
@@ -1036,6 +1065,47 @@ async function countContacts(userId) {
     `SELECT count(*)::int AS n FROM emergency_contacts WHERE user_id = $1`, [userId],
   );
   return rows[0].n;
+}
+
+// --- Verified public-service directory -------------------------------------
+
+/**
+ * Candidate verified entries for one category near a point.
+ *
+ * A plain lat/lng bounding box, not PostGIS — this table will hold at most a
+ * few thousand rows for a long time, and places.js already does the same
+ * "rough box in SQL, exact haversine + sort in JS" split for OSM results, so
+ * this stays consistent with it rather than introducing a second approach
+ * (or a database extension) for a problem this small.
+ */
+async function listDirectoryNearby(category, lat, lng, radiusM = 15000) {
+  if (!pool || !Number.isFinite(lat) || !Number.isFinite(lng)) return [];
+  const deg = radiusM / 111000; // ~111km per degree of latitude; a generous box, not the true radius
+  const { rows } = await pool.query(
+    `SELECT * FROM directory_entries
+      WHERE category = $1
+        AND lat BETWEEN $2 - $4 AND $2 + $4
+        AND lng BETWEEN $3 - $4 AND $3 + $4`,
+    [category, lat, lng, deg],
+  );
+  return rows;
+}
+
+/**
+ * The only way a row gets into directory_entries today — there is no
+ * submission form or admin screen yet (see the table's own comment in
+ * init()), so this is called from scripts/add-directory-entry.js by whoever
+ * actually confirmed the listing. Always 'verified': a row created this way
+ * exists because someone checked it, not because it was submitted.
+ */
+async function createDirectoryEntry({ category, name, phone, lat, lng, address, source }) {
+  if (!pool) throw new Error('persistence disabled');
+  const { rows } = await pool.query(
+    `INSERT INTO directory_entries (category, name, phone, lat, lng, address, verification_status, verified_at, source)
+     VALUES ($1, $2, $3, $4, $5, $6, 'verified', now(), $7) RETURNING *`,
+    [category, name, phone ?? null, lat, lng, address ?? null, source ?? null],
+  );
+  return rows[0];
 }
 
 // --- Incidents (all scoped to an org) --------------------------------------
@@ -2211,6 +2281,8 @@ module.exports = {
   listUserTransactions,
   listContacts,
   listNotifiableContacts,
+  listDirectoryNearby,
+  createDirectoryEntry,
   createContact,
   updateContact,
   deleteContact,
