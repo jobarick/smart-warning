@@ -108,6 +108,12 @@ export function NearbyHelp({ lat, lng, locale }: Props) {
                       </small>
                     </span>
                   </span>
+                  {/* Every result here comes from the same OSM source (see
+                      places.js) — this repeats that trust signal at the point
+                      of decision, the way SafeRoutePanel's "Site plan" /
+                      "Nearest public" tags already do, rather than leaving it
+                      to the one disclaimer line at the bottom of the list. */}
+                  <span className="route-tag route-tag-public">{t(locale, 'nearby.communitySourced')}</span>
                   <span className="pocket-numbers">
                     {p.phone && dialable && isDialable(p.phone) && (
                       <a className="pocket-call" href={telHref(p.phone)}>

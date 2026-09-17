@@ -57,6 +57,7 @@ export type StringKey =
   | 'pocket.cannotDial'
   | 'nearby.heading'
   | 'nearby.disclaimer'
+  | 'nearby.communitySourced'
   | 'nearby.empty'
   | 'nearby.loading'
   | 'nearby.error'
@@ -197,6 +198,7 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'pocket.cannotDial': "This device can't place calls. Dial these from a phone, or reach your site's emergency contact through the details on the Contact & support page.",
     'nearby.heading': 'Nearby help',
     'nearby.disclaimer': 'From OpenStreetMap, not a verified directory. Always follow official guidance where it is available.',
+    'nearby.communitySourced': 'Community-sourced',
     'nearby.empty': 'Nothing found nearby',
     'nearby.loading': 'Looking nearby…',
     'nearby.error': "Couldn't look this up — try again in a moment",
@@ -334,6 +336,7 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'pocket.cannotDial': 'Kifaa hiki hakiwezi kupiga simu. Piga namba hizi kutoka kwenye simu, au wasiliana na mtu wa dharura wa eneo lako kupitia maelezo kwenye ukurasa wa Mawasiliano na msaada.',
     'nearby.heading': 'Msaada wa Karibu',
     'nearby.disclaimer': 'Taarifa kutoka OpenStreetMap, si orodha iliyothibitishwa. Fuata maelekezo rasmi pale yanapopatikana.',
+    'nearby.communitySourced': 'Chanzo cha jamii',
     'nearby.empty': 'Hakuna kilichopatikana karibu',
     'nearby.loading': 'Inatafuta karibu…',
     'nearby.error': 'Imeshindikana kupata taarifa — jaribu tena baadaye kidogo',
