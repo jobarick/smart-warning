@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { track } from '../lib/analytics';
 import { fetchPlans, formatMoney, type Plan, type PaymentMethods } from '../lib/billing';
-import { PROVIDER, SUPPORT_EMAIL, SUPPORT_PHONE, SALES_EMAIL } from '../lib/terms';
+import { PROVIDER, SUPPORT_EMAIL, SUPPORT_PHONE, SALES_EMAIL, IDESIGN_URL } from '../lib/terms';
 import { t } from '../lib/i18n';
 import type { Locale } from '../types';
 import { EmergencyGrid } from './EmergencyGrid';
@@ -66,7 +66,6 @@ export function LandingPage({ onGetStarted, onWatchDemo, locale, onToggleLocale 
           <span>Smart Warning</span>
         </a>
         <nav className="lp-nav-links">
-          <a href="#how">{t(locale, 'landing.nav.how')}</a>
           <a href="#pricing">{t(locale, 'landing.nav.pricing')}</a>
           <a href="#privacy">{t(locale, 'landing.nav.privacy')}</a>
           <a href="/legal/">{t(locale, 'landing.nav.legal')}</a>
@@ -139,43 +138,6 @@ export function LandingPage({ onGetStarted, onWatchDemo, locale, onToggleLocale 
           <a href="#pricing" className="lp-pitch-link">{t(locale, 'landing.pitch.seeMore')}</a>
         </section>
 
-        {/* Deliberately the second thing on the page, not the fourth. This used
-            to sit below "Who it is for" — true of the code as written, but a
-            visitor deciding whether to trust an emergency product with their
-            location reads that decision top to bottom, and three sections is
-            a long way to carry an open question about what happens if they
-            actually need police, fire, or an ambulance. */}
-        <section className="lp-section">
-          <div className="lp-honest">
-            <h2>{t(locale, 'landing.honest.heading')}</h2>
-            <p>{t(locale, 'landing.honest.p1')}</p>
-            <p>
-              <b>{t(locale, 'landing.honest.p2b')}</b>{t(locale, 'landing.honest.p2')}
-            </p>
-          </div>
-        </section>
-
-        <section className="lp-section" id="how">
-          <h2>{t(locale, 'landing.how.heading')}</h2>
-          <ol className="lp-steps">
-            <li>
-              <span className="lp-step-n">1</span>
-              <h3>{t(locale, 'landing.how.step1Title')}</h3>
-              <p>{t(locale, 'landing.how.step1Body')}</p>
-            </li>
-            <li>
-              <span className="lp-step-n">2</span>
-              <h3>{t(locale, 'landing.how.step2Title')}</h3>
-              <p>{t(locale, 'landing.how.step2Body')}</p>
-            </li>
-            <li>
-              <span className="lp-step-n">3</span>
-              <h3>{t(locale, 'landing.how.step3Title')}</h3>
-              <p>{t(locale, 'landing.how.step3Body')}</p>
-            </li>
-          </ol>
-        </section>
-
         <section className="lp-section">
           <h2>{t(locale, 'landing.who.heading')}</h2>
           <div className="lp-audience">
@@ -200,37 +162,20 @@ export function LandingPage({ onGetStarted, onWatchDemo, locale, onToggleLocale 
 
         <PricingSection billing={billing} onGetStarted={() => go('pricing_start')} locale={locale} />
 
+        {/* The four-card privacy breakdown that used to live here is now the
+            job of the actual Privacy Policy (see lib/terms.ts) — it already
+            covers background tracking, password storage and account deletion
+            in full. One line and a link keeps the promise on the page a
+            visitor is actually scanning, without asking them to read a policy
+            document before they have even signed up. */}
         <section className="lp-section" id="privacy">
           <h2>{t(locale, 'landing.privacy.heading')}</h2>
-          <div className="lp-privacy">
-            <article>
-              <h3>{t(locale, 'landing.privacy.card1Title')}</h3>
-              <p>{t(locale, 'landing.privacy.card1Body')}</p>
-            </article>
-            <article>
-              <h3>{t(locale, 'landing.privacy.card2Title')}</h3>
-              <p>{t(locale, 'landing.privacy.card2Body')}</p>
-            </article>
-            <article>
-              <h3>{t(locale, 'landing.privacy.card3Title')}</h3>
-              <p>{t(locale, 'landing.privacy.card3Body')}</p>
-            </article>
-            <article>
-              <h3>{t(locale, 'landing.privacy.card4Title')}</h3>
-              <p>{t(locale, 'landing.privacy.card4Body')}</p>
-            </article>
-          </div>
+          <p className="lp-section-sub">{t(locale, 'landing.privacy.summary')}</p>
           <p className="lp-privacy-links">
             <a href="/legal/privacy.html">{t(locale, 'landing.privacy.linkPrivacy')}</a>
             <a href="/legal/terms.html">{t(locale, 'landing.privacy.linkTerms')}</a>
             <a href="/legal/delete.html">{t(locale, 'landing.privacy.linkDelete')}</a>
           </p>
-        </section>
-
-        <section className="lp-section lp-final">
-          <h2>{t(locale, 'landing.final.heading')}</h2>
-          <p>{t(locale, 'landing.final.body')}</p>
-          <button className="lp-cta" onClick={() => go('footer_get_started')}>{t(locale, 'landing.hero.getStarted')}</button>
         </section>
       </main>
 
@@ -240,7 +185,7 @@ export function LandingPage({ onGetStarted, onWatchDemo, locale, onToggleLocale 
           <p>{t(locale, 'landing.footer.aboutP1', { provider: PROVIDER })}</p>
           <p>
             {t(locale, 'landing.footer.aboutP2')}{' '}
-            <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>, {t(locale, 'landing.footer.aboutAnswer')}
+            <a href={`mailto:${SALES_EMAIL}`}>{SALES_EMAIL}</a>, {t(locale, 'landing.footer.aboutAnswer')}
           </p>
           <p className="lp-footer-phone">
             {t(locale, 'landing.footer.phoneLabel')}: <a href={`tel:${SUPPORT_PHONE.replace(/\s+/g, '')}`}>{SUPPORT_PHONE}</a>
@@ -404,7 +349,7 @@ function PricingSection({ billing, onGetStarted, locale }: { billing: ReturnType
       {enterprise && (
         <p className="lp-plan-enterprise">
           <b>{enterprise.name}</b>: {enterprise.tagline.toLowerCase()}{' '}
-          <a href={`mailto:${SUPPORT_EMAIL}`}>{t(locale, 'landing.pricing.talkToUs')}</a>.
+          <a href={IDESIGN_URL} target="_blank" rel="noreferrer">{t(locale, 'landing.pricing.talkToUs')}</a>.
         </p>
       )}
 

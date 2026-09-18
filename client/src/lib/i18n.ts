@@ -142,7 +142,6 @@ export type StringKey =
   | 'contacts.nameRequired'
   | 'contacts.needReachable'
   | 'landing.skipToContent'
-  | 'landing.nav.how'
   | 'landing.nav.pricing'
   | 'landing.nav.privacy'
   | 'landing.nav.legal'
@@ -159,17 +158,6 @@ export type StringKey =
   | 'landing.pitch.withPrice'
   | 'landing.pitch.free'
   | 'landing.pitch.seeMore'
-  | 'landing.honest.heading'
-  | 'landing.honest.p1'
-  | 'landing.honest.p2b'
-  | 'landing.honest.p2'
-  | 'landing.how.heading'
-  | 'landing.how.step1Title'
-  | 'landing.how.step1Body'
-  | 'landing.how.step2Title'
-  | 'landing.how.step2Body'
-  | 'landing.how.step3Title'
-  | 'landing.how.step3Body'
   | 'landing.who.heading'
   | 'landing.who.soloTitle'
   | 'landing.who.soloBody'
@@ -192,19 +180,10 @@ export type StringKey =
   | 'landing.pricing.termsNote'
   | 'landing.pricing.startTrial'
   | 'landing.privacy.heading'
-  | 'landing.privacy.card1Title'
-  | 'landing.privacy.card1Body'
-  | 'landing.privacy.card2Title'
-  | 'landing.privacy.card2Body'
-  | 'landing.privacy.card3Title'
-  | 'landing.privacy.card3Body'
-  | 'landing.privacy.card4Title'
-  | 'landing.privacy.card4Body'
+  | 'landing.privacy.summary'
   | 'landing.privacy.linkPrivacy'
   | 'landing.privacy.linkTerms'
   | 'landing.privacy.linkDelete'
-  | 'landing.final.heading'
-  | 'landing.final.body'
   | 'landing.footer.aboutHeading'
   | 'landing.footer.aboutP1'
   | 'landing.footer.aboutP2'
@@ -593,7 +572,6 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'contacts.nameRequired': 'Give this contact a name.',
     'contacts.needReachable': 'Add a phone number or an email so this person can be reached.',
     'landing.skipToContent': 'Skip to content',
-    'landing.nav.how': 'How it works',
     'landing.nav.pricing': 'Pricing',
     'landing.nav.privacy': 'Privacy',
     'landing.nav.legal': 'Legal',
@@ -610,17 +588,6 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'landing.pitch.withPrice': 'For just {price}/month, Premium adds a medical profile, a trusted circle, and priority support — good for you, your family, and the people around you.',
     'landing.pitch.free': 'Premium adds a medical profile, a trusted circle, and priority support — good for you, your family, and the people around you.',
     'landing.pitch.seeMore': 'See what’s included →',
-    'landing.honest.heading': 'What Smart Warning is not',
-    'landing.honest.p1': 'Smart Warning complements emergency services. It does not replace them. It cannot dispatch police, fire, or an ambulance, and it is not affiliated with any emergency service or government body.',
-    'landing.honest.p2b': 'In a life threatening emergency, call your local emergency number first',
-    'landing.honest.p2': ', then use Smart Warning to alert the people around you.',
-    'landing.how.heading': 'How it works',
-    'landing.how.step1Title': 'Raise it',
-    'landing.how.step1Body': 'Pick what is happening and hold the SOS button. Fire, medical, security, hazard, cyber, or evacuation, each at four severities.',
-    'landing.how.step2Title': 'Everyone knows',
-    'landing.how.step2Body': 'Phones with Smart Warning open alarm at once: full screen, siren, vibration. Phones that are locked or closed get a push notification. Your location appears on the map either way.',
-    'landing.how.step3Title': 'Someone comes',
-    'landing.how.step3Body': 'Whoever is on duty acknowledges, and everyone you alerted sees that help is on the way, with an ETA.',
     'landing.who.heading': 'Who it is for',
     'landing.who.soloTitle': 'On your own',
     'landing.who.soloBody': 'A panic button that actually reaches someone. Your trusted contacts get your live location the moment you raise an alert.',
@@ -643,19 +610,10 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'landing.pricing.termsNote': 'Prices in Tanzanian shillings. Cancel whenever you like; you keep the plan until the month you paid for runs out.',
     'landing.pricing.startTrial': 'Start your 30 days',
     'landing.privacy.heading': 'Your location is yours',
-    'landing.privacy.card1Title': 'We do not track you in the background',
-    'landing.privacy.card1Body': 'The app asks for your location only while an alert is active. When it is cleared, it stops. There is no background location permission in this app. You can check the permission list yourself.',
-    'landing.privacy.card2Title': 'Your alert goes to your people',
-    'landing.privacy.card2Body': "Alerts are relayed to the phones in your team or your contact list. We do not sell data and we do not run ads. This website measures page visits with Vercel's cookieless analytics; the Android app and the alerting relay carry no analytics at all.",
-    'landing.privacy.card3Title': 'We cannot read your password',
-    'landing.privacy.card3Body': 'It is stored in a form that cannot be reversed. If you lose it we can help you set a new one, we can never send you the old one. Everything travels over an encrypted connection, on the web and in the app.',
-    'landing.privacy.card4Title': 'You can delete everything',
-    'landing.privacy.card4Body': 'One button deletes your account and everything attached to it: your incidents, your location history, your reports. It happens immediately.',
+    'landing.privacy.summary': 'Your location is only used while an alert is active, never sold, never used for ads. Passwords are never stored in a readable form. Delete your account and everything in it at any time.',
     'landing.privacy.linkPrivacy': 'Full Privacy Policy',
     'landing.privacy.linkTerms': 'Terms & Conditions',
     'landing.privacy.linkDelete': 'How to delete your account',
-    'landing.final.heading': 'Ready when you are',
-    'landing.final.body': 'Set it up before you need it. That is the whole point.',
     'landing.footer.aboutHeading': 'About Smart Warning',
     'landing.footer.aboutP1': 'Smart Warning is built by {provider}, an independent software team in Tanzania. We build it because a fire alarm on a wall only helps the people who can hear it, and most emergencies start with one person who needs everyone else to know, now.',
     'landing.footer.aboutP2': 'Questions, problems, or something that did not work when it mattered:',
@@ -1041,7 +999,6 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'contacts.nameRequired': 'Mpe mtu huyu jina.',
     'contacts.needReachable': 'Ongeza namba ya simu au barua pepe ili mtu huyu aweze kupatikana.',
     'landing.skipToContent': 'Rukia hadi maudhui',
-    'landing.nav.how': 'Jinsi inavyofanya kazi',
     'landing.nav.pricing': 'Bei',
     'landing.nav.privacy': 'Faragha',
     'landing.nav.legal': 'Kisheria',
@@ -1058,17 +1015,6 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'landing.pitch.withPrice': 'Kwa {price}/mwezi tu, Premium huongeza wasifu wa kiafya, Mzunguko wa Uaminifu, na msaada wa kipaumbele — nzuri kwako, familia yako, na watu walio karibu nawe.',
     'landing.pitch.free': 'Premium huongeza wasifu wa kiafya, Mzunguko wa Uaminifu, na msaada wa kipaumbele — nzuri kwako, familia yako, na watu walio karibu nawe.',
     'landing.pitch.seeMore': 'Ona kilichomo →',
-    'landing.honest.heading': 'Smart Warning si nini',
-    'landing.honest.p1': 'Smart Warning huongeza huduma za dharura. Haichukui nafasi yao. Haiwezi kutuma polisi, zimamoto, au gari la wagonjwa, na haihusiani na huduma yoyote ya dharura au taasisi ya serikali.',
-    'landing.honest.p2b': 'Katika dharura inayohatarisha maisha, piga simu namba yako ya dharura kwanza',
-    'landing.honest.p2': ', kisha tumia Smart Warning kuwajulisha watu walio karibu nawe.',
-    'landing.how.heading': 'Jinsi inavyofanya kazi',
-    'landing.how.step1Title': 'Zindua',
-    'landing.how.step1Body': 'Chagua kinachotokea kisha shikilia kitufe cha SOS. Moto, matibabu, usalama, hatari, mtandao, au uhamishaji, kila moja ikiwa na viwango vinne.',
-    'landing.how.step2Title': 'Kila mtu anajua',
-    'landing.how.step2Body': 'Simu zenye Smart Warning huwasha kengele mara moja: skrini nzima, kengele, mtetemo. Simu zilizofungwa au zilizozimwa hupokea arifa. Eneo lako huonekana kwenye ramani kwa hali zote mbili.',
-    'landing.how.step3Title': 'Mtu anakuja',
-    'landing.how.step3Body': 'Aliye zamu hukiri, na kila uliyemjulisha huona kuwa msaada unakuja, pamoja na muda wa kufika.',
     'landing.who.heading': 'Ni kwa ajili ya nani',
     'landing.who.soloTitle': 'Peke yako',
     'landing.who.soloBody': 'Kitufe cha hofu kinachomfikia mtu kweli. Anwani zako za kuaminika hupokea eneo lako la moja kwa moja mara tu unapotoa tahadhari.',
@@ -1091,19 +1037,10 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'landing.pricing.termsNote': 'Bei kwa shilingi za Kitanzania. Ghairi wakati wowote unavyotaka; unabaki na mpango hadi mwezi uliolipia utakapoisha.',
     'landing.pricing.startTrial': 'Anza siku zako 30',
     'landing.privacy.heading': 'Eneo lako ni lako',
-    'landing.privacy.card1Title': 'Hatukufuatilii ukiwa nyuma',
-    'landing.privacy.card1Body': 'Programu huomba eneo lako tu wakati tahadhari inaendelea. Inapofutwa, huacha. Hakuna ruhusa ya eneo la nyuma katika programu hii. Unaweza kuangalia orodha ya ruhusa mwenyewe.',
-    'landing.privacy.card2Title': 'Tahadhari yako huwafikia watu wako',
-    'landing.privacy.card2Body': 'Tahadhari husambazwa kwenye simu za timu yako au orodha yako ya anwani. Hatuuzi taarifa na hatuendeshi matangazo. Tovuti hii hupima matembezi ya ukurasa kwa kutumia takwimu za Vercel zisizo na vidakuzi; programu ya Android na huduma ya kusambaza tahadhari hazina takwimu kabisa.',
-    'landing.privacy.card3Title': 'Hatuwezi kusoma nywila yako',
-    'landing.privacy.card3Body': 'Huhifadhiwa kwa njia isiyoweza kubadilishwa nyuma. Ukiisahau tunaweza kukusaidia kuweka mpya, hatuwezi kamwe kukutumia ile ya zamani. Kila kitu husafiri kupitia muunganisho uliosimbwa, kwenye wavuti na kwenye programu.',
-    'landing.privacy.card4Title': 'Unaweza kufuta kila kitu',
-    'landing.privacy.card4Body': 'Kitufe kimoja hufuta akaunti yako na kila kilichounganishwa nayo: matukio yako, historia ya eneo lako, ripoti zako. Hutokea mara moja.',
+    'landing.privacy.summary': 'Eneo lako hutumika tu wakati tahadhari inaendelea, hatuliuzi kamwe, na halitumiki kwa matangazo. Nywila hazihifadhiwi kwa namna inayosomeka. Futa akaunti yako na kila kilichomo wakati wowote.',
     'landing.privacy.linkPrivacy': 'Sera Kamili ya Faragha',
     'landing.privacy.linkTerms': 'Vigezo na Masharti',
     'landing.privacy.linkDelete': 'Jinsi ya kufuta akaunti yako',
-    'landing.final.heading': 'Tuko tayari wakati wowote utakapokuwa tayari',
-    'landing.final.body': 'Iweke tayari kabla hujaihitaji. Hilo ndilo lengo lote.',
     'landing.footer.aboutHeading': 'Kuhusu Smart Warning',
     'landing.footer.aboutP1': 'Smart Warning imetengenezwa na {provider}, timu huru ya programu nchini Tanzania. Tunaitengeneza kwa sababu kengele ya moto ukutani husaidia tu watu wanaoisikia, na dharura nyingi huanza na mtu mmoja anayehitaji kila mtu mwingine ajue, sasa hivi.',
     'landing.footer.aboutP2': 'Maswali, matatizo, au kitu kisichofanya kazi wakati muhimu:',

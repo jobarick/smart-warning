@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { t } from '../lib/i18n';
-import { SALES_EMAIL } from '../lib/terms';
+import { IDESIGN_URL } from '../lib/terms';
 import type { Locale } from '../types';
 import { Icon } from './Icon';
 import { PaymentModal } from './PaymentModal';
@@ -178,7 +178,7 @@ export function BillingPanel({ token, onBack, locale }: Props) {
                 {isCurrent ? (
                   <span className="bill-badge">{t(locale, 'bill.currentBadge')}</span>
                 ) : plan.contactOnly ? (
-                  <a className="bill-btn ghost" href={`mailto:${SALES_EMAIL}?subject=Smart%20Warning%20Enterprise`}>
+                  <a className="bill-btn ghost" href={IDESIGN_URL} target="_blank" rel="noreferrer">
                     {t(locale, 'bill.talkToUs')}
                   </a>
                 ) : !plan.chargeable ? (

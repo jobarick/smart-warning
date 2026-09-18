@@ -29,6 +29,9 @@ export const SUPPORT_PHONE = '+255 713 455 454';
  */
 export const SALES_EMAIL = 'lab@idesign.co.tz';
 
+/** Where "Talk to us" (enterprise pricing, billing) sends a visitor — the agency's own site, not a mailto. */
+export const IDESIGN_URL = 'https://idesign.co.tz';
+
 /**
  * Who provides the Service.
  *

@@ -107,24 +107,6 @@
   margin: 0 0 26px; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; text-align: center;
 }
 
-.lp-steps {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
-  margin: 0; padding: 0; list-style: none; counter-reset: none;
-}
-.lp-steps li {
-  padding: 22px 20px 24px;
-  background: linear-gradient(180deg, var(--panel-2), var(--panel));
-  border: 1px solid var(--panel-border); border-radius: 16px;
-}
-.lp-step-n {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 28px; height: 28px; border-radius: 50%;
-  font-size: 0.82rem; font-weight: 700; color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-}
-.lp-steps h3 { margin: 14px 0 7px; font-size: 1.02rem; font-weight: 650; }
-.lp-steps p { margin: 0; font-size: 0.92rem; line-height: 1.55; color: var(--muted); }
-
 .lp-section-sub {
   max-width: 40rem; margin: -14px auto 26px; text-align: center;
   font-size: 0.94rem; line-height: 1.55; color: var(--muted);
@@ -185,7 +167,16 @@
 
 /* --- emergency grid: the 3x3 "get help now" panel, reachable with zero
    sign-in (see EmergencyGrid.tsx and the section comment in LandingPage.tsx) --- */
-.lp-eg-section { max-width: 42rem; padding-top: 8px; }
+/* The one panel on the page that gets a frame — everything else here is text
+   on the page background. A stranger's eye should land here first, right
+   after the headline, which is the whole point of putting it second rather
+   than fourth. */
+.lp-eg-section {
+  max-width: 42rem; margin: 28px auto 0; padding: 28px 24px 26px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--cmd-crit, #dc2626) 6%, var(--panel-2)), var(--panel));
+  border: 1px solid color-mix(in srgb, var(--cmd-crit, #dc2626) 20%, var(--panel-border));
+  border-radius: 22px;
+}
 .eg-heading { margin: 0 0 8px; font-size: 1.4rem; font-weight: 700; letter-spacing: -0.01em; text-align: center; }
 .eg-sub { margin: 0 0 22px; text-align: center; font-size: 0.92rem; line-height: 1.5; color: var(--muted); }
 .eg-grid {
@@ -345,28 +336,12 @@
   .egr-rec-dot { animation: none; }
 }
 
-.lp-honest {
-  padding: 26px 24px;
-  background: color-mix(in srgb, var(--cmd-warn) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--cmd-warn) 28%, transparent);
-  border-radius: 16px;
-}
-.lp-honest h2 { margin: 0 0 12px; font-size: 1.15rem; font-weight: 650; color: var(--cmd-warn); }
-.lp-honest p { margin: 0 0 10px; font-size: 0.96rem; line-height: 1.6; color: var(--text); }
-.lp-honest p:last-child { margin-bottom: 0; }
-
-.lp-privacy { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px 26px; }
-.lp-privacy h3 { margin: 0 0 7px; font-size: 0.98rem; font-weight: 650; }
-.lp-privacy p { margin: 0; font-size: 0.92rem; line-height: 1.55; color: var(--muted); }
 .lp-privacy-links {
   display: flex; flex-wrap: wrap; gap: 8px 22px; justify-content: center;
   margin: 26px 0 0; font-size: 0.88rem;
 }
 .lp-privacy-links a { color: var(--accent); text-decoration: none; font-weight: 600; }
 .lp-privacy-links a:hover { text-decoration: underline; }
-
-.lp-final { text-align: center; padding-bottom: 8px; }
-.lp-final p { margin: 0 0 24px; color: var(--muted); }
 
 /* --- footer --- */
 .lp-footer {
@@ -418,7 +393,7 @@
 }
 
 @media (max-width: 720px) {
-  .lp-steps, .lp-audience, .lp-privacy, .lp-plans { grid-template-columns: 1fr; }
+  .lp-audience, .lp-plans { grid-template-columns: 1fr; }
   .lp-plan-tag { top: -9px; }
   .lp-hero { padding-top: 40px; }
   .lp-section { padding-top: 44px; }
