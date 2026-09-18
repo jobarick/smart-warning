@@ -44,14 +44,14 @@
 .lp-lang-toggle:hover { color: var(--text); border-color: color-mix(in srgb, var(--accent) 45%, var(--panel-border)); }
 
 /* --- hero --- */
-.lp-hero { max-width: 46rem; margin: 0 auto; padding: 56px 24px 8px; text-align: center; }
+.lp-hero { max-width: 46rem; margin: 0 auto; padding: 40px 24px 4px; text-align: center; }
 .lp-hero h1 {
   margin: 0 0 18px; font-size: clamp(2rem, 5.2vw, 3rem); line-height: 1.1;
   font-weight: 700; letter-spacing: -0.02em;
 }
 .lp-lead { margin: 0 auto; max-width: 34rem; font-size: 1.12rem; line-height: 1.55; color: var(--muted); }
 
-.lp-cta-row { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 30px; }
+.lp-cta-row { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 22px; }
 .lp-cta {
   padding: 14px 24px; cursor: pointer; font: inherit; font-size: 1rem; font-weight: 650;
   color: #fff; background: var(--accent-fill); border: none; border-radius: 12px;
@@ -102,56 +102,15 @@
 }
 
 /* --- sections --- */
-.lp-section { max-width: 62rem; margin: 0 auto; padding: 56px 24px 0; }
+.lp-section { max-width: 62rem; margin: 0 auto; padding: 40px 24px 0; }
 .lp-section > h2 {
-  margin: 0 0 26px; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; text-align: center;
+  margin: 0 0 20px; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; text-align: center;
 }
 
 .lp-section-sub {
-  max-width: 40rem; margin: -14px auto 26px; text-align: center;
+  max-width: 40rem; margin: -10px auto 20px; text-align: center;
   font-size: 0.94rem; line-height: 1.55; color: var(--muted);
 }
-
-/* --- pricing --- */
-.lp-plans { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; align-items: start; }
-.lp-plan {
-  position: relative; padding: 22px 18px 24px;
-  background: linear-gradient(180deg, var(--panel-2), var(--panel));
-  border: 1px solid var(--panel-border); border-radius: 16px;
-}
-/* One plan is marked, because a page of equal columns makes the visitor do work
-   the page should have done. It is the individual plan, not the dearest one. */
-.lp-plan-pick { border-color: color-mix(in srgb, var(--accent) 40%, var(--panel-border)); }
-.lp-plan-tag {
-  position: absolute; top: -10px; left: 18px; padding: 3px 9px; border-radius: 999px;
-  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase;
-  color: #fff; background: var(--accent-fill);
-}
-.lp-plan h3 { margin: 0 0 8px; font-size: 0.96rem; font-weight: 650; color: var(--muted); }
-.lp-plan-price { margin: 0 0 10px; font-size: 0.86rem; color: var(--muted); }
-.lp-plan-price b { font-size: 1.5rem; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
-.lp-plan-seats {
-  margin: 0 0 8px; font-size: 0.78rem; font-weight: 650; letter-spacing: 0.01em;
-  color: var(--cmd-safe);
-}
-.lp-plan-tagline { margin: 0 0 14px; font-size: 0.86rem; line-height: 1.5; color: var(--muted); }
-.lp-plan-includes { margin: 0; padding: 14px 0 0; list-style: none; border-top: 1px solid var(--panel-border); }
-.lp-plan-includes li {
-  position: relative; padding-left: 18px; margin-bottom: 7px;
-  font-size: 0.85rem; line-height: 1.45; color: var(--muted);
-}
-.lp-plan-includes li::before {
-  content: ''; position: absolute; left: 3px; top: 8px;
-  width: 5px; height: 5px; border-radius: 50%; background: var(--cmd-safe);
-}
-.lp-plan-enterprise { margin: 20px 0 0; text-align: center; font-size: 0.9rem; color: var(--muted); }
-.lp-plan-enterprise b { color: var(--text); }
-.lp-plan-enterprise a { color: var(--accent); text-decoration: none; font-weight: 600; }
-.lp-pay {
-  max-width: 42rem; margin: 18px auto 0; text-align: center;
-  font-size: 0.84rem; line-height: 1.55; color: var(--faint);
-}
-.lp-plans-cta { display: flex; justify-content: center; margin-top: 26px; }
 
 .lp-audience { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
 .lp-card {
@@ -172,7 +131,7 @@
    after the headline, which is the whole point of putting it second rather
    than fourth. */
 .lp-eg-section {
-  max-width: 42rem; margin: 28px auto 0; padding: 28px 24px 26px;
+  max-width: 42rem; margin: 20px auto 0; padding: 24px 24px 22px;
   background: linear-gradient(180deg, color-mix(in srgb, var(--cmd-crit, #dc2626) 6%, var(--panel-2)), var(--panel));
   border: 1px solid color-mix(in srgb, var(--cmd-crit, #dc2626) 20%, var(--panel-border));
   border-radius: 22px;
@@ -225,14 +184,11 @@
 
 /* Trust bullets, relocated here from the hero (see LandingPage.tsx) so the
    very first thing on the page is the numbers, not a claims list. */
-.lp-trust-compact { margin-top: 22px; }
+.lp-trust-compact { margin-top: 18px; }
 
-/* The one-line pricing hook right under the numbers — short on purpose; the
-   full comparison lives further down at #pricing. */
-.lp-pitch-section { max-width: 34rem; padding-top: 28px; text-align: center; }
-.lp-pitch-text { margin: 0 0 8px; font-size: 0.94rem; line-height: 1.5; color: var(--muted); }
-.lp-pitch-link { font-size: 0.88rem; font-weight: 650; color: var(--accent); text-decoration: none; }
-.lp-pitch-link:hover { text-decoration: underline; }
+/* The one-line pricing hook right under the numbers — short on purpose. */
+.lp-pitch-section { max-width: 34rem; padding-top: 20px; text-align: center; }
+.lp-pitch-text { margin: 0; font-size: 0.94rem; line-height: 1.5; color: var(--muted); }
 
 /* --- emergency report form, nested inside .eg-detail (see EmergencyReportForm.tsx) --- */
 .egr { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--panel-border); text-align: left; }
@@ -343,22 +299,26 @@
 .lp-privacy-links a { color: var(--accent); text-decoration: none; font-weight: 600; }
 .lp-privacy-links a:hover { text-decoration: underline; }
 
-/* --- footer --- */
-.lp-footer {
-  max-width: 62rem; margin: 64px auto 0; padding: 32px 24px 48px;
-  border-top: 1px solid var(--panel-border);
-}
-.lp-footer-about { max-width: 40rem; }
-.lp-footer-about h3 { margin: 0 0 10px; font-size: 0.98rem; font-weight: 650; }
-.lp-footer-about p { margin: 0 0 10px; font-size: 0.9rem; line-height: 1.6; color: var(--muted); }
-.lp-footer-about a { color: var(--accent); text-decoration: none; }
+/* About Smart Warning — moved up from the footer to right after the privacy
+   links (see LandingPage.tsx), so it reads while a visitor is still deciding
+   rather than below the fold where a footer goes unread. */
+.lp-about-section { max-width: 40rem; text-align: left; }
+.lp-about-section h2 { text-align: left; font-size: 1.15rem; }
+.lp-about-section p { margin: 0 0 10px; font-size: 0.92rem; line-height: 1.6; color: var(--muted); }
+.lp-about-section a { color: var(--accent); text-decoration: none; }
 .lp-footer-phone { color: var(--muted); }
 .lp-footer-phone a { color: var(--accent); text-decoration: none; }
+
+/* --- footer --- */
+.lp-footer {
+  max-width: 62rem; margin: 40px auto 0; padding: 24px 24px 40px;
+  border-top: 1px solid var(--panel-border);
+}
 
 /* The quiet B2B door: present on every visit to the landing page, never
    competing with the hero for attention. */
 .lp-footer-b2b {
-  max-width: 30rem; margin-top: 28px; padding: 18px 20px; border-radius: 14px;
+  max-width: 30rem; margin-top: 0; padding: 18px 20px; border-radius: 14px;
   background: var(--panel); border: 1px solid var(--panel-border);
 }
 .lp-footer-b2b h3 { margin: 0 0 8px; font-size: 0.92rem; font-weight: 650; }
@@ -388,15 +348,10 @@
 }
 
 /* --- narrow screens --- */
-@media (max-width: 980px) {
-  .lp-plans { grid-template-columns: repeat(2, 1fr); }
-}
-
 @media (max-width: 720px) {
-  .lp-audience, .lp-plans { grid-template-columns: 1fr; }
-  .lp-plan-tag { top: -9px; }
-  .lp-hero { padding-top: 40px; }
-  .lp-section { padding-top: 44px; }
+  .lp-audience { grid-template-columns: 1fr; }
+  .lp-hero { padding-top: 32px; }
+  .lp-section { padding-top: 32px; }
   .lp-cta { width: 100%; }
   .lp-nav-links a:not(:last-of-type) { display: none; }
   .lp-trust { gap: 8px 18px; }

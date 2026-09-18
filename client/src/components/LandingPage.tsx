@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { track } from '../lib/analytics';
 import { fetchPlans, formatMoney, type Plan, type PaymentMethods } from '../lib/billing';
-import { PROVIDER, SUPPORT_EMAIL, SUPPORT_PHONE, SALES_EMAIL, IDESIGN_URL } from '../lib/terms';
+import { PROVIDER, SUPPORT_EMAIL, SUPPORT_PHONE, SALES_EMAIL } from '../lib/terms';
 import { t } from '../lib/i18n';
 import type { Locale } from '../types';
 import { EmergencyGrid } from './EmergencyGrid';
@@ -49,7 +49,6 @@ export function LandingPage({ onGetStarted, onWatchDemo, locale, onToggleLocale 
   const price = personal?.price != null ? formatMoney(personal.price, personal.currency) : null;
 
   useEffect(() => { track('view_landing_page'); }, []);
-  usePricingSeen();
 
   /** Which button sent them onward — the whole point of measuring this page. */
   const go = (cta: string, step?: 'login' | 'worker' | 'sales') => {
@@ -66,7 +65,6 @@ export function LandingPage({ onGetStarted, onWatchDemo, locale, onToggleLocale 
           <span>Smart Warning</span>
         </a>
         <nav className="lp-nav-links">
-          <a href="#pricing">{t(locale, 'landing.nav.pricing')}</a>
           <a href="#privacy">{t(locale, 'landing.nav.privacy')}</a>
           <a href="/legal/">{t(locale, 'landing.nav.legal')}</a>
           <button
@@ -126,16 +124,13 @@ export function LandingPage({ onGetStarted, onWatchDemo, locale, onToggleLocale 
 
         {/* The persuasion pitch — deliberately short and placed right after the
             free emergency numbers, not before them: a visitor should see that
-            help is free and immediate before being asked to pay for anything.
-            The full plan comparison stays further down at #pricing; this is
-            just the one-line hook, kept the page from getting long here. */}
+            help is free and immediate before being asked to pay for anything. */}
         <section className="lp-section lp-pitch-section">
           <p className="lp-pitch-text">
             {price
               ? t(locale, 'landing.pitch.withPrice', { price })
               : t(locale, 'landing.pitch.free')}
           </p>
-          <a href="#pricing" className="lp-pitch-link">{t(locale, 'landing.pitch.seeMore')}</a>
         </section>
 
         <section className="lp-section">
@@ -160,8 +155,6 @@ export function LandingPage({ onGetStarted, onWatchDemo, locale, onToggleLocale 
           </div>
         </section>
 
-        <PricingSection billing={billing} onGetStarted={() => go('pricing_start')} locale={locale} />
-
         {/* The four-card privacy breakdown that used to live here is now the
             job of the actual Privacy Policy (see lib/terms.ts) — it already
             covers background tracking, password storage and account deletion
@@ -177,11 +170,12 @@ export function LandingPage({ onGetStarted, onWatchDemo, locale, onToggleLocale 
             <a href="/legal/delete.html">{t(locale, 'landing.privacy.linkDelete')}</a>
           </p>
         </section>
-      </main>
 
-      <footer className="lp-footer">
-        <div className="lp-footer-about">
-          <h3>{t(locale, 'landing.footer.aboutHeading')}</h3>
+        {/* Moved up from the footer (2026-09-18, product owner request) — right
+            after the legal/privacy links rather than below the fold where
+            nobody scrolling to decide whether to sign up would ever read it. */}
+        <section className="lp-section lp-about-section">
+          <h2>{t(locale, 'landing.footer.aboutHeading')}</h2>
           <p>{t(locale, 'landing.footer.aboutP1', { provider: PROVIDER })}</p>
           <p>
             {t(locale, 'landing.footer.aboutP2')}{' '}
@@ -190,7 +184,10 @@ export function LandingPage({ onGetStarted, onWatchDemo, locale, onToggleLocale 
           <p className="lp-footer-phone">
             {t(locale, 'landing.footer.phoneLabel')}: <a href={`tel:${SUPPORT_PHONE.replace(/\s+/g, '')}`}>{SUPPORT_PHONE}</a>
           </p>
-        </div>
+        </section>
+      </main>
+
+      <footer className="lp-footer">
         <div className="lp-footer-b2b">
           <h3>{t(locale, 'landing.footer.b2bHeading')}</h3>
           <p>{t(locale, 'landing.footer.b2bBody')}</p>
@@ -235,36 +232,6 @@ function onLegalLinkClick(e: React.MouseEvent<HTMLDivElement>): void {
 }
 
 /**
- * Fires `view_pricing` once, when the pricing section is actually on screen.
- *
- * Scrolled-into-view rather than rendered: the section is always in the DOM, so
- * reporting it on mount would mean every visitor "viewed pricing" and the
- * number would answer nothing. Falls silent where IntersectionObserver is
- * missing — an unmeasured visit is better than an invented one.
- */
-function usePricingSeen(): void {
-  const seen = useRef(false);
-
-  useEffect(() => {
-    const el = document.getElementById('pricing');
-    if (!el || typeof IntersectionObserver === 'undefined') return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (!e.isIntersecting || seen.current) continue;
-          seen.current = true;
-          track('view_pricing');
-          io.disconnect();
-        }
-      },
-      { threshold: 0.35 },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-}
-
-/**
  * The plans and the payment methods, as the server states them.
  *
  * Fetched rather than typed into the page. A price written into a screen is one
@@ -291,77 +258,3 @@ function useBilling(): { plans: Plan[]; payments: PaymentMethods } | null {
   return data;
 }
 
-/**
- * What a visitor will pay, before they are asked for an email address.
- *
- * Renders nothing at all until the plans arrive. An empty space is a fair thing
- * to show somebody for half a second; a plausible-looking placeholder price is
- * not, and this is the section where being wrong costs the most trust.
- *
- * Plan names, taglines and feature lines come from the server (see the header
- * comment on `useBilling`) and are shown exactly as it states them — those
- * strings are not translated here, the same way a price is not: this page has
- * no way to know whether a Swahili tagline the server never sent is accurate,
- * and a guess in the one section about money is worse than English.
- */
-function PricingSection({ billing, onGetStarted, locale }: { billing: ReturnType<typeof useBilling>; onGetStarted: () => void; locale: Locale }) {
-  if (!billing) return null;
-
-  // Enterprise is quoted, not chosen from a page, so it gets a line underneath
-  // rather than a column that would push the others narrow.
-  const shown = billing.plans.filter((p) => p.id !== 'enterprise');
-  const enterprise = billing.plans.find((p) => p.id === 'enterprise');
-  const { mobileMoney, card } = billing.payments;
-
-  return (
-    <section className="lp-section" id="pricing">
-      <h2>{t(locale, 'landing.pricing.heading')}</h2>
-      <p className="lp-section-sub">{t(locale, 'landing.pricing.sub')}</p>
-
-      <div className="lp-plans">
-        {shown.map((plan) => (
-          <article key={plan.id} className={`lp-plan${plan.id === 'personal' ? ' lp-plan-pick' : ''}`}>
-            {plan.id === 'personal' && <span className="lp-plan-tag">{t(locale, 'landing.pricing.mostPopular')}</span>}
-            <h3>{plan.name}</h3>
-            <p className="lp-plan-price">
-              {plan.price === 0
-                ? <b>{t(locale, 'landing.pricing.free')}</b>
-                : <><b>{formatMoney(plan.price, plan.currency)}</b> <small>{t(locale, 'landing.pricing.perMonth')}</small></>}
-            </p>
-            {/* What you are buying, in the unit the price is per. Two plans
-                priced differently for 1 seat and 50 needs the 1 and the 50 on
-                screen next to the numbers, or the difference reads as arbitrary. */}
-            <p className="lp-plan-seats">
-              {plan.seats === 1
-                ? t(locale, 'landing.pricing.oneSeat')
-                : plan.seats
-                  ? t(locale, 'landing.pricing.upToSeats', { n: String(plan.seats) })
-                  : t(locale, 'landing.pricing.anySeats')}
-            </p>
-            <p className="lp-plan-tagline">{plan.tagline}</p>
-            <ul className="lp-plan-includes">
-              {plan.includes.map((line, i) => <li key={i}>{line}</li>)}
-            </ul>
-          </article>
-        ))}
-      </div>
-
-      {enterprise && (
-        <p className="lp-plan-enterprise">
-          <b>{enterprise.name}</b>: {enterprise.tagline.toLowerCase()}{' '}
-          <a href={IDESIGN_URL} target="_blank" rel="noreferrer">{t(locale, 'landing.pricing.talkToUs')}</a>.
-        </p>
-      )}
-
-      <p className="lp-pay">
-        {mobileMoney.enabled && <>{t(locale, 'landing.pricing.mobileMoney')} </>}
-        {card.enabled && <>{t(locale, 'landing.pricing.cardsAccepted')} </>}
-        {t(locale, 'landing.pricing.termsNote')}
-      </p>
-
-      <div className="lp-plans-cta">
-        <button className="lp-cta" onClick={onGetStarted}>{t(locale, 'landing.pricing.startTrial')}</button>
-      </div>
-    </section>
-  );
-}

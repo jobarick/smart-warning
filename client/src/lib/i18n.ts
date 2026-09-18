@@ -142,7 +142,6 @@ export type StringKey =
   | 'contacts.nameRequired'
   | 'contacts.needReachable'
   | 'landing.skipToContent'
-  | 'landing.nav.pricing'
   | 'landing.nav.privacy'
   | 'landing.nav.legal'
   | 'landing.nav.signin'
@@ -157,7 +156,6 @@ export type StringKey =
   | 'landing.hero.trust4'
   | 'landing.pitch.withPrice'
   | 'landing.pitch.free'
-  | 'landing.pitch.seeMore'
   | 'landing.who.heading'
   | 'landing.who.soloTitle'
   | 'landing.who.soloBody'
@@ -166,19 +164,6 @@ export type StringKey =
   | 'landing.who.teamTitle'
   | 'landing.who.teamBody'
   | 'landing.who.teamPrice'
-  | 'landing.pricing.heading'
-  | 'landing.pricing.sub'
-  | 'landing.pricing.mostPopular'
-  | 'landing.pricing.oneSeat'
-  | 'landing.pricing.upToSeats'
-  | 'landing.pricing.anySeats'
-  | 'landing.pricing.free'
-  | 'landing.pricing.perMonth'
-  | 'landing.pricing.talkToUs'
-  | 'landing.pricing.mobileMoney'
-  | 'landing.pricing.cardsAccepted'
-  | 'landing.pricing.termsNote'
-  | 'landing.pricing.startTrial'
   | 'landing.privacy.heading'
   | 'landing.privacy.summary'
   | 'landing.privacy.linkPrivacy'
@@ -572,7 +557,6 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'contacts.nameRequired': 'Give this contact a name.',
     'contacts.needReachable': 'Add a phone number or an email so this person can be reached.',
     'landing.skipToContent': 'Skip to content',
-    'landing.nav.pricing': 'Pricing',
     'landing.nav.privacy': 'Privacy',
     'landing.nav.legal': 'Legal',
     'landing.nav.signin': 'Sign in',
@@ -587,7 +571,6 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'landing.hero.trust4': 'Delete your account any time',
     'landing.pitch.withPrice': 'For just {price}/month, Premium adds a medical profile, a trusted circle, and priority support — good for you, your family, and the people around you.',
     'landing.pitch.free': 'Premium adds a medical profile, a trusted circle, and priority support — good for you, your family, and the people around you.',
-    'landing.pitch.seeMore': 'See what’s included →',
     'landing.who.heading': 'Who it is for',
     'landing.who.soloTitle': 'On your own',
     'landing.who.soloBody': 'A panic button that actually reaches someone. Your trusted contacts get your live location the moment you raise an alert.',
@@ -596,19 +579,6 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'landing.who.teamTitle': 'For a site or team',
     'landing.who.teamBody': 'Your workers join with a code, no accounts to create. You get a live roster, a map, and an incident record you can hand to an inspector.',
     'landing.who.teamPrice': 'Team and site plans, billed monthly or yearly.',
-    'landing.pricing.heading': 'What it costs',
-    'landing.pricing.sub': 'Every plan starts with a 30 day trial. We do not ask for payment details to begin, and nothing charges itself when the trial ends. You choose a plan, or you keep the free one.',
-    'landing.pricing.mostPopular': 'Most people start here',
-    'landing.pricing.oneSeat': 'One person',
-    'landing.pricing.upToSeats': 'Up to {n} people',
-    'landing.pricing.anySeats': 'Any number of people',
-    'landing.pricing.free': 'Free',
-    'landing.pricing.perMonth': '/ month',
-    'landing.pricing.talkToUs': 'Talk to us',
-    'landing.pricing.mobileMoney': 'Pay with mobile money: Mixx by Yas, MPesa, Airtel Money, HaloPesa, EzyPesa.',
-    'landing.pricing.cardsAccepted': 'Cards accepted.',
-    'landing.pricing.termsNote': 'Prices in Tanzanian shillings. Cancel whenever you like; you keep the plan until the month you paid for runs out.',
-    'landing.pricing.startTrial': 'Start your 30 days',
     'landing.privacy.heading': 'Your location is yours',
     'landing.privacy.summary': 'Your location is only used while an alert is active, never sold, never used for ads. Passwords are never stored in a readable form. Delete your account and everything in it at any time.',
     'landing.privacy.linkPrivacy': 'Full Privacy Policy',
@@ -999,7 +969,6 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'contacts.nameRequired': 'Mpe mtu huyu jina.',
     'contacts.needReachable': 'Ongeza namba ya simu au barua pepe ili mtu huyu aweze kupatikana.',
     'landing.skipToContent': 'Rukia hadi maudhui',
-    'landing.nav.pricing': 'Bei',
     'landing.nav.privacy': 'Faragha',
     'landing.nav.legal': 'Kisheria',
     'landing.nav.signin': 'Ingia',
@@ -1014,7 +983,6 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'landing.hero.trust4': 'Futa akaunti yako wakati wowote',
     'landing.pitch.withPrice': 'Kwa {price}/mwezi tu, Premium huongeza wasifu wa kiafya, Mzunguko wa Uaminifu, na msaada wa kipaumbele — nzuri kwako, familia yako, na watu walio karibu nawe.',
     'landing.pitch.free': 'Premium huongeza wasifu wa kiafya, Mzunguko wa Uaminifu, na msaada wa kipaumbele — nzuri kwako, familia yako, na watu walio karibu nawe.',
-    'landing.pitch.seeMore': 'Ona kilichomo →',
     'landing.who.heading': 'Ni kwa ajili ya nani',
     'landing.who.soloTitle': 'Peke yako',
     'landing.who.soloBody': 'Kitufe cha hofu kinachomfikia mtu kweli. Anwani zako za kuaminika hupokea eneo lako la moja kwa moja mara tu unapotoa tahadhari.',
@@ -1023,19 +991,6 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'landing.who.teamTitle': 'Kwa eneo au timu',
     'landing.who.teamBody': 'Wafanyakazi wako hujiunga kwa msimbo, hakuna akaunti za kuunda. Unapata orodha ya moja kwa moja, ramani, na rekodi ya tukio unayoweza kumkabidhi mkaguzi.',
     'landing.who.teamPrice': 'Mipango ya timu na eneo, hulipwa kila mwezi au mwaka.',
-    'landing.pricing.heading': 'Gharama',
-    'landing.pricing.sub': 'Kila mpango huanza na jaribio la siku 30. Hatuombi taarifa za malipo kuanza, na hakuna kinachojitoza pesa jaribio linapoisha. Unachagua mpango, au unabaki na ule wa bure.',
-    'landing.pricing.mostPopular': 'Watu wengi huanzia hapa',
-    'landing.pricing.oneSeat': 'Mtu mmoja',
-    'landing.pricing.upToSeats': 'Hadi watu {n}',
-    'landing.pricing.anySeats': 'Idadi yoyote ya watu',
-    'landing.pricing.free': 'Bure',
-    'landing.pricing.perMonth': '/ mwezi',
-    'landing.pricing.talkToUs': 'Ongea nasi',
-    'landing.pricing.mobileMoney': 'Lipa kwa pesa ya simu: Mixx by Yas, MPesa, Airtel Money, HaloPesa, EzyPesa.',
-    'landing.pricing.cardsAccepted': 'Kadi zinakubaliwa.',
-    'landing.pricing.termsNote': 'Bei kwa shilingi za Kitanzania. Ghairi wakati wowote unavyotaka; unabaki na mpango hadi mwezi uliolipia utakapoisha.',
-    'landing.pricing.startTrial': 'Anza siku zako 30',
     'landing.privacy.heading': 'Eneo lako ni lako',
     'landing.privacy.summary': 'Eneo lako hutumika tu wakati tahadhari inaendelea, hatuliuzi kamwe, na halitumiki kwa matangazo. Nywila hazihifadhiwi kwa namna inayosomeka. Futa akaunti yako na kila kilichomo wakati wowote.',
     'landing.privacy.linkPrivacy': 'Sera Kamili ya Faragha',
