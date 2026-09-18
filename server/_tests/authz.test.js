@@ -56,11 +56,13 @@ before(() => {
       return { users: 1, incidents: 2, location_points: 7, reports: 0 };
     },
     // The scoped deletes under test: a row is only removed when the caller's
-    // org matches, mirroring the real WHERE ... AND org_id = $2.
-    deletePushSubscription: async (endpoint, orgId = null) => {
+    // org (or, since Nearby Help, user) matches, mirroring the real
+    // WHERE ... AND org_id = $2 / AND user_id = $2.
+    deletePushSubscription: async (endpoint, { orgId = null, userId = null } = {}) => {
       const owner = store.subscriptions.get(endpoint);
       if (owner === undefined) return 0;
-      if (orgId !== null && owner !== orgId) return 0;
+      const claimed = userId ?? orgId;
+      if (claimed === null || owner !== claimed) return 0;
       store.subscriptions.delete(endpoint);
       return 1;
     },

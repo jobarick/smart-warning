@@ -77,12 +77,20 @@ async function init() {
 
     CREATE TABLE IF NOT EXISTS push_subscriptions (
       id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      org_id     UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      org_id     UUID REFERENCES organizations(id) ON DELETE CASCADE,
       endpoint   TEXT NOT NULL UNIQUE,
       p256dh     TEXT NOT NULL,
       auth       TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    -- Was NOT NULL: a personal (org-less) account could not register a Web
+    -- Push subscription at all, the same gap device_tokens (FCM) already
+    -- closed for native — see deviceOwnerFromRequest's own comment on why.
+    -- Exactly one of org_id/user_id is set per row, same shape as that helper
+    -- returns, never both and never neither.
+    ALTER TABLE push_subscriptions ALTER COLUMN org_id DROP NOT NULL;
+    ALTER TABLE push_subscriptions ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id) ON DELETE CASCADE;
+    CREATE INDEX IF NOT EXISTS push_subscriptions_user_idx ON push_subscriptions (user_id) WHERE user_id IS NOT NULL;
     CREATE INDEX IF NOT EXISTS push_subscriptions_org_idx ON push_subscriptions (org_id);
 
     -- Small key/value store for server-managed config (e.g. the VAPID keypair).
@@ -231,6 +239,56 @@ async function init() {
     -- What the retention purge scans: every row is a candidate by age alone,
     -- with no org or incident in the WHERE clause to lean on.
     CREATE INDEX IF NOT EXISTS location_pings_at_idx ON location_pings (at);
+
+    -- Nearby Help: who has opted in to be found by a ring search when someone
+    -- near them raises an emergency (see nearbyHelp.js). One row per account —
+    -- a person is either currently offering to help or they are not, never a
+    -- history of it. 'org_id' is nullable: a personal account can opt in with
+    -- no organisation at all, which is the case this feature matters most for
+    -- (a lone user with a thin or empty Trusted Circle).
+    --
+    -- Explicitly NOT a trusted-circle contact and not an emergency service —
+    -- same caution contacts.js already applies to that other kind of "person
+    -- who gets told": a responder is a fellow opted-in citizen, labelled as
+    -- exactly that everywhere it appears.
+    CREATE TABLE IF NOT EXISTS responders (
+      user_id       UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      org_id        UUID REFERENCES organizations(id) ON DELETE SET NULL,
+      lat           DOUBLE PRECISION,
+      lng           DOUBLE PRECISION,
+      -- When 'lat'/'lng' was captured — never treated as current past
+      -- RESPONDER_FRESHNESS_MS in nearbyHelp.js, regardless of 'is_available'.
+      captured_at   TIMESTAMPTZ,
+      categories    TEXT[] NOT NULL DEFAULT '{}',
+      is_available  BOOLEAN NOT NULL DEFAULT false,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    -- Every ring-search query filters on availability first; a partial index
+    -- keeps it small regardless of how many accounts have ever opted in once
+    -- and stopped.
+    CREATE INDEX IF NOT EXISTS responders_available_idx ON responders (lat, lng) WHERE is_available;
+
+    -- One row per (incident, candidate responder) a ring search notified.
+    -- 'incident_id' is TEXT, matching incidents.id (the client-generated alert
+    -- uuid) rather than a foreign key: a personal account's incident row and a
+    -- Nearby Help search for it are created in the same request, and requiring
+    -- the FK to already exist would just be a same-transaction technicality —
+    -- TEXT keeps this table usable standalone in tests, same reasoning as
+    -- incidents.id itself.
+    CREATE TABLE IF NOT EXISTS incident_offers (
+      id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      incident_id   TEXT NOT NULL,
+      responder_id  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      category      TEXT NOT NULL,
+      distance_m    INTEGER,
+      -- notified | accepted | declined
+      status        TEXT NOT NULL DEFAULT 'notified',
+      notified_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      responded_at  TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS incident_offers_incident_idx  ON incident_offers (incident_id);
+    CREATE INDEX IF NOT EXISTS incident_offers_responder_idx ON incident_offers (responder_id, status);
 
     -- Supervisor feedback. Stored first and delivered second, so a submission is
     -- never lost because mail was misconfigured.
@@ -1140,6 +1198,111 @@ async function createDirectoryEntry({ category, name, phone, lat, lng, address, 
   return rows[0];
 }
 
+// --- Nearby Help: responders and incident offers ----------------------------
+
+/**
+ * Set or update one account's Nearby Help status. A single upsert rather than
+ * separate create/update: this is a toggle with at most one row per user, not
+ * a history.
+ */
+async function setResponderStatus({ userId, orgId, lat, lng, categories, isAvailable }) {
+  if (!pool) throw new Error('persistence disabled');
+  const hasLocation = Number.isFinite(lat) && Number.isFinite(lng);
+  // Every placeholder cast explicitly, and hasLocation passed as its own typed
+  // parameter rather than re-testing $3 for null inside a CASE — reusing one
+  // placeholder across a plain column position and a bare IS NULL check is
+  // exactly what left Postgres unable to infer its type ("could not determine
+  // data type of parameter"), the same class of bug already hit and fixed in
+  // listDirectoryNearby.
+  const { rows } = await pool.query(
+    `INSERT INTO responders (user_id, org_id, lat, lng, captured_at, categories, is_available, updated_at)
+     VALUES ($1::uuid, $2::uuid, $3::double precision, $4::double precision,
+             CASE WHEN $7::boolean THEN now() ELSE NULL END, $5::text[], $6::boolean, now())
+     ON CONFLICT (user_id) DO UPDATE SET
+       org_id = $2::uuid, lat = $3::double precision, lng = $4::double precision,
+       captured_at = CASE WHEN $7::boolean THEN now() ELSE responders.captured_at END,
+       categories = $5::text[], is_available = $6::boolean, updated_at = now()
+     RETURNING *`,
+    [userId, orgId ?? null, hasLocation ? lat : null, hasLocation ? lng : null, categories ?? [], isAvailable === true, hasLocation],
+  );
+  return rows[0];
+}
+
+async function getResponderStatus(userId) {
+  if (!pool) return null;
+  const { rows } = await pool.query(`SELECT * FROM responders WHERE user_id = $1`, [userId]);
+  return rows[0] || null;
+}
+
+/**
+ * Candidates for a ring search: available, fresh (within `freshnessMs`),
+ * inside the box for `radiusM`, tagged for `category` or 'general', excluding
+ * the person who raised the incident. Same "box in SQL, haversine + rank in
+ * JS" split as listDirectoryNearby/places.js — see that function's comment
+ * for why this is the right amount of geospatial engineering at this scale.
+ */
+async function findNearbyResponders({ lat, lng, category, radiusM, freshnessMs, excludeUserId }) {
+  if (!pool || !Number.isFinite(lat) || !Number.isFinite(lng)) return [];
+  const deg = radiusM / 111000;
+  const { rows } = await pool.query(
+    `SELECT * FROM responders
+      WHERE is_available = true
+        AND user_id != $5
+        AND lat IS NOT NULL AND lng IS NOT NULL
+        AND captured_at > now() - ($4 || ' milliseconds')::interval
+        AND lat BETWEEN $1::double precision - $6::double precision AND $1::double precision + $6::double precision
+        AND lng BETWEEN $2::double precision - $6::double precision AND $2::double precision + $6::double precision
+        AND ($3 = ANY(categories) OR 'general' = ANY(categories))
+      ORDER BY ($3 = ANY(categories)) DESC`,
+    [lat, lng, category, String(freshnessMs), excludeUserId, deg],
+  );
+  return rows;
+}
+
+/** One offer row per notified candidate — see incident_offers' own comment. */
+async function createIncidentOffers(offers) {
+  if (!pool || !offers.length) return [];
+  const values = [];
+  const params = [];
+  offers.forEach((o, i) => {
+    const base = i * 4;
+    values.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`);
+    params.push(o.incidentId, o.responderId, o.category, o.distanceM ?? null);
+  });
+  const { rows } = await pool.query(
+    `INSERT INTO incident_offers (incident_id, responder_id, category, distance_m)
+     VALUES ${values.join(', ')} RETURNING *`,
+    params,
+  );
+  return rows;
+}
+
+async function listOffersForIncident(incidentId) {
+  if (!pool) return [];
+  const { rows } = await pool.query(
+    `SELECT * FROM incident_offers WHERE incident_id = $1 ORDER BY distance_m ASC NULLS LAST`,
+    [incidentId],
+  );
+  return rows;
+}
+
+/**
+ * A responder answers one offer. Matched on (id, responder_id, status =
+ * 'notified') so a stale or already-answered notification can't be replayed
+ * into a second acceptance, and a responder can't answer an offer that was
+ * never theirs.
+ */
+async function respondToOffer({ offerId, responderId, status }) {
+  if (!pool) throw new Error('persistence disabled');
+  const { rows } = await pool.query(
+    `UPDATE incident_offers SET status = $3, responded_at = now()
+      WHERE id = $1 AND responder_id = $2 AND status = 'notified'
+      RETURNING *`,
+    [offerId, responderId, status],
+  );
+  return rows[0] || null;
+}
+
 // --- Incidents (all scoped to an org) --------------------------------------
 
 // Record a raised alert. `worker` is the triggering device's roster entry (if
@@ -1333,15 +1496,21 @@ async function stats(orgId) {
 
 // --- Push subscriptions (org-scoped) ---------------------------------------
 
-async function createPushSubscription({ orgId, endpoint, p256dh, auth }) {
+async function createPushSubscription({ orgId, userId, endpoint, p256dh, auth }) {
   if (!pool) return;
   // A device may re-subscribe (new keys) — key on the endpoint.
   await pool.query(
-    `INSERT INTO push_subscriptions (org_id, endpoint, p256dh, auth)
-     VALUES ($1, $2, $3, $4)
-     ON CONFLICT (endpoint) DO UPDATE SET org_id = EXCLUDED.org_id, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth`,
-    [orgId, endpoint, p256dh, auth],
+    `INSERT INTO push_subscriptions (org_id, user_id, endpoint, p256dh, auth)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (endpoint) DO UPDATE SET org_id = EXCLUDED.org_id, user_id = EXCLUDED.user_id, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth`,
+    [orgId ?? null, userId ?? null, endpoint, p256dh, auth],
   );
+}
+
+async function listPushSubscriptionsForUser(userId) {
+  if (!pool) return [];
+  const { rows } = await pool.query(`SELECT * FROM push_subscriptions WHERE user_id = $1`, [userId]);
+  return rows;
 }
 
 async function listPushSubscriptions(orgId) {
@@ -1350,17 +1519,22 @@ async function listPushSubscriptions(orgId) {
   return rows;
 }
 
-// Remove a subscription. When orgId is given the delete is scoped to that
-// organization, so possessing an endpoint string is not on its own enough to
-// switch off someone else's emergency notifications.
+// Remove a subscription. When an owner ({orgId} or {userId}) is given the
+// delete is scoped to it, so possessing an endpoint string is not on its own
+// enough to switch off someone else's emergency notifications.
 //
-// orgId is omitted only by the push sender pruning an endpoint the push
+// The owner is omitted only by the push sender pruning an endpoint the push
 // service itself has reported as gone (404/410), which is authoritative.
-async function deletePushSubscription(endpoint, orgId = null) {
+async function deletePushSubscription(endpoint, owner = null) {
   if (!pool) return 0;
-  const { rowCount } = orgId
-    ? await pool.query(`DELETE FROM push_subscriptions WHERE endpoint = $1 AND org_id = $2`, [endpoint, orgId])
-    : await pool.query(`DELETE FROM push_subscriptions WHERE endpoint = $1`, [endpoint]);
+  let rowCount;
+  if (owner?.userId) {
+    ({ rowCount } = await pool.query(`DELETE FROM push_subscriptions WHERE endpoint = $1 AND user_id = $2`, [endpoint, owner.userId]));
+  } else if (owner?.orgId) {
+    ({ rowCount } = await pool.query(`DELETE FROM push_subscriptions WHERE endpoint = $1 AND org_id = $2`, [endpoint, owner.orgId]));
+  } else {
+    ({ rowCount } = await pool.query(`DELETE FROM push_subscriptions WHERE endpoint = $1`, [endpoint]));
+  }
   return rowCount;
 }
 
@@ -2334,6 +2508,12 @@ module.exports = {
   listNotifiableContacts,
   listDirectoryNearby,
   createDirectoryEntry,
+  setResponderStatus,
+  getResponderStatus,
+  findNearbyResponders,
+  createIncidentOffers,
+  listOffersForIncident,
+  respondToOffer,
   createContact,
   updateContact,
   deleteContact,
@@ -2350,6 +2530,7 @@ module.exports = {
   stats,
   createPushSubscription,
   listPushSubscriptions,
+  listPushSubscriptionsForUser,
   deletePushSubscription,
   getKv,
   setKv,

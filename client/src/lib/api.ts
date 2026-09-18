@@ -904,3 +904,61 @@ export async function fetchTrack(incidentId: string, token?: string): Promise<Tr
   const body = await res.json();
   return body.track ?? [];
 }
+
+// --- Nearby Help ---
+
+/** A responder category this account can be matched against — see server/nearbyHelp.js's CATEGORY_BY_ALERT_TYPE. */
+export type ResponderCategory = 'fire' | 'medical' | 'security' | 'hazard' | 'general';
+
+export interface ResponderStatus {
+  isAvailable: boolean;
+  categories: ResponderCategory[];
+  hasLocation: boolean;
+  updatedAt: number | null;
+}
+
+export async function fetchResponderStatus(token: string): Promise<ResponderStatus> {
+  const res = await fetch(`${API_BASE}/api/responders/me`, { headers: authHeaders(token) });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not load Nearby Help status'));
+  return res.json();
+}
+
+export async function setResponderStatus(
+  input: { isAvailable: boolean; lat?: number; lng?: number; categories?: ResponderCategory[] },
+  token: string,
+): Promise<ResponderStatus> {
+  const res = await fetch(`${API_BASE}/api/responders/me`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not update Nearby Help status'));
+  return res.json();
+}
+
+export async function respondToOffer(
+  offerId: string, status: 'accepted' | 'declined', token: string,
+): Promise<{ ok: true; offer: { id: string; status: string } }> {
+  const res = await fetch(`${API_BASE}/api/responders/offers/${encodeURIComponent(offerId)}/respond`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not send your response'));
+  return res.json();
+}
+
+export interface IncidentOfferView {
+  distanceM: number | null;
+  category: string;
+  status: 'notified' | 'accepted' | 'declined';
+  notifiedAt: number;
+}
+
+/** Unauthenticated by design (see routes/responders.js): an incident id is a UUID nobody can guess. */
+export async function fetchIncidentOffers(incidentId: string): Promise<IncidentOfferView[]> {
+  const res = await fetch(`${API_BASE}/api/incidents/${encodeURIComponent(incidentId)}/offers`);
+  if (!res.ok) return [];
+  const body = await res.json();
+  return body.offers ?? [];
+}

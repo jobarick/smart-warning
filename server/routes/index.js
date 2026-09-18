@@ -22,6 +22,7 @@ const MODULES = [
   require('./emergency'),
   require('./feedback'),
   require('./billing'),
+  require('./responders'),
 ];
 
 async function handle(req, res) {

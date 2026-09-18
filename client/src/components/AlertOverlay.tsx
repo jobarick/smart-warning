@@ -4,6 +4,7 @@ import { ALERT_META, severityWants } from '../types';
 import { effectiveFlashRate, SAFE_FLASH_RATE } from '../lib/settings';
 import { t, SEVERITY_KEY } from '../lib/i18n';
 import { Icon } from './Icon';
+import { NearbyHelpStatus } from './NearbyHelpStatus';
 
 interface Props {
   alert: AlertMessage;
@@ -108,6 +109,7 @@ export function AlertOverlay({ alert, acknowledged, settings, locale, label, saf
         <p className="overlay-meta">
           {t(locale, 'overlay.triggeredBy', { sender: alert.sender, time: new Date(alert.timestamp).toLocaleTimeString() })}
         </p>
+        <NearbyHelpStatus incidentId={alert.id} />
       </div>
       <div className="overlay-actions">
         {!acknowledged ? (

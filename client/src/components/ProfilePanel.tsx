@@ -5,6 +5,7 @@ import { alertLabel } from '../lib/profiles';
 import type { AlertType, Locale, LogEntry } from '../types';
 import { AlertLog } from './AlertLog';
 import { Icon } from './Icon';
+import { NearbyHelpOptIn } from './NearbyHelpOptIn';
 import { TrustedCircle } from './TrustedCircle';
 
 interface Props {
@@ -14,6 +15,10 @@ interface Props {
   personal: boolean;
   deviceName: string;
   profile: IndustryProfile;
+  /** Undefined for a worker holding only a join code — Nearby Help needs a
+   *  real account (see routes/responders.js's requireAuth), same reason
+   *  onBilling below is optional. */
+  token?: string;
   /** Only fetched — and only ever shown — for a signed-in org account. */
   incidents: Incident[];
   persistence: boolean | null;
@@ -43,7 +48,7 @@ interface Props {
  * identity check that was never done.
  */
 export function ProfilePanel({
-  session, org, workerCode, personal, deviceName, profile,
+  session, org, workerCode, personal, deviceName, profile, token,
   incidents, persistence, historyLoading, historyError, log,
   onAbout, onSettings, onSupport, onBilling, locale, onToggleLocale,
 }: Props) {
@@ -72,6 +77,8 @@ export function ProfilePanel({
       </section>
 
       <AlertLog entries={log} />
+
+      {token && <NearbyHelpOptIn token={token} />}
 
       {org && (
         <section className="panel">

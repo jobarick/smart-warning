@@ -16,6 +16,7 @@ const db = require('./db');
 const auth = require('./auth');
 const push = require('./push');
 const fcm = require('./fcm');
+const nearbyHelp = require('./nearbyHelp');
 const { ORGS, TOKEN } = require('./config');
 const { STATUS_LEVELS, numOrNull, titleCase, sanitizeWorker } = require('./wire');
 
@@ -258,6 +259,19 @@ async function raiseAlert(orgId, alert, worker = null, origin = 'unknown', actor
     actorName: alert.sender || null, actorRole: actorRole,
     detail: { type: alert.type, severity: alert.severity, origin },
   }).catch((e) => console.error('[db] recordIncidentEvent(raised):', e.message));
+
+  // Nearby Help, in parallel with the org broadcast above — not after it and
+  // not instead of it. "Alerts go to official services and nearby verified
+  // responders in parallel" was the explicit product principle this was built
+  // against; a sequential ladder (team first, nearby help only if
+  // unacknowledged) is a real future option but a different, larger change
+  // (see escalation.js, which already has the timer infrastructure a delayed
+  // tier would reuse).
+  if (worker?.lat != null && worker?.lng != null) {
+    nearbyHelp
+      .searchAndNotify({ incidentId: alert.id, type: alert.type, lat: worker.lat, lng: worker.lng, orgId })
+      .catch((e) => console.error('[nearby-help] search failed:', e.message));
+  }
 
   // Two independent channels, deliberately not chained: browsers get Web Push,
   // the Android app gets FCM, and one being unconfigured or failing must never

@@ -18,6 +18,7 @@ const crypto = require('crypto');
 const db = require('../db');
 const auth = require('../auth');
 const mailer = require('../mailer');
+const nearbyHelp = require('../nearbyHelp');
 const { sendJson, readJson } = require('../http');
 const { requireAuth, allowPersonalAlert } = require('../guards');
 const { UUID_RE, ALERT_TYPES, SEVERITIES, numOrNull, titleCase } = require('../wire');
@@ -163,6 +164,16 @@ async function handle({ req, res, path }) {
       );
     } catch (e) {
       console.error('[db] recordAlert (personal):', e.message);
+    }
+
+    // Nearby Help, in parallel with the Trusted Circle emails below — this is
+    // exactly the account kind Section 6/34 of the product brief is about: a
+    // person alone with a thin or empty Trusted Circle is the strongest case
+    // for finding someone physically close instead.
+    if (lat != null && lng != null) {
+      nearbyHelp
+        .searchAndNotify({ incidentId, type, lat, lng, excludeUserId: user.id, orgId: null })
+        .catch((e) => console.error('[nearby-help] search failed (personal):', e.message));
     }
 
     const contacts = await db.listNotifiableContacts(user.id);

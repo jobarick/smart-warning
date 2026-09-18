@@ -72,16 +72,8 @@ const PUSH_OPTIONS = { urgency: 'high', TTL: 3600 };
  * Mirrors fcm.js's notifyOrg return shape, so a caller recording the outcome
  * of both channels doesn't need to special-case one of them.
  */
-async function notifyOrg(orgId, payloadObj) {
-  if (!enabled()) return { sent: 0, pruned: 0, failed: 0, skipped: 'not configured' };
-  if (!orgId) return { sent: 0, pruned: 0, failed: 0 };
-  let subs;
-  try {
-    subs = await db.listPushSubscriptions(orgId);
-  } catch (e) {
-    console.error('[push] list subscriptions failed:', e.message);
-    return { sent: 0, pruned: 0, failed: 0, skipped: e.message };
-  }
+/** Shared by notifyOrg and notifyUser — same delivery loop, different subscription list. */
+async function sendToSubs(subs, payloadObj, ownerForPrune) {
   if (!subs.length) return { sent: 0, pruned: 0, failed: 0 };
   const payload = JSON.stringify(payloadObj);
   let sent = 0;
@@ -94,7 +86,7 @@ async function notifyOrg(orgId, payloadObj) {
         sent++;
       } catch (e) {
         if (e.statusCode === 404 || e.statusCode === 410) {
-          await db.deletePushSubscription(s.endpoint).catch(() => {});
+          await db.deletePushSubscription(s.endpoint, ownerForPrune).catch(() => {});
           pruned++;
         } else {
           console.error('[push] send failed:', e.statusCode || e.message);
@@ -106,4 +98,37 @@ async function notifyOrg(orgId, payloadObj) {
   return { sent, pruned, failed };
 }
 
-module.exports = { init, enabled, getPublicKey, notifyOrg };
+async function notifyOrg(orgId, payloadObj) {
+  if (!enabled()) return { sent: 0, pruned: 0, failed: 0, skipped: 'not configured' };
+  if (!orgId) return { sent: 0, pruned: 0, failed: 0 };
+  let subs;
+  try {
+    subs = await db.listPushSubscriptions(orgId);
+  } catch (e) {
+    console.error('[push] list subscriptions failed:', e.message);
+    return { sent: 0, pruned: 0, failed: 0, skipped: e.message };
+  }
+  return sendToSubs(subs, payloadObj, { orgId });
+}
+
+/**
+ * The individual-subscriber equivalent of notifyOrg — closes the gap
+ * deviceOwnerFromRequest's own comment describes for FCM device tokens (a
+ * personal account previously had nowhere to register a web subscription at
+ * all). Used by Nearby Help to reach an opted-in responder who has no
+ * organisation.
+ */
+async function notifyUser(userId, payloadObj) {
+  if (!enabled()) return { sent: 0, pruned: 0, failed: 0, skipped: 'not configured' };
+  if (!userId) return { sent: 0, pruned: 0, failed: 0 };
+  let subs;
+  try {
+    subs = await db.listPushSubscriptionsForUser(userId);
+  } catch (e) {
+    console.error('[push] list subscriptions (user) failed:', e.message);
+    return { sent: 0, pruned: 0, failed: 0, skipped: e.message };
+  }
+  return sendToSubs(subs, payloadObj, { userId });
+}
+
+module.exports = { init, enabled, getPublicKey, notifyOrg, notifyUser };

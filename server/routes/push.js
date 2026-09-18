@@ -7,7 +7,7 @@ const db = require('../db');
 const push = require('../push');
 const fcm = require('../fcm');
 const { sendJson, readJson } = require('../http');
-const { orgIdFromRequest, deviceOwnerFromRequest } = require('../guards');
+const { deviceOwnerFromRequest } = require('../guards');
 
 async function handle({ req, res, path }) {
   // --- Web push ---
@@ -19,14 +19,18 @@ async function handle({ req, res, path }) {
   if (path === '/api/push/subscribe' && req.method === 'POST') {
     if (!push.enabled()) { sendJson(res, 501, { error: 'push notifications are not available' }); return true; }
     const body = await readJson(req);
-    const orgId = await orgIdFromRequest(req, body);
-    if (!orgId) { sendJson(res, 401, { error: 'org credentials required' }); return true; }
+    // Either owner will do — a site's roster or a person with no organisation
+    // at all. See deviceOwnerFromRequest's own comment: this used to be
+    // org-only, which left every individual subscriber unable to receive a
+    // web push on a closed tab, the exact gap already closed for native FCM.
+    const owner = await deviceOwnerFromRequest(req, body);
+    if (!owner) { sendJson(res, 401, { error: 'credentials required' }); return true; }
     const sub = body.subscription;
     if (!sub || !sub.endpoint || !sub.keys || !sub.keys.p256dh || !sub.keys.auth) {
       sendJson(res, 400, { error: 'invalid subscription' });
       return true;
     }
-    await db.createPushSubscription({ orgId, endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth });
+    await db.createPushSubscription({ orgId: owner.orgId, userId: owner.userId, endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth });
     sendJson(res, 201, { ok: true });
     return true;
   }
@@ -43,9 +47,9 @@ async function handle({ req, res, path }) {
   // to probe which endpoints belong to which organization.
   if (path === '/api/push/unsubscribe' && req.method === 'POST') {
     const body = await readJson(req);
-    const orgId = await orgIdFromRequest(req, body);
-    if (!orgId) { sendJson(res, 401, { error: 'org credentials required' }); return true; }
-    if (body.endpoint) await db.deletePushSubscription(String(body.endpoint), orgId);
+    const owner = await deviceOwnerFromRequest(req, body);
+    if (!owner) { sendJson(res, 401, { error: 'credentials required' }); return true; }
+    if (body.endpoint) await db.deletePushSubscription(String(body.endpoint), owner);
     sendJson(res, 200, { ok: true });
     return true;
   }

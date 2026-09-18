@@ -1209,6 +1209,7 @@ export default function App() {
               personal={personal}
               deviceName={settings.deviceName}
               profile={profile}
+              token={token}
               incidents={history.incidents}
               persistence={history.persistence}
               historyLoading={history.loading}
