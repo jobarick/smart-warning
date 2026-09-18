@@ -284,6 +284,29 @@ export async function resetPassword(input: { token: string; password: string }):
   return res.json();
 }
 
+export interface SalesInquiry {
+  interest: 'personal' | 'company' | 'enterprise' | 'partnership' | 'support' | 'general';
+  companyName?: string;
+  contactName: string;
+  email?: string;
+  phone?: string;
+  employees?: string;
+  locations?: string;
+  industry?: string;
+  message?: string;
+}
+
+/** Send an enterprise/sales inquiry from the auth page's "Contact Sales" door. */
+export async function contactSales(input: SalesInquiry): Promise<{ ok: boolean }> {
+  const res = await fetch(`${API_BASE}/api/contact/sales`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not send that — please email us directly'));
+  return res.json();
+}
+
 // --- Team invites ---
 //
 // Adding a second (or third) supervisor to an organization. Every invited

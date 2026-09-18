@@ -2,6 +2,7 @@ import type { Session } from '../lib/session';
 import type { Incident, OrgProfile } from '../lib/api';
 import type { IndustryProfile } from '../lib/profiles';
 import { alertLabel } from '../lib/profiles';
+import { t } from '../lib/i18n';
 import type { AlertType, Locale, LogEntry } from '../types';
 import { AlertLog } from './AlertLog';
 import { Icon } from './Icon';
@@ -64,15 +65,15 @@ export function ProfilePanel({
         {personal && session?.kind === 'supervisor' ? (
           <>
             <span className="profile-id-line">{session.user.email}</span>
-            <span className="profile-id-line profile-id-muted">Personal account</span>
+            <span className="profile-id-line profile-id-muted">{t(locale, 'profile.personalAccount')}</span>
           </>
         ) : org ? (
           <>
             <span className="profile-id-line">{org.name}</span>
-            <span className="profile-id-line profile-id-muted">Team code {org.joinCode}</span>
+            <span className="profile-id-line profile-id-muted">{t(locale, 'profile.teamCode', { code: org.joinCode })}</span>
           </>
         ) : (
-          <span className="profile-id-line profile-id-muted">Team {workerCode}</span>
+          <span className="profile-id-line profile-id-muted">{t(locale, 'profile.team', { code: workerCode ?? '' })}</span>
         )}
       </section>
 
@@ -82,17 +83,17 @@ export function ProfilePanel({
 
       {org && (
         <section className="panel">
-          <h2>Team activity</h2>
+          <h2>{t(locale, 'profile.teamActivity')}</h2>
           {!persistence ? (
             <p className="hint">
               {persistence === false
-                ? 'Incident history is not stored on this deployment.'
-                : historyLoading ? 'Loading…' : 'History unavailable.'}
+                ? t(locale, 'profile.historyNoDb')
+                : historyLoading ? t(locale, 'profile.loading') : t(locale, 'profile.historyUnavailable')}
             </p>
           ) : historyError ? (
-            <p className="hint">History unavailable, retrying.</p>
+            <p className="hint">{t(locale, 'profile.historyRetrying')}</p>
           ) : incidents.length === 0 ? (
-            <p className="hint">No incidents recorded yet.</p>
+            <p className="hint">{t(locale, 'profile.noIncidents')}</p>
           ) : (
             <ul className="log-list">
               {incidents.slice(0, 20).map((inc) => (
@@ -105,11 +106,13 @@ export function ProfilePanel({
                       <strong>{alertLabel(profile, inc.type as AlertType)}</strong>
                       {inc.zone ? ` · ${inc.zone}` : ''}
                     </span>
-                    <span className="log-sender">{inc.sender || 'unknown'}</span>
+                    <span className="log-sender">{inc.sender || t(locale, 'profile.unknownSender')}</span>
                   </div>
                   <div className="log-meta">
                     <span>
-                      {inc.status === 'active' ? 'Active' : inc.resolved_by ? `Resolved by ${inc.resolved_by}` : 'Resolved'}
+                      {inc.status === 'active'
+                        ? t(locale, 'profile.statusActive')
+                        : inc.resolved_by ? t(locale, 'profile.resolvedBy', { name: inc.resolved_by }) : t(locale, 'profile.statusResolved')}
                     </span>
                   </div>
                 </li>
@@ -124,26 +127,26 @@ export function ProfilePanel({
       )}
 
       <section className="panel profile-prefs">
-        <span className="profile-prefs-label">Language</span>
+        <span className="profile-prefs-label">{t(locale, 'settings.language')}</span>
         <button type="button" className="profile-lang-toggle" onClick={onToggleLocale}>
-          {locale === 'en' ? 'English' : 'Kiswahili'}
+          {t(locale, locale === 'en' ? 'settings.languageEnglish' : 'settings.languageSwahili')}
         </button>
       </section>
 
       <div className="profile-actions">
         {onBilling && (
           <button className="btn settings-link" onClick={onBilling}>
-            <Icon name="check-circle" /> Plans &amp; billing
+            <Icon name="check-circle" /> {t(locale, 'profile.plansAndBilling')}
           </button>
         )}
         <button className="btn settings-link" onClick={onAbout}>
-          About &amp; legal
+          {t(locale, 'profile.aboutAndLegal')}
         </button>
         <button className="btn settings-link" onClick={onSettings}>
-          <Icon name="settings" /> Settings
+          <Icon name="settings" /> {t(locale, 'profile.settings')}
         </button>
         <button className="btn settings-link" onClick={onSupport}>
-          <Icon name="help" /> Support
+          <Icon name="help" /> {t(locale, 'profile.support')}
         </button>
       </div>
     </div>

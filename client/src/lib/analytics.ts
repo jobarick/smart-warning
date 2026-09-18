@@ -38,6 +38,10 @@ export type AnalyticsEvent =
   | 'legal_view'
   | 'signup_start'
   | 'signup_complete'
+  // The auth page's "Talk to Smart Warning" enterprise door — opened versus
+  // actually sent, same funnel shape as signup_start/signup_complete.
+  | 'sales_contact_start'
+  | 'sales_contact_sent'
   // How many people open the feedback widget versus finish it. Only the counts
   // — the answer itself goes to the feedback endpoint, never to an analytics
   // provider.

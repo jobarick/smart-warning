@@ -932,7 +932,14 @@ export default function App() {
   // between them and the alarm.
   if (orgsMode && !session) {
     if (isNativeApp() || path === AUTH_ROUTE) {
-      return <AuthGate onAuthed={onAuthed} notice={authNotice} />;
+      return (
+        <AuthGate
+          onAuthed={onAuthed}
+          notice={authNotice}
+          locale={settings.locale}
+          onToggleLocale={() => patchSettings({ locale: settings.locale === 'en' ? 'sw' : 'en' })}
+        />
+      );
     }
     return (
       <LandingPage
@@ -1038,7 +1045,7 @@ export default function App() {
 
       {showSupport ? (
         <main className="worker">
-          <ContactSupport onBack={() => window.history.back()} />
+          <ContactSupport onBack={() => window.history.back()} locale={settings.locale} />
         </main>
       ) : showAbout ? (
         <main className="worker">
@@ -1056,7 +1063,7 @@ export default function App() {
       ) : showBilling && token ? (
         <main className="worker">
           <Suspense fallback={<PanelFallback label="plans" />}>
-            <BillingPanel token={token} onBack={() => window.history.back()} />
+            <BillingPanel token={token} onBack={() => window.history.back()} locale={settings.locale} />
           </Suspense>
         </main>
       ) : showSettings ? (
@@ -1138,7 +1145,7 @@ export default function App() {
                   thing on this screen and must never push the button that
                   matters further down. Renders nothing unless there is
                   something true to say. */}
-              {token && <TrialBanner token={token} onUpgrade={() => navigate('/billing')} />}
+              {token && <TrialBanner token={token} onUpgrade={() => navigate('/billing')} locale={settings.locale} />}
               <OperatorStatus
                 name={settings.deviceName}
                 operatorId={settings.operatorId}
@@ -1152,7 +1159,7 @@ export default function App() {
             </>
           )}
 
-          {tab === 'safety' && <SafetyPanel premium={!!tier && tier !== 'free'} />}
+          {tab === 'safety' && <SafetyPanel premium={!!tier && tier !== 'free'} token={token} locale={settings.locale} />}
 
           {tab === 'help' && (
             <>
@@ -1228,7 +1235,7 @@ export default function App() {
 
       {/* Hidden whenever a full-screen panel is open, so those keep their own
           Back button as the single way out rather than competing with it. */}
-      {tabbed && <TabBar tab={tab} onChange={(t) => navigate(TAB_PATHS[t])} alertCount={log.length} active={alarmActive} />}
+      {tabbed && <TabBar tab={tab} onChange={(t) => navigate(TAB_PATHS[t])} alertCount={log.length} active={alarmActive} locale={settings.locale} />}
 
       {view === 'worker' && alarm.alert && (
         <AlertOverlay

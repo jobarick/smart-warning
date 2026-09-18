@@ -1,11 +1,17 @@
 import { useState } from 'react';
 import { SAFETY_GROUPS, SAFETY_GUIDES, findGuide, guidesInGroup, type SafetyGuide } from '../lib/safety';
+import type { Locale } from '../types';
 import { Icon } from './Icon';
 import { SafetyBriefingCard } from './SafetyBriefingCard';
+import { WeatherCard } from './WeatherCard';
 
 interface Props {
   /** Any tier other than 'free' — see App.tsx's tier fetch and SafetyBriefingCard. */
   premium: boolean;
+  /** Undefined for a worker holding only a join code — WeatherCard still
+   *  renders, it just cannot unlock the forecast (decided server-side). */
+  token?: string;
+  locale: Locale;
 }
 
 /**
@@ -18,7 +24,7 @@ interface Props {
  * Master and detail live in the same tab rather than a route, so returning to
  * the list is one obvious control and never leaves the screen the person is on.
  */
-export function SafetyPanel({ premium }: Props) {
+export function SafetyPanel({ premium, token, locale }: Props) {
   const [openId, setOpenId] = useState<string | null>(null);
   const guide = openId ? findGuide(openId) : undefined;
 
@@ -27,6 +33,7 @@ export function SafetyPanel({ premium }: Props) {
   return (
     <section className="safety">
       <SafetyBriefingCard premium={premium} />
+      <WeatherCard token={token} locale={locale} />
 
       <header className="safety-head">
         <h2>Safety &amp; preparedness</h2>

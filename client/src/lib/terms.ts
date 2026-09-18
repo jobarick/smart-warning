@@ -20,6 +20,16 @@ export const SUPPORT_EMAIL = 'jobarick@gmail.com';
 export const SUPPORT_PHONE = '+255 713 455 454';
 
 /**
+ * Public-facing business/sales contact, shown on the landing page and the
+ * auth page's enterprise door. Deliberately separate from SUPPORT_EMAIL:
+ * that address is where account-support tickets and the legal documents
+ * above tell a user to write for a privacy/data request, and a "talk to
+ * sales" inquiry should not compete with that inbox unless someone chooses
+ * to point both at the same place.
+ */
+export const SALES_EMAIL = 'lab@idesign.co.tz';
+
+/**
  * Who provides the Service.
  *
  * Named in one place and used everywhere — the terms, the privacy policy, the

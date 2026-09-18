@@ -189,6 +189,12 @@ const allowOrgInvite = rateLimiter({ windowMs: 60 * 60 * 1000, max: 30, name: 'o
 // come back later — not an emergency going unreported.
 const allowVisitorFeedback = rateLimiter({ windowMs: 60 * 60 * 1000, max: 5, name: 'visitor-feedback' });
 
+// Enterprise/sales inquiries from the auth page's "Contact Sales" door — same
+// reasoning as allowVisitorFeedback (unauthenticated by necessity, a stranger
+// asking about the product has no account to hold a credential), same tight
+// bucket for the same reason.
+const allowSalesContact = rateLimiter({ windowMs: 60 * 60 * 1000, max: 5, name: 'sales-contact' });
+
 // A personal account alerting its own Trusted Circle. Generous — a real
 // emergency can mean several genuine alerts in a short window (a fall, then
 // a worse fall) — but bounded so one account cannot turn this into a mail
@@ -227,6 +233,6 @@ function allowPasswordResetForAddress(email) {
 module.exports = {
   requireAuth, guardOrg, orgContext, orgIdFromRequest, deviceOwnerFromRequest, allowFeature,
   allowReport, allowPlaces, allowWebhook, allowPasswordReset, allowPasswordResetForAddress,
-  allowVisitorFeedback, allowLogin, allowSignup, allowOrgInvite, allowPersonalAlert,
+  allowVisitorFeedback, allowSalesContact, allowLogin, allowSignup, allowOrgInvite, allowPersonalAlert,
   allowEmergencyReport,
 };

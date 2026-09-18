@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchFeedback, submitFeedback, type FeedbackItem, type FeedbackKind } from '../lib/api';
-import { SUPPORT_EMAIL } from './ContactSupport';
+import { SUPPORT_EMAIL } from '../lib/terms';
 import { Icon } from './Icon';
 
 interface Props {

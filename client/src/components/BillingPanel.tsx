@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
+import { t } from '../lib/i18n';
+import { SALES_EMAIL } from '../lib/terms';
+import type { Locale } from '../types';
 import { Icon } from './Icon';
 import { PaymentModal } from './PaymentModal';
 import {
@@ -11,9 +14,10 @@ import {
 interface Props {
   token: string;
   onBack?: () => void;
+  locale: Locale;
 }
 
-export function BillingPanel({ token, onBack }: Props) {
+export function BillingPanel({ token, onBack, locale }: Props) {
   const [currency, setCurrency] = useState<Currency>('TZS');
   const [cycle] = useState<Cycle>('monthly');
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -76,12 +80,12 @@ export function BillingPanel({ token, onBack }: Props) {
     <section className="bill">
       {onBack && (
         <button className="bill-back" type="button" onClick={onBack}>
-          <Icon name="arrow-left" /> Back
+          <Icon name="arrow-left" /> {t(locale, 'bill.back')}
         </button>
       )}
 
       <header className="bill-head">
-        <h2>Plans &amp; billing</h2>
+        <h2>{t(locale, 'bill.heading')}</h2>
         <div className="bill-cur">
           {(['TZS', 'USD'] as Currency[]).map((c) => (
             <button
@@ -100,37 +104,37 @@ export function BillingPanel({ token, onBack }: Props) {
           It is the product's central promise and it should not be something a
           customer has to infer from a pricing table. */}
       <p className="bill-promise">
-        <Icon name="siren" /> Emergency alerting is never billed. SOS, all-clear, roll call and
-        live location work on every plan, including while a payment is pending, overdue or
-        cancelled. Plans only affect Safety Coordinator tools.
+        <Icon name="siren" /> {t(locale, 'bill.promise')}
       </p>
 
       {entitlements && (
         <div className={`bill-current${entitlements.status !== 'active' ? ' warn' : ''}`}>
           <div>
-            <span className="bill-lbl">Current plan</span>
+            <span className="bill-lbl">{t(locale, 'bill.currentPlan')}</span>
             <b>{entitlements.planName}</b>
             <span className="bill-sub">{describeStatus(entitlements)}</span>
           </div>
           {entitlements.seats.limit != null && (
             <div>
-              <span className="bill-lbl">Seats</span>
+              <span className="bill-lbl">{t(locale, 'bill.seats')}</span>
               <b>{entitlements.seats.used} / {entitlements.seats.limit}</b>
               {entitlements.seats.over && (
-                <span className="bill-sub warn">Over your plan, everyone still gets alerts</span>
+                <span className="bill-sub warn">{t(locale, 'bill.seatsOver')}</span>
               )}
             </div>
           )}
           {subscription?.billingPhone && (
             <div>
-              <span className="bill-lbl">Billing number</span>
+              <span className="bill-lbl">{t(locale, 'bill.billingNumber')}</span>
               <b>{subscription.billingPhone}</b>
             </div>
           )}
           {entitlements.degraded && (
             <p className="bill-note">
-              You are subscribed to {entitlements.subscribedTier.replace('_', ' ')} but currently
-              served {entitlements.planName} while the payment settles.
+              {t(locale, 'bill.degradedNote', {
+                tier: entitlements.subscribedTier.replace('_', ' '),
+                plan: entitlements.planName,
+              })}
             </p>
           )}
         </div>
@@ -150,16 +154,16 @@ export function BillingPanel({ token, onBack }: Props) {
 
               <div className="bill-amount">
                 {plan.contactOnly ? (
-                  <b>Custom</b>
+                  <b>{t(locale, 'bill.custom')}</b>
                 ) : (
                   <>
                     <b>{formatMoney(plan.price, plan.currency)}</b>
-                    <span>{plan.price ? `per ${cycle === 'annual' ? 'year' : 'month'}` : 'always free'}</span>
+                    <span>{plan.price ? t(locale, cycle === 'annual' ? 'bill.perYear' : 'bill.perMonth') : t(locale, 'bill.alwaysFree')}</span>
                   </>
                 )}
                 {plan.perSeat && (
                   <span className="bill-seat">
-                    ${plan.perSeat.min}–{plan.perSeat.max} per user / month
+                    {t(locale, 'bill.perSeatRange', { min: `$${plan.perSeat.min}`, max: `$${plan.perSeat.max}` })}
                   </span>
                 )}
               </div>
@@ -172,28 +176,28 @@ export function BillingPanel({ token, onBack }: Props) {
 
               <footer>
                 {isCurrent ? (
-                  <span className="bill-badge">Current plan</span>
+                  <span className="bill-badge">{t(locale, 'bill.currentBadge')}</span>
                 ) : plan.contactOnly ? (
-                  <a className="bill-btn ghost" href="mailto:jobarick@gmail.com?subject=Smart%20Warning%20Enterprise">
-                    Talk to us
+                  <a className="bill-btn ghost" href={`mailto:${SALES_EMAIL}?subject=Smart%20Warning%20Enterprise`}>
+                    {t(locale, 'bill.talkToUs')}
                   </a>
                 ) : !plan.chargeable ? (
-                  <span className="bill-badge">Included</span>
+                  <span className="bill-badge">{t(locale, 'bill.includedBadge')}</span>
                 ) : currency === 'TZS' ? (
                   // Offering a button that can only 502 is worse than saying
                   // plainly that the method is not switched on yet.
                   methods && !methods.mobileMoney.enabled ? (
-                    <span className="bill-badge">Mobile money not configured</span>
+                    <span className="bill-badge">{t(locale, 'bill.mobileMoneyOff')}</span>
                   ) : (
                     <button type="button" className="bill-btn" onClick={() => setCheckout(plan)}>
-                      <Icon name="phone" /> Pay by mobile money
+                      <Icon name="phone" /> {t(locale, 'bill.payMobileMoney')}
                     </button>
                   )
                 ) : methods && !methods.card.enabled ? (
-                  <span className="bill-badge">Card payments not configured</span>
+                  <span className="bill-badge">{t(locale, 'bill.cardOff')}</span>
                 ) : (
                   <button type="button" className="bill-btn" disabled={busy} onClick={() => onCard(plan)}>
-                    Pay by card
+                    {t(locale, 'bill.payByCard')}
                   </button>
                 )}
               </footer>
@@ -204,7 +208,7 @@ export function BillingPanel({ token, onBack }: Props) {
 
       {transactions.length > 0 && (
         <div className="bill-history">
-          <span className="bill-lbl">Payment history</span>
+          <span className="bill-lbl">{t(locale, 'bill.paymentHistory')}</span>
           <ul>
             {transactions.map((t) => (
               <li key={t.id}>
@@ -222,7 +226,7 @@ export function BillingPanel({ token, onBack }: Props) {
 
       {entitlements && entitlements.tier !== 'free' && entitlements.status !== 'canceled' && (
         <button type="button" className="bill-cancel" disabled={busy} onClick={onCancel}>
-          Cancel subscription
+          {t(locale, 'bill.cancelSubscription')}
         </button>
       )}
 

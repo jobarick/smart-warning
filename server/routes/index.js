@@ -21,7 +21,9 @@ const MODULES = [
   require('./destinations'),
   require('./emergency'),
   require('./feedback'),
+  require('./contact'),
   require('./billing'),
+  require('./weather'),
   require('./responders'),
 ];
 

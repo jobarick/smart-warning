@@ -14,6 +14,10 @@ const FEATURES = {
   UNLIMITED_CONTACTS: 'unlimited_contacts',
   FAMILY_LOCATION: 'family_location',
   SAFETY_ASSISTANT: 'safety_assistant',
+  // Current conditions are free for everyone (see server/weather.js and
+  // routes/weather.js) — this gates only the 3-day forecast and the
+  // rain/wind/heat safety notes layered on top of it.
+  WEATHER_FORECAST: 'weather_forecast',
   SUPERVISOR_DASHBOARD: 'supervisor_dashboard',
   INCIDENT_REPORTS: 'incident_reports',
   ADVANCED_ANALYTICS: 'advanced_analytics',
@@ -154,7 +158,7 @@ const PLANS = [
     // price the monthly cycle barely pays for itself, and prepaid airtime has
     // already taught this market to buy time in blocks.
     bundles: BUNDLE_PRICE,
-    features: [F.UNLIMITED_CONTACTS, F.FAMILY_LOCATION, F.SAFETY_ASSISTANT],
+    features: [F.UNLIMITED_CONTACTS, F.FAMILY_LOCATION, F.SAFETY_ASSISTANT, F.WEATHER_FORECAST],
     includes: ['Everything in Free', 'Unlimited emergency contacts', 'Family location sharing', 'Safety assistant guidance'],
   },
   {
@@ -167,7 +171,7 @@ const PLANS = [
     price: TEAM_MONTHLY_PRICE,
     bundles: TEAM_BUNDLE_PRICE,
     features: [
-      F.UNLIMITED_CONTACTS, F.FAMILY_LOCATION, F.SAFETY_ASSISTANT,
+      F.UNLIMITED_CONTACTS, F.FAMILY_LOCATION, F.SAFETY_ASSISTANT, F.WEATHER_FORECAST,
       F.SUPERVISOR_DASHBOARD, F.INCIDENT_REPORTS,
     ],
     includes: ['Everything in Personal', 'Safety Coordinator command centre', 'Incident history & roll call', 'Up to 50 people'],
@@ -182,7 +186,7 @@ const PLANS = [
     minSeats: 51,
     price: BUSINESS_PRICE,
     features: [
-      F.UNLIMITED_CONTACTS, F.FAMILY_LOCATION, F.SAFETY_ASSISTANT,
+      F.UNLIMITED_CONTACTS, F.FAMILY_LOCATION, F.SAFETY_ASSISTANT, F.WEATHER_FORECAST,
       F.SUPERVISOR_DASHBOARD, F.INCIDENT_REPORTS,
       F.ADVANCED_ANALYTICS, F.EMERGENCY_DRILLS, F.PRIORITY_SUPPORT,
     ],
@@ -200,7 +204,7 @@ const PLANS = [
     seats: null,
     price: ENTERPRISE_PRICE,
     features: [
-      F.UNLIMITED_CONTACTS, F.FAMILY_LOCATION, F.SAFETY_ASSISTANT,
+      F.UNLIMITED_CONTACTS, F.FAMILY_LOCATION, F.SAFETY_ASSISTANT, F.WEATHER_FORECAST,
       F.SUPERVISOR_DASHBOARD, F.INCIDENT_REPORTS,
       F.ADVANCED_ANALYTICS, F.EMERGENCY_DRILLS, F.PRIORITY_SUPPORT,
       F.CUSTOM_BILLING,

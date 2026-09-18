@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { track } from '../lib/analytics';
 import { fetchPlans, formatMoney, type Plan, type PaymentMethods } from '../lib/billing';
-import { PROVIDER, SUPPORT_EMAIL } from '../lib/terms';
+import { PROVIDER, SUPPORT_EMAIL, SUPPORT_PHONE, SALES_EMAIL } from '../lib/terms';
 import { t } from '../lib/i18n';
 import type { Locale } from '../types';
 import { EmergencyGrid } from './EmergencyGrid';
@@ -16,7 +16,7 @@ interface Props {
    * that gate can open straight to their form instead of the account-choice
    * screen everyone else needs. Omitted, it lands on the choice screen.
    */
-  onGetStarted: (step?: 'login' | 'worker') => void;
+  onGetStarted: (step?: 'login' | 'worker' | 'sales') => void;
   /** Plays the twelve-second simulation. */
   onWatchDemo: () => void;
   /**
@@ -52,7 +52,7 @@ export function LandingPage({ onGetStarted, onWatchDemo, locale, onToggleLocale 
   usePricingSeen();
 
   /** Which button sent them onward — the whole point of measuring this page. */
-  const go = (cta: string, step?: 'login' | 'worker') => {
+  const go = (cta: string, step?: 'login' | 'worker' | 'sales') => {
     track('click_cta', { cta });
     onGetStarted(step);
   };
@@ -242,6 +242,21 @@ export function LandingPage({ onGetStarted, onWatchDemo, locale, onToggleLocale 
             {t(locale, 'landing.footer.aboutP2')}{' '}
             <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>, {t(locale, 'landing.footer.aboutAnswer')}
           </p>
+          <p className="lp-footer-phone">
+            {t(locale, 'landing.footer.phoneLabel')}: <a href={`tel:${SUPPORT_PHONE.replace(/\s+/g, '')}`}>{SUPPORT_PHONE}</a>
+          </p>
+        </div>
+        <div className="lp-footer-b2b">
+          <h3>{t(locale, 'landing.footer.b2bHeading')}</h3>
+          <p>{t(locale, 'landing.footer.b2bBody')}</p>
+          <p className="lp-footer-phone">
+            <a href={`tel:${SUPPORT_PHONE.replace(/\s+/g, '')}`}>{SUPPORT_PHONE}</a>
+            {' · '}
+            <a href={`mailto:${SALES_EMAIL}`}>{SALES_EMAIL}</a>
+          </p>
+          <button className="lp-footer-sales-cta" onClick={() => go('footer_contact_sales', 'sales')}>
+            {t(locale, 'landing.footer.contactSales')}
+          </button>
         </div>
         <nav className="lp-footer-links">
           <a href="/legal/terms.html">{t(locale, 'landing.footer.terms')}</a>

@@ -1617,17 +1617,96 @@ body {
 }
 .boot-splash svg { width: 22px; height: 22px; color: var(--accent); }
 
-.auth {
-  min-height: 100dvh; display: flex; align-items: center; justify-content: center;
-  padding: 24px; background: radial-gradient(1200px 600px at 50% -10%, var(--bg-2), var(--bg));
+.auth-page {
+  min-height: 100dvh;
+  padding: 24px;
+  background: radial-gradient(1200px 600px at 50% -10%, var(--bg-2), var(--bg));
 }
 /* The choice screen is the one card tall enough to matter, and it has always
    fitted a phone without scrolling. Buying back the gutter keeps that true now
    that it also carries the scope disclaimer and the legal links — a first
    screen you have to scroll to finish reading is one people finish by guessing. */
 @media (max-width: 480px) {
-  .auth { padding: 16px 14px; }
+  .auth-page { padding: 16px 14px; }
 }
+
+/* Two-column entry page: a story/premium/vision/who-we-serve/enterprise column
+   next to the actual auth form. Mobile stacks in the order a stranger needs
+   it — a short story, then the form, then everything that would otherwise
+   make them scroll past the one thing they came here to do. Desktop gets the
+   full story beside a sticky form, never above it. */
+.auth-shell {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: grid;
+  gap: 26px 48px;
+  grid-template-columns: 1fr;
+  grid-template-areas: "brand" "intro" "vision" "form" "premium" "serve" "enterprise";
+}
+@media (min-width: 960px) {
+  .auth-shell {
+    grid-template-columns: 1.05fr 0.95fr;
+    align-items: start;
+    grid-template-areas:
+      "brand      brand"
+      "intro      form"
+      "vision     form"
+      "premium    form"
+      "serve      form"
+      "enterprise form";
+  }
+}
+
+.auth-brand-row { display: flex; align-items: center; justify-content: space-between; }
+.auth-lang-toggle {
+  background: none; border: 1px solid var(--panel-border); border-radius: 8px;
+  padding: 6px 12px; color: var(--muted); font-size: 0.8rem; font-weight: 650; cursor: pointer;
+}
+.auth-lang-toggle:hover { color: var(--text); border-color: color-mix(in srgb, var(--accent) 45%, var(--panel-border)); }
+
+/* Each child claims its own named grid-area via an inline style, so the
+   wrapper itself must not create a box the grid would place instead. */
+.auth-story { display: contents; }
+
+.auth-eyebrow { color: var(--accent); font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 8px; }
+.auth-story-heading { font-size: clamp(1.5rem, 1.2rem + 1.4vw, 2.2rem); font-weight: 750; line-height: 1.15; margin: 0 0 12px; color: var(--text); }
+.auth-story-lead { color: var(--muted); font-size: 1rem; line-height: 1.5; margin: 0 0 18px; max-width: 46ch; }
+
+.auth-feature-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px 18px; }
+.auth-feature-list li { display: flex; align-items: center; gap: 10px; color: var(--text); font-size: 0.9rem; font-weight: 600; }
+.auth-feature-list svg { width: 18px; height: 18px; color: var(--accent); flex: none; }
+
+.auth-story-vision {
+  padding: 16px 18px; border-radius: 14px;
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--panel-border));
+}
+.auth-story-vision h2 { margin: 0 0 6px; font-size: 1.05rem; font-weight: 700; color: var(--text); }
+.auth-story-vision p { margin: 0; color: var(--muted); font-size: 0.88rem; line-height: 1.5; }
+
+.auth-story-block h2 { font-size: 1.2rem; font-weight: 700; margin: 0 0 8px; color: var(--text); }
+.auth-story-block > p { color: var(--muted); font-size: 0.92rem; line-height: 1.5; margin: 0 0 14px; max-width: 52ch; }
+
+.auth-serve-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.auth-serve-card { padding: 14px; border-radius: 12px; background: var(--panel); border: 1px solid var(--panel-border); display: flex; flex-direction: column; gap: 6px; }
+.auth-serve-card svg { width: 20px; height: 20px; color: var(--accent); }
+.auth-serve-card b { font-size: 0.9rem; color: var(--text); }
+.auth-serve-card span { font-size: 0.8rem; color: var(--muted); line-height: 1.4; }
+
+.auth-story-enterprise { padding: 20px; border-radius: 16px; background: linear-gradient(180deg, var(--panel-2), var(--panel)); border: 1px solid var(--panel-border); }
+.auth-enterprise-cta {
+  margin-top: 6px; padding: 11px 20px; border-radius: 11px; border: none;
+  background: var(--accent-fill); color: #fff; font-weight: 650; font-size: 0.92rem; cursor: pointer;
+}
+.auth-enterprise-cta:hover { filter: brightness(1.05); }
+
+.auth-choice--sales { border-style: dashed; }
+
+.auth-form-col { display: flex; justify-content: center; }
+@media (min-width: 960px) {
+  .auth-form-col { position: sticky; top: 24px; }
+}
+
 .auth-card {
   width: 100%; max-width: 420px;
   background: linear-gradient(180deg, var(--panel-2), var(--panel));
@@ -1663,11 +1742,12 @@ body {
 .auth-back svg { width: 15px; height: 15px; }
 .auth-field { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
 .auth-field span { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
-.auth-field input {
-  padding: 12px 13px; font-size: 0.95rem; color: var(--text);
+.auth-field input, .auth-field select, .auth-field textarea {
+  padding: 12px 13px; font-size: 0.95rem; color: var(--text); font-family: inherit;
   background: var(--bg-2); border: 1px solid var(--panel-border); border-radius: 11px; outline: none;
 }
-.auth-field input:focus { border-color: var(--accent); }
+.auth-field textarea { resize: vertical; min-height: 72px; }
+.auth-field input:focus, .auth-field select:focus, .auth-field textarea:focus { border-color: var(--accent); }
 .auth-field span small { font-weight: 500; opacity: 0.75; margin-left: 6px; }
 
 /* Password field with a reveal control. The input keeps its own full-width
@@ -2785,6 +2865,50 @@ body {
 }
 .briefing-steps { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: 6px; }
 .briefing-steps li { font-size: 13px; line-height: 1.5; }
+
+/* Weather card (WeatherCard) — sits directly under the briefing card. A
+   third-party forecast, deliberately styled like a sibling of .briefing
+   rather than a copy of it: the .weather-disclaimer line is what keeps it
+   from being mistaken for the TMA slot above it. */
+.weather-card {
+  display: flex; flex-direction: column; gap: 12px; padding: 16px;
+  background: var(--panel); border: 1px solid var(--panel-border); border-radius: 14px;
+}
+.weather-heading { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 1.02rem; font-weight: 700; }
+.weather-heading svg { color: var(--accent); }
+.weather-empty { margin: 0; font-size: 13px; color: var(--muted); }
+.weather-choose-label { margin: 0; font-size: 12px; font-weight: 650; color: var(--muted); }
+.weather-place-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.weather-place-btn {
+  padding: 8px 12px; border-radius: 9px; border: 1px solid var(--panel-border);
+  background: var(--panel-2); color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.weather-place-btn:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--panel-border)); }
+.weather-current { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.weather-temp { font-size: 2.1rem; font-weight: 750; line-height: 1; }
+.weather-condition { font-size: 0.95rem; color: var(--muted); font-weight: 600; }
+.weather-wind { margin-left: auto; font-size: 0.82rem; color: var(--faint); }
+.weather-notes { display: flex; flex-direction: column; gap: 8px; }
+.weather-note {
+  margin: 0; padding: 10px 12px; border-radius: 10px; font-size: 12.5px; line-height: 1.5;
+  color: var(--muted); background: color-mix(in srgb, var(--cmd-warn, #d97706) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cmd-warn, #d97706) 24%, transparent);
+}
+.weather-note b { display: block; color: var(--text); font-weight: 650; margin-bottom: 2px; }
+.weather-teaser { margin: 0; font-size: 13px; line-height: 1.55; color: var(--muted); }
+.weather-forecast-label {
+  display: block; margin-bottom: 8px; font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint);
+}
+.weather-forecast-grid { display: flex; gap: 8px; }
+.weather-forecast-day {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 10px 6px; border-radius: 10px; background: var(--panel-2); font-size: 12px;
+}
+.weather-forecast-day span:first-child { color: var(--muted); font-weight: 600; }
+.weather-forecast-day b { font-size: 15px; }
+.weather-forecast-min { color: var(--faint); }
+.weather-disclaimer { margin: 4px 0 0; padding-top: 10px; border-top: 1px solid var(--panel-border); font-size: 11px; line-height: 1.5; color: var(--faint); }
 /* ---------- trial / subscription banner ----------
    Sits below the SOS on Home. Quiet by design: billing is the least important
    thing on an emergency screen. */

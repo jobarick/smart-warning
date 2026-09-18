@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 import { fetchSubscription, type SubscriptionView } from '../lib/billing';
+import { t } from '../lib/i18n';
+import type { Locale } from '../types';
 import { Icon } from './Icon';
 
 interface Props {
   token: string;
   /** Opens the plans screen. */
   onUpgrade: () => void;
+  locale: Locale;
 }
 
 /**
@@ -20,7 +23,7 @@ interface Props {
  * Renders nothing when there is nothing worth saying. A paying customer in the
  * middle of their month does not need to be told about billing.
  */
-export function TrialBanner({ token, onUpgrade }: Props) {
+export function TrialBanner({ token, onUpgrade, locale }: Props) {
   const [view, setView] = useState<SubscriptionView | null>(null);
 
   useEffect(() => {
@@ -40,22 +43,20 @@ export function TrialBanner({ token, onUpgrade }: Props) {
   const trial = ent.trial;
   const forOrg = subject?.kind === 'organization';
   const price = pricing?.monthly;
-
-  // Wording differs only in whose account it is; the numbers are identical.
-  const whose = forOrg ? "Your organization's Smart Warning trial" : 'Your Smart Warning trial';
+  const priceLabel = price ? `$${price.USD}/${t(locale, 'bill.perMonth')}` : null;
 
   if (trial?.active) {
     return (
       <section className="trial-banner">
-        <p className="trial-line"><Icon name="check-circle" /> {whose} is active</p>
-        <p className="trial-days">{trial.daysLeft} {trial.daysLeft === 1 ? 'day' : 'days'} remaining</p>
-        {price && (
+        <p className="trial-line"><Icon name="check-circle" /> {t(locale, forOrg ? 'trial.active.org' : 'trial.active.individual')}</p>
+        <p className="trial-days">{t(locale, trial.daysLeft === 1 ? 'trial.daysLeftOne' : 'trial.daysLeftMany', { days: String(trial.daysLeft) })}</p>
+        {priceLabel && (
           <p className="trial-after">
-            After your trial: <b>${price.USD}/month</b>
-            {price.TZS ? <span className="trial-local"> · about {price.TZS.toLocaleString()} TZS</span> : null}
+            {t(locale, 'trial.afterLabel', { price: priceLabel })}
+            {price?.TZS ? <span className="trial-local"> · {t(locale, 'trial.aboutTzs', { amount: price.TZS.toLocaleString() })}</span> : null}
           </p>
         )}
-        <button className="btn trial-cta" onClick={onUpgrade}>Continue with Smart Warning</button>
+        <button className="btn trial-cta" onClick={onUpgrade}>{t(locale, 'trial.continueCta')}</button>
       </section>
     );
   }
@@ -63,15 +64,12 @@ export function TrialBanner({ token, onUpgrade }: Props) {
   if (trial?.ended) {
     return (
       <section className="trial-banner trial-banner-ended">
-        <p className="trial-line"><Icon name="hazard" /> {whose} has ended</p>
+        <p className="trial-line"><Icon name="hazard" /> {t(locale, forOrg ? 'trial.ended.org' : 'trial.ended.individual')}</p>
         {/* Stated plainly, because it is the thing somebody is most likely to
             be worried about at this exact moment. */}
-        <p className="trial-after">
-          Emergency alerts, your location during an incident, the emergency numbers and the safety
-          guides all keep working.
-        </p>
-        {price && <p className="trial-after">Subscribe for <b>${price.USD}/month</b> to keep the rest.</p>}
-        <button className="btn trial-cta" onClick={onUpgrade}>See plans</button>
+        <p className="trial-after">{t(locale, 'trial.endedBody')}</p>
+        {priceLabel && <p className="trial-after">{t(locale, 'trial.subscribeToKeep', { price: priceLabel })}</p>}
+        <button className="btn trial-cta" onClick={onUpgrade}>{t(locale, 'trial.seePlans')}</button>
       </section>
     );
   }

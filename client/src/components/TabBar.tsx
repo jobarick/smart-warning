@@ -1,3 +1,5 @@
+import { t, type StringKey } from '../lib/i18n';
+import type { Locale } from '../types';
 import { Icon, type IconName } from './Icon';
 
 export type UserTab = 'home' | 'safety' | 'help' | 'profile';
@@ -10,13 +12,14 @@ interface Props {
   alertCount?: number;
   /** True while an alarm is running, so Home reads as live. */
   active?: boolean;
+  locale: Locale;
 }
 
-const TABS: { id: UserTab; label: string; icon: IconName }[] = [
-  { id: 'home', label: 'Home', icon: 'home' },
-  { id: 'safety', label: 'Safety', icon: 'shield-alert' },
-  { id: 'help', label: 'Help', icon: 'navigation' },
-  { id: 'profile', label: 'Safety Profile', icon: 'user' },
+const TABS: { id: UserTab; labelKey: StringKey; icon: IconName }[] = [
+  { id: 'home', labelKey: 'tab.home', icon: 'home' },
+  { id: 'safety', labelKey: 'tab.safety', icon: 'shield-alert' },
+  { id: 'help', labelKey: 'tab.help', icon: 'navigation' },
+  { id: 'profile', labelKey: 'tab.profile', icon: 'user' },
 ];
 
 /**
@@ -31,30 +34,30 @@ const TABS: { id: UserTab; label: string; icon: IconName }[] = [
  * thumb already is, and this app is used standing up and in a hurry more often
  * than at a desk.
  */
-export function TabBar({ tab, onChange, alertCount = 0, active = false }: Props) {
+export function TabBar({ tab, onChange, alertCount = 0, active = false, locale }: Props) {
   return (
     <nav className="tabbar" aria-label="Main">
-      {TABS.map((t) => {
-        const current = t.id === tab;
-        const live = t.id === 'home' && active;
+      {TABS.map((entry) => {
+        const current = entry.id === tab;
+        const live = entry.id === 'home' && active;
         return (
           <button
-            key={t.id}
+            key={entry.id}
             type="button"
             className={`tabbar-item${current ? ' is-current' : ''}${live ? ' is-live' : ''}`}
             // aria-current, not aria-selected: these are navigation links, not
             // the tabs of a tablist widget, and a screen reader should announce
             // them as "current page".
             aria-current={current ? 'page' : undefined}
-            onClick={() => onChange(t.id)}
+            onClick={() => onChange(entry.id)}
           >
             <span className="tabbar-icon">
-              <Icon name={t.icon} />
-              {t.id === 'profile' && alertCount > 0 && (
+              <Icon name={entry.icon} />
+              {entry.id === 'profile' && alertCount > 0 && (
                 <span className="tabbar-badge" aria-hidden="true">{alertCount > 9 ? '9+' : alertCount}</span>
               )}
             </span>
-            <span className="tabbar-label">{t.label}</span>
+            <span className="tabbar-label">{t(locale, entry.labelKey)}</span>
           </button>
         );
       })}
