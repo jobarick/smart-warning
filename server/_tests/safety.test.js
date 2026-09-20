@@ -204,3 +204,72 @@ test('the billing plan catalogue stays public and honest', async () => {
   assert.strictEqual(team.price, require('../billing/plans').priceFor('team', 'TZS'));
   assert.strictEqual(body.enforcement, true);
 });
+
+// --- Alert volume ceiling (relay.js's ALERT_VOLUME_MAX / ALERT_VOLUME_WINDOW_MS) ---
+//
+// A single connection sending a fresh, distinct alert id every 501ms sails
+// straight past ALERT_COOLDOWN_MS (that filter only swallows a double-tap
+// artifact from the SAME id-less burst, not a volume of distinct ones), and
+// every one of those ids is "first time" as far as db.recordAlert's dedup is
+// concerned — each would otherwise fan out to Postgres, Web Push, FCM and
+// Nearby Help for real. This proves the ceiling catches that, and — just as
+// important given the safety stakes of getting this wrong — that it is
+// scoped per-connection, not per-org, so one connection being capped never
+// throttles a different, genuinely separate person raising their own alert
+// through the same relay process.
+test('SAFETY: a flood of distinct alert ids from one connection is capped, without throttling a different connection', async (t) => {
+  const relay = require('../relay.js');
+  const flooder = await connect();
+  await join(flooder);
+
+  const baseline = recorded.alerts.length;
+  // One below the ceiling: every one of these must still be raised for real.
+  for (let i = 0; i < relay.ALERT_VOLUME_MAX; i++) {
+    flooder.send(JSON.stringify({
+      kind: 'alert', id: `flood-${i}`, type: 'hazard', severity: 'high',
+      sender: 'Flooder', timestamp: Date.now(),
+    }));
+    // Spaced past relay.js's ALERT_COOLDOWN_MS (500ms) so this exercises the
+    // volume ceiling specifically, not the unrelated double-tap filter — a
+    // send inside that window is swallowed before it ever reaches the volume
+    // check's caller, which would make every one but the first vanish for
+    // the wrong reason.
+    await new Promise((r) => setTimeout(r, 520));
+  }
+  // Let the last few sends actually reach db.recordAlert before asserting.
+  await new Promise((r) => setTimeout(r, 300));
+  assert.strictEqual(
+    recorded.alerts.length - baseline,
+    relay.ALERT_VOLUME_MAX,
+    'every alert up to the ceiling must still be raised for real',
+  );
+
+  // One more, still respecting the cooldown gap, pushes this connection over
+  // the ceiling — it must be dropped before it ever reaches db.recordAlert.
+  const watcher = await connect();
+  await join(watcher);
+  const sawOneMore = nextMessage(watcher, (m) => m.kind === 'alert' && m.id === 'flood-over-the-top', 1500)
+    .then(() => true).catch(() => false);
+  flooder.send(JSON.stringify({
+    kind: 'alert', id: 'flood-over-the-top', type: 'hazard', severity: 'high',
+    sender: 'Flooder', timestamp: Date.now(),
+  }));
+  assert.strictEqual(await sawOneMore, false, 'an alert past the ceiling must not be broadcast');
+  assert.strictEqual(recorded.alerts.length - baseline, relay.ALERT_VOLUME_MAX, 'and must not be persisted either');
+
+  // A second, unrelated connection in the same org is completely unaffected —
+  // the ceiling must never become a per-org throttle.
+  const real = await connect();
+  await join(real);
+  const delivered = nextMessage(watcher, (m) => m.kind === 'alert' && m.id === 'a-real-second-person');
+  real.send(JSON.stringify({
+    kind: 'alert', id: 'a-real-second-person', type: 'medical', severity: 'critical',
+    sender: 'A Different Person', timestamp: Date.now(),
+  }));
+  const got = await delivered;
+  assert.strictEqual(got.id, 'a-real-second-person', 'a genuinely different connection must still get through');
+
+  flooder.close();
+  watcher.close();
+  real.close();
+});

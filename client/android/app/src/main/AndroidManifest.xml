@@ -53,6 +53,23 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!-- Started only for the duration of an active incident (see
+             IncidentLocationPlugin.java / trigger()'s isPersonal-false branch
+             in App.tsx), stopped on all-clear. Its only job is to hold a
+             foreground-service slot with the `location` type, which is what
+             exempts this app from Android's background execution limits
+             while it runs — the webview's own watchPosition() and WebSocket
+             connection (useSelfTelemetry.ts, useAlertSocket.ts) do the actual
+             work and keep running because of it; this service does not read
+             location itself. Deliberately the narrower alternative to
+             ACCESS_BACKGROUND_LOCATION: it only claims background access
+             while a real emergency is live and visibly says so via its
+             notification, not always. -->
+        <service
+            android:name=".IncidentLocationService"
+            android:foregroundServiceType="location"
+            android:exported="false" />
     </application>
 
     <!-- Permissions -->
@@ -75,6 +92,17 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+
+    <!-- IncidentLocationService, below: both are required to start a
+         foreground service at all (FOREGROUND_SERVICE) and, as of Android 14
+         / API 34, specifically one declared with the `location` type
+         (FOREGROUND_SERVICE_LOCATION) — starting one without the matching
+         permission throws a SecurityException on API 34+ rather than merely
+         being ignored. Neither is the background-location permission; this
+         app still does not hold ACCESS_BACKGROUND_LOCATION and does not ask
+         for it, on purpose (see the service's own manifest comment). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
     <!-- Android 11+ hides other apps unless they are declared here. Without this
          the webview's tel:/mailto:/geo: links resolve to nothing and silently do

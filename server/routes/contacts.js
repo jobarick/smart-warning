@@ -141,6 +141,21 @@ async function handle({ req, res, path }) {
   // reach a phone-only contact: no SMS gateway is wired up, so one is neither
   // attempted nor claimed. The response says exactly who was actually told,
   // so the client can show that truth rather than a bare "sent".
+  //
+  // Idempotent on the incident id: the client now generates it up front and
+  // retries this request (bounded, with a timeout — see client/src/lib/api.ts)
+  // on a network failure, the same way the org/relay path has always been
+  // able to safely replay an alert. `id` is optional and freshly generated
+  // here when absent only for an older client that predates this — every
+  // current client always sends one. Mirrors relay.js's raiseAlert(): the
+  // INSERT's own ON CONFLICT tells us whether this is genuinely the first
+  // time this id has been seen, and everything below that would tell a human
+  // something (email a contact, ping a nearby responder) only ever runs on
+  // that first time. A retry that reaches here after the first attempt's
+  // response was merely lost in transit is therefore a no-op, not a second
+  // round of emails and a second batch of Nearby Help pings — see
+  // createIncidentOffers, which has no dedup of its own and would otherwise
+  // double-notify the same responders on every retry.
   if (path === '/api/contacts/alert' && req.method === 'POST') {
     if (!allowPersonalAlert(req)) { sendJson(res, 429, { error: 'too many alerts, please wait a moment' }); return true; }
     const user = await personalUser(req, res);
@@ -152,18 +167,29 @@ async function handle({ req, res, path }) {
     const message = body.message ? String(body.message).trim().slice(0, 500) : null;
     const lat = numOrNull(body.lat);
     const lng = numOrNull(body.lng);
-    const incidentId = crypto.randomUUID();
+    const incidentId = typeof body.id === 'string' && UUID_RE.test(body.id) ? body.id : crypto.randomUUID();
     const raisedAt = Date.now();
 
+    // Matches relay.js's raiseAlert(): default to "treat as new" so a
+    // database hiccup degrades to the old always-notify behaviour rather than
+    // silently swallowing a real, first-ever alert.
+    let firstTime = true;
     try {
-      await db.recordAlert(
+      const stored = await db.recordAlert(
         { id: incidentId, type, severity, message, sender: user.name || null, timestamp: raisedAt },
         { lat, lng },
         null,
         user.id,
       );
+      if (db.enabled()) firstTime = stored;
     } catch (e) {
       console.error('[db] recordAlert (personal):', e.message);
+    }
+
+    if (!firstTime) {
+      console.log(`[=] personal alert ${incidentId} is already on record — replay accepted, not re-notifying`);
+      sendJson(res, 200, { incidentId, contacted: [], skipped: [], replayed: true });
+      return true;
     }
 
     // Nearby Help, in parallel with the Trusted Circle emails below — this is
@@ -222,6 +248,120 @@ async function handle({ req, res, path }) {
     }
 
     sendJson(res, 201, { incidentId, contacted, skipped });
+    return true;
+  }
+
+  // Attach a location to a personal incident raised without one — see
+  // db.backfillPersonalIncidentLocation's own comment for the scenario this
+  // exists for. Best-effort by nature: arriving too late (the incident
+  // already has a location, or has been resolved) is an ordinary race, not
+  // an error, so this always answers 200 and simply says whether anything
+  // changed rather than treating "too late" as a failure.
+  const locationMatch = path.match(/^\/api\/contacts\/alert\/([^/]+)\/location$/);
+  if (locationMatch && req.method === 'PATCH') {
+    if (!allowPersonalAlert(req)) { sendJson(res, 429, { error: 'too many requests, please wait a moment' }); return true; }
+    const user = await personalUser(req, res);
+    if (!user) return true;
+    const incidentId = decodeURIComponent(locationMatch[1]);
+    if (!UUID_RE.test(incidentId)) { sendJson(res, 404, { error: 'no such incident' }); return true; }
+
+    const body = await readJson(req);
+    const lat = numOrNull(body.lat);
+    const lng = numOrNull(body.lng);
+    if (lat == null || lng == null) { sendJson(res, 400, { error: 'lat and lng are both required' }); return true; }
+
+    const incident = await db.backfillPersonalIncidentLocation({ id: incidentId, userId: user.id, lat, lng });
+    if (!incident) { sendJson(res, 200, { ok: true, updated: false }); return true; }
+
+    // This is genuinely the first location this incident has had — the one
+    // thing skipped at raise time for lack of one (see the POST handler
+    // above) that is still worth doing late: Nearby Help was never
+    // attempted, and a nearby responder found now is still a responder found.
+    // The Trusted Circle is deliberately NOT re-mailed here — their message
+    // already went out, and a second email whose only news is "here is a
+    // map link" is more noise than help for a channel that cannot act on a
+    // location the way a physically nearby responder can.
+    nearbyHelp
+      .searchAndNotify({ incidentId, type: incident.type, lat, lng, excludeUserId: user.id, orgId: null })
+      .catch((e) => console.error('[nearby-help] search failed (personal, backfilled location):', e.message));
+
+    sendJson(res, 200, { ok: true, updated: true });
+    return true;
+  }
+
+  // Resolve a personal account's own incident — the "I'm safe" / "false
+  // alarm" close for the SOS raised through the route above.
+  //
+  // Until this existed, a personal account's Trusted Circle received the
+  // panic email and had no way to ever learn it was over: App.tsx's "All
+  // clear" button only ever cleared the local overlay on the sender's own
+  // screen, because a personal account holds no WebSocket connection to
+  // broadcast an all-clear over in the first place (see isPersonal/runSocket
+  // — the org/team path's all-clear is a relay message, and there is no
+  // relay room here to send one into). This is the missing server half.
+  const resolveMatch = path.match(/^\/api\/contacts\/alert\/([^/]+)\/resolve$/);
+  if (resolveMatch && req.method === 'POST') {
+    if (!allowPersonalAlert(req)) { sendJson(res, 429, { error: 'too many requests, please wait a moment' }); return true; }
+    const user = await personalUser(req, res);
+    if (!user) return true;
+    const incidentId = decodeURIComponent(resolveMatch[1]);
+    if (!UUID_RE.test(incidentId)) { sendJson(res, 404, { error: 'no such incident' }); return true; }
+
+    const body = await readJson(req);
+    const reason = body.reason === 'false-alarm' ? 'false-alarm' : 'resolved';
+
+    const incident = await db.resolvePersonalIncident({
+      id: incidentId, userId: user.id, reason, resolvedBy: user.name || null,
+    });
+    if (!incident) {
+      // Either this account never raised an incident with that id, or it was
+      // already resolved. The two are not this endpoint's to tell apart:
+      // answering differently would let a caller poking at random ids learn
+      // which ones exist. Either way there is nothing new to notify anyone
+      // about, and repeating the call (a retry, a second tap) must stay safe.
+      sendJson(res, 200, { ok: true, incidentId, alreadyResolved: true });
+      return true;
+    }
+
+    const contacts = await db.listNotifiableContacts(user.id);
+    const raiser = user.name || 'Mtumiaji wa Smart Warning';
+    const falseAlarm = reason === 'false-alarm';
+
+    // Fire-and-forget, unlike the original alert's loop: a stand-down message
+    // has no "was this actually delivered" state the caller needs to render,
+    // the way the original alarm's contacted/skipped list does. Waiting on
+    // every send here would only slow down a button whose entire job is to
+    // say "you can stop worrying now" as promptly as possible.
+    for (const contact of contacts) {
+      if (!contact.email) continue;
+      const subject = falseAlarm
+        ? `Taarifa ya uongo — ${raiser} / False alarm — ${raiser}`
+        : `Hali salama — ${raiser} / All clear — ${raiser}`;
+      const body2 = [
+        falseAlarm
+          ? `${raiser} anasema taarifa ya awali ya dharura ilikuwa ya makosa.`
+          : `${raiser} anasema dharura iliyotangulia imekwisha.`,
+        falseAlarm
+          ? `${raiser} says the earlier emergency alert was raised by mistake.`
+          : `${raiser} says the earlier emergency is now over.`,
+        '',
+        `Aina ya awali / Original type: ${titleCase(incident.type)}`,
+        `Muda / Time: ${new Date().toISOString()}`,
+        '',
+        '— Smart Warning',
+      ].join('\n');
+
+      mailer.send({
+        to: contact.email,
+        subject,
+        body: body2,
+        kind: 'personal-alert-resolved',
+        refId: `${incidentId}:${contact.id}:resolved`,
+        orgId: null,
+      }).catch((e) => console.error('[mail] personal-alert-resolved:', e.message));
+    }
+
+    sendJson(res, 200, { ok: true, incidentId, resolution: reason });
     return true;
   }
 

@@ -77,17 +77,32 @@ test('an overdue incident is escalated: bumped, logged, and notified on both cha
   const escalation = load({ db, push, fcm });
 
   const out = await escalation.sweep();
+  // push.notifyOrg/fcm.notifyOrg are deliberately fire-and-forget from
+  // escalateOne (never awaited, so a slow or hung provider cannot delay the
+  // sweep itself) — their own recordIncidentEvent('notified') calls land a
+  // tick after sweep() resolves, not before. setImmediate runs after every
+  // microtask queued so far, which is enough since this test's fakes resolve
+  // immediately with no real I/O.
+  await new Promise((resolve) => setImmediate(resolve));
 
   assert.strictEqual(out.checked, 1);
   assert.deepStrictEqual(db._bumps, ['inc-1']);
-  assert.strictEqual(db._events.length, 1);
-  assert.strictEqual(db._events[0].kind, 'escalated');
-  assert.strictEqual(db._events[0].actorRole, 'system');
   assert.strictEqual(push._calls.length, 1);
   assert.strictEqual(fcm._calls.length, 1);
   assert.strictEqual(push._calls[0].orgId, 'org-1');
   // Honest framing: this is a reminder, not a second emergency.
   assert.match(push._calls[0].n.title, /unacknowledged/i);
+
+  // One 'escalated' event, plus one 'notified' event per channel — each
+  // delivery outcome recorded on its own, the same way relay.js's raiseAlert
+  // records the original alert's own delivery.
+  const escalated = db._events.filter((e) => e.kind === 'escalated');
+  assert.strictEqual(escalated.length, 1);
+  assert.strictEqual(escalated[0].actorRole, 'system');
+
+  const notified = db._events.filter((e) => e.kind === 'notified');
+  assert.strictEqual(notified.length, 2);
+  assert.deepStrictEqual(notified.map((e) => e.detail.channel).sort(), ['fcm', 'web-push']);
 });
 
 test('with no database configured, the sweep does nothing and reports zero', async (t) => {

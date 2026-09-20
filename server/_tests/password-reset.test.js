@@ -27,6 +27,7 @@ const user = {
   name: 'Asha Mwangi',
   role: 'supervisor',
   password_hash: bcrypt.hashSync('the-old-password', 10),
+  token_version: 0,
 };
 
 /** token_hash → { userId, expiresAt, usedAt } */
@@ -76,6 +77,11 @@ before(async () => {
     setUserPassword: async (id, hash) => {
       if (id !== user.id) return null;
       user.password_hash = hash;
+      // Mirrors the real UPDATE's `token_version = token_version + 1` in the
+      // same statement as the password — see db.js and auth.js's
+      // userFromToken, which is what this file's "an old session is signed
+      // out by a password reset" test below actually exercises.
+      user.token_version += 1;
       for (const t of tickets.values()) if (t.userId === id && !t.usedAt) t.usedAt = new Date();
       return { ...user };
     },
@@ -188,6 +194,19 @@ test('the new password works and the old one does not', async () => {
   assert.equal(bad.status, 401);
 });
 
+test('an unknown email is refused identically to a known one with the wrong password', async () => {
+  // Functional correctness for the constant-time fix in auth.js's login():
+  // bcrypt.compare now always runs, against DUMMY_PASSWORD_HASH for an
+  // account that does not exist, specifically so this branch cannot be timed
+  // apart from the wrong-password one — that property itself isn't something
+  // a functional test can assert, only that both still answer the same way.
+  const unknown = await post('/api/auth/login', { email: 'nobody-here@example.com', password: 'whatever' });
+  const wrongPassword = await post('/api/auth/login', { email: EMAIL, password: 'definitely-not-it' });
+  assert.equal(unknown.status, 401);
+  assert.equal(wrongPassword.status, 401);
+  assert.deepEqual(await unknown.json(), await wrongPassword.json());
+});
+
 test('a second outstanding link is retired once one of them is used', async () => {
   const first = await freshToken();
   const second = await freshToken();
@@ -197,6 +216,30 @@ test('a second outstanding link is retired once one of them is used', async () =
   // The older message is still sitting in an inbox. It must no longer open the
   // account.
   assert.equal((await post('/api/auth/reset', { token: first, password: 'password-number-four' })).status, 400);
+});
+
+test('a session opened before a password reset is signed out by it', async () => {
+  // A session in a browser tab, opened under the current password.
+  const login = await post('/api/auth/login', { email: EMAIL, password: 'password-number-three' });
+  assert.equal(login.status, 200);
+  const oldSessionToken = (await login.json()).token;
+
+  const before = await fetch(`${BASE}/api/auth/me`, { headers: { Authorization: `Bearer ${oldSessionToken}` } });
+  assert.equal(before.status, 200, 'the session is good before anything happens to the account');
+
+  // The person suspects that session token leaked, and resets their password
+  // specifically to invalidate it — not to change what they type to log in.
+  const reset = await post('/api/auth/reset', { token: await freshToken(), password: 'password-number-five' });
+  assert.equal(reset.status, 200);
+
+  const after = await fetch(`${BASE}/api/auth/me`, { headers: { Authorization: `Bearer ${oldSessionToken}` } });
+  assert.equal(after.status, 401, 'the old session token must not survive a password reset');
+
+  // And the session the reset itself just handed back still works — a
+  // password reset must sign out every OTHER session, not this one.
+  const newSessionToken = (await reset.json()).token;
+  const stillGood = await fetch(`${BASE}/api/auth/me`, { headers: { Authorization: `Bearer ${newSessionToken}` } });
+  assert.equal(stillGood.status, 200);
 });
 
 // --- helpers ---------------------------------------------------------------

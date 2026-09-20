@@ -148,6 +148,36 @@ test('records a nearby-searched incident_event with the ring and counts used', a
   assert.strictEqual(evt.detail.notified, 3);
 });
 
+test('records a notified event per responder per channel, so a silent delivery failure is not indistinguishable from success', async () => {
+  // Three, matching MIN_CANDIDATES, so the search stops at ring 0 — the mock
+  // findNearbyResponders (unlike the real, radius-based SQL query) does not
+  // accumulate candidates across wider rings, so fewer than MIN_CANDIDATES
+  // here means the search widens all the way out and finds nobody.
+  byRadius[nearbyHelp.RINGS_M[0]] = [
+    { user_id: 'r1', lat: -6.8009, lng: 39.28, categories: ['fire'] },
+    { user_id: 'r2', lat: -6.8018, lng: 39.28, categories: ['fire'] },
+    { user_id: 'r3', lat: -6.8027, lng: 39.28, categories: ['fire'] },
+  ];
+
+  await nearbyHelp.searchAndNotify({ incidentId: 'inc-9', type: 'fire', orgId: 'org-y', ...ORIGIN });
+  // push.notifyUser/fcm.notifyUser are fire-and-forget from the loop that
+  // calls them (never awaited, so a slow provider cannot delay the search
+  // itself) — their recordIncidentEvent('notified') calls land a tick after
+  // searchAndNotify() resolves, not before.
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const notified = events.filter((e) => e.kind === 'notified');
+  assert.strictEqual(notified.length, 6, 'three responders x two channels each');
+  assert.ok(notified.every((e) => e.incidentId === 'inc-9' && e.orgId === 'org-y'));
+  assert.ok(notified.every((e) => e.detail.nearbyHelp === true));
+  assert.deepStrictEqual(
+    notified.map((e) => e.detail.responderId).sort(),
+    ['r1', 'r1', 'r2', 'r2', 'r3', 'r3'],
+    'every responder gets one event per channel, not one shared event',
+  );
+  assert.deepStrictEqual(new Set(notified.map((e) => e.detail.channel)), new Set(['web-push', 'fcm']));
+});
+
 test('a database failure is caught, not thrown — Nearby Help must never break the alert path around it', async () => {
   const db = require('../db');
   const original = db.findNearbyResponders;

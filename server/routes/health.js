@@ -13,11 +13,22 @@ const staticFiles = require('../static');
 const relay = require('../relay');
 const { ORGS, BILLING_ENFORCE } = require('../config');
 const { sendJson } = require('../http');
+const { requireAuth } = require('../guards');
 
-function health() {
+// Live connected-client count and process uptime are minor reconnaissance
+// value to a would-be prober against a public, unauthenticated endpoint — a
+// number that briefly changes is a way to tell from outside whether
+// something you just did (a flood, a disconnect storm) had an effect.
+// Withheld from an anonymous caller; a signed-in supervisor still sees them,
+// since they're a legitimate operational signal for whoever actually runs a
+// site. Nothing that monitors this endpoint from outside needs either field
+// today — the synthetic canary (.github/workflows/canary.yml) only ever
+// reads `database.ok`, and Render's own health check only looks at the HTTP
+// status.
+function health({ authenticated = false } = {}) {
   return {
     service: 'alert-backend',
-    clients: relay.clientCount(),
+    ...(authenticated ? { clients: relay.clientCount() } : {}),
     persistence: db.enabled(),
     // `persistence` above only says a DATABASE_URL was configured — it stays
     // true through an actual outage. `database` is whether the last real
@@ -50,15 +61,24 @@ function health() {
       card: payments.status().card.enabled,
     },
     billing: { enforcing: BILLING_ENFORCE },
-    uptime: process.uptime(),
+    ...(authenticated ? { uptime: process.uptime() } : {}),
   };
 }
 
 async function handle({ req, res, path }) {
+  // A signed-in supervisor (any org, or a personal account) sees a couple of
+  // extra operational fields — see health()'s own comment for which and why.
+  // Failing open to "anonymous" on a bad/expired token is deliberate and
+  // matches every other optional-auth route in this app (e.g. orgContext in
+  // guards.js): this is a public health check first, and a malformed
+  // Authorization header must never be the reason it stops answering.
+  const ctx = await requireAuth(req).catch(() => null);
+  const opts = { authenticated: !!ctx };
+
   // Lives under /api so that "/" is free to serve the app when the built client
   // is bundled in; it is also Render's healthCheckPath.
   if (path === '/api/health' && req.method === 'GET') {
-    sendJson(res, 200, health());
+    sendJson(res, 200, health(opts));
     return true;
   }
 
@@ -66,7 +86,7 @@ async function handle({ req, res, path }) {
   // When the client is bundled, "/" belongs to the app instead and falls
   // through to the static handler at the end of the chain.
   if (path === '/' && req.method === 'GET' && !staticFiles.enabled()) {
-    sendJson(res, 200, health());
+    sendJson(res, 200, health(opts));
     return true;
   }
 

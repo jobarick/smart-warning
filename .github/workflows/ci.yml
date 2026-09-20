@@ -1,0 +1,54 @@
+name: CI
+
+# Runs both test suites (server/_tests, 256 tests as of 2026-09; client, new
+# as of this workflow) plus a type-check and a production build, on every
+# push and pull request. Before this workflow existed, the server's genuinely
+# good test coverage — including adversarial and safety-property tests —
+# existed but was never enforced: nothing ran it before a merge, so a broken
+# test could sit unnoticed indefinitely. This makes both suites a required
+# check instead.
+#
+# Neither suite needs a real Postgres instance or any secret: every
+# _tests/*.test.js file that touches the database layer stubs db.js itself
+# (see e.g. _tests/personal-alert.test.js), and the rest test pure logic
+# modules directly. Nothing here should ever need a DATABASE_URL, a JWT
+# secret, or any other credential — if a future test genuinely needs one,
+# that is worth a second look before adding it to this workflow, not a
+# default to reach for.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+        working-directory: server
+      - run: npm test
+        working-directory: server
+
+  client:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - run: npm ci
+        working-directory: client
+      - run: npm test
+        working-directory: client
+      - run: npx tsc --noEmit -p tsconfig.json
+        working-directory: client
+      - run: npm run build
+        working-directory: client

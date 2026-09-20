@@ -26,26 +26,36 @@ function makeDb() {
   return {
     enabled: () => true,
     async ensureSubscription(orgId) {
-      if (!subs.has(orgId)) subs.set(orgId, { id: `s-${orgId}`, orgId, tier: 'free', previousTier: 'free', status: 'active' });
+      if (!subs.has(orgId)) subs.set(orgId, { id: `s-${orgId}`, orgId, tier: 'free', previousTier: 'free', status: 'active', updatedAt: 0 });
       return { ...subs.get(orgId) };
     },
     async getSubscription(orgId) { return subs.has(orgId) ? { ...subs.get(orgId) } : null; },
-    async updateSubscription(orgId, patch) {
+    // expectedUpdatedAt models the real updateSubscription's optimistic-
+    // concurrency guard (see db.js): a plain incrementing counter here
+    // instead of a real timestamp, since what matters for a test is "does a
+    // stale read get rejected", not wall-clock precision. Omitted, this is
+    // the old unconditional last-write-wins behaviour every non-payments
+    // caller in this file still relies on.
+    async updateSubscription(orgId, patch, expectedUpdatedAt) {
       if (!subs.has(orgId)) await this.ensureSubscription(orgId);
-      Object.assign(subs.get(orgId), patch);
-      return { ...subs.get(orgId) };
+      const row = subs.get(orgId);
+      if (expectedUpdatedAt !== undefined && row.updatedAt !== expectedUpdatedAt) return null;
+      Object.assign(row, patch, { updatedAt: row.updatedAt + 1 });
+      return { ...row };
     },
     async ensureUserSubscription(userId) {
       const k = `user:${userId}`;
-      if (!subs.has(k)) subs.set(k, { id: `sub-${k}`, kind: 'individual', userId, orgId: null, tier: 'free', previousTier: 'free', status: 'active' });
+      if (!subs.has(k)) subs.set(k, { id: `sub-${k}`, kind: 'individual', userId, orgId: null, tier: 'free', previousTier: 'free', status: 'active', updatedAt: 0 });
       return { ...subs.get(k) };
     },
     async getUserSubscription(userId) { return subs.has(`user:${userId}`) ? { ...subs.get(`user:${userId}`) } : null; },
-    async updateUserSubscription(userId, patch) {
+    async updateUserSubscription(userId, patch, expectedUpdatedAt) {
       const k = `user:${userId}`;
       if (!subs.has(k)) await this.ensureUserSubscription(userId);
-      Object.assign(subs.get(k), patch);
-      return { ...subs.get(k) };
+      const row = subs.get(k);
+      if (expectedUpdatedAt !== undefined && row.updatedAt !== expectedUpdatedAt) return null;
+      Object.assign(row, patch, { updatedAt: row.updatedAt + 1 });
+      return { ...row };
     },
     // Mirrors the real resolver, refusal to fall back included.
     subscriptionsFor(subject) {
@@ -54,14 +64,14 @@ function makeDb() {
         return {
           get: () => this.getUserSubscription(subject.userId),
           ensure: () => this.ensureUserSubscription(subject.userId),
-          update: (p) => this.updateUserSubscription(subject.userId, p),
+          update: (p, expectedUpdatedAt) => this.updateUserSubscription(subject.userId, p, expectedUpdatedAt),
         };
       }
       if (subject.kind === 'organization' && subject.orgId) {
         return {
           get: () => this.getSubscription(subject.orgId),
           ensure: () => this.ensureSubscription(subject.orgId),
-          update: (p) => this.updateSubscription(subject.orgId, p),
+          update: (p, expectedUpdatedAt) => this.updateSubscription(subject.orgId, p, expectedUpdatedAt),
         };
       }
       return null;
@@ -287,6 +297,60 @@ test('fifty callbacks landing at once still provision exactly once', async (t) =
   const start = new Date(sub.currentPeriodStart);
   const end = new Date(sub.currentPeriodEnd);
   assert.strictEqual((end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()), 1);
+});
+
+test('a subscription changed concurrently is retried with a fresh read, not lost', async (t) => {
+  t.after(reset);
+  const db = makeDb();
+  const payments = loadPayments(db, makeClickpesa());
+  const { orderReference } = await payments.initiateMobileMoney({ orgId: 'o-race', planId: 'team', phoneNumber: '0713455454' });
+  await db.updateTransactionStatus({ orderReference, status: 'paid' });
+
+  // Simulates a second, different paid transaction for the same org landing
+  // between applyOutcome's own read and write: the guard rejects the first
+  // write attempt (stale expectedUpdatedAt), exactly once, before behaving
+  // normally again.
+  const realUpdate = db.updateSubscription.bind(db);
+  let calls = 0;
+  db.updateSubscription = async (...args) => {
+    calls++;
+    if (calls === 1) return null; // the race, lost once
+    return realUpdate(...args);
+  };
+
+  const ok = await payments.applyOutcome(orderReference);
+
+  assert.strictEqual(ok, true, 'a losing first attempt must not be treated as a failure to provision');
+  assert.strictEqual(calls, 2, 'exactly one retry — a fresh read on the second attempt won');
+  const sub = await db.getSubscription('o-race');
+  assert.strictEqual(sub.tier, 'team');
+  assert.strictEqual(sub.status, 'active');
+});
+
+test('sustained conflict gives up after SUBSCRIPTION_UPDATE_ATTEMPTS, and releases the claim for a later retry', async (t) => {
+  t.after(reset);
+  const db = makeDb();
+  const payments = loadPayments(db, makeClickpesa());
+  const { orderReference } = await payments.initiateMobileMoney({ orgId: 'o-conflict', planId: 'team', phoneNumber: '0713455454' });
+  await db.updateTransactionStatus({ orderReference, status: 'paid' });
+
+  // initiateMobileMoney above already moved the subscription to
+  // 'pending_payment' for the duration of the checkout — real, expected
+  // behaviour, and the state applyOutcome is supposed to move out of.
+  const before = await db.getSubscription('o-conflict');
+  assert.strictEqual(before.status, 'pending_payment');
+
+  db.updateSubscription = async () => null; // loses every single time
+
+  await assert.rejects(() => payments.applyOutcome(orderReference), /lost the race/);
+
+  // The transaction must not be stuck "claimed but never provisioned" —
+  // releaseTransactionClaim() is what lets a redelivered webhook or the
+  // reconcile sweep take another pass at it later.
+  assert.strictEqual(db._txs.get(orderReference).applied, false);
+  const sub = await db.getSubscription('o-conflict');
+  assert.strictEqual(sub.status, 'pending_payment', 'never actually provisioned given constant conflict — still awaiting payment');
+  assert.strictEqual(sub.updatedAt, before.updatedAt, 'no write ever actually landed');
 });
 
 test('a double tap on Pay raises ONE USSD push, not two', async (t) => {

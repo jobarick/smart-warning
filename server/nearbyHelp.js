@@ -117,12 +117,30 @@ async function searchAndNotify({ incidentId, type, lat, lng, excludeUserId, orgI
     severity: 'nearby-help',
     tag: `nearby-${incidentId}`,
   };
+  // Recorded per responder, per channel, the same way relay.js's raiseAlert()
+  // and escalation.js's escalateOne() record theirs — a Nearby Help push that
+  // silently failed used to exist only as a console.error, indistinguishable
+  // from one that quietly succeeded. "Was this specific responder actually
+  // told" is now answerable from incident_events instead.
+  const recordNotified = (offer, channel, detail) => db.recordIncidentEvent?.({
+    incidentId, orgId, kind: 'notified', actorRole: 'system',
+    detail: { channel, nearbyHelp: true, responderId: offer.responder_id, offerId: offer.id, ...detail },
+  }).catch((e) => console.error(`[db] recordIncidentEvent(notified/${channel}):`, e.message));
+
   for (const offer of offers) {
     const body = `A person may need help approximately ${offer.distance_m}m away. ${category} emergency.`;
     push.notifyUser(offer.responder_id, { ...notification, body, offerId: offer.id })
-      .catch((e) => console.error(`[nearby-help] push to ${offer.responder_id} failed: ${e.message}`));
+      .then((result) => recordNotified(offer, 'web-push', result))
+      .catch((e) => {
+        console.error(`[nearby-help] push to ${offer.responder_id} failed: ${e.message}`);
+        recordNotified(offer, 'web-push', { error: e.message });
+      });
     fcm.notifyUser(offer.responder_id, { ...notification, body, offerId: offer.id })
-      .catch((e) => console.error(`[nearby-help] fcm to ${offer.responder_id} failed: ${e.message}`));
+      .then((result) => recordNotified(offer, 'fcm', result))
+      .catch((e) => {
+        console.error(`[nearby-help] fcm to ${offer.responder_id} failed: ${e.message}`);
+        recordNotified(offer, 'fcm', { error: e.message });
+      });
   }
 
   db.recordIncidentEvent?.({

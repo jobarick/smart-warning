@@ -46,4 +46,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
 
+    // Required for @capacitor/push-notifications to receive an APNs token at
+    // all — without these two methods, Push.register() on the JS side hangs
+    // (or times out, see client/src/lib/nativePush.ts's own 20s timeout)
+    // because nothing ever posts the 'registration'/'registrationError' event
+    // the plugin listens for. Capacitor's own CAPNotifications extension
+    // reads these NotificationCenter names; nothing here needs to touch the
+    // plugin directly.
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
+    }
+
 }

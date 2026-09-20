@@ -15,7 +15,9 @@ const { test, before, after } = require('node:test');
 const assert = require('node:assert');
 const path = require('node:path');
 
-const PORT = 3974;
+const PORT = 3981; // was 3974, which _tests/password-reset.test.js also uses — Node's test
+// runner runs files concurrently by default, and two servers racing for the same port
+// produced an intermittent ECONNREFUSED/401 flake in the full suite (observed 2026-09-20).
 const BASE = `http://127.0.0.1:${PORT}`;
 
 const INDIVIDUAL = { id: 'user-solo', name: 'Solo', email: 'solo@example.test' };

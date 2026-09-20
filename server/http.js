@@ -83,10 +83,31 @@ function bearer(req) {
   return h.startsWith('Bearer ') ? h.slice(7) : '';
 }
 
-// Behind Render's proxy the socket address is the proxy, so prefer the
-// forwarded client address. Spoofable in general, but the proxy overwrites it,
-// and the fallback is still correct for a direct connection.
+// Behind Render's proxy the socket address is the proxy's, not the caller's,
+// so every rate limiter below needs a real client address from a header.
+//
+// This deployment sits entirely behind Cloudflare (Render's own edge), and
+// Cloudflare sets `CF-Connecting-IP` to the connecting client's address at
+// its own edge — a client cannot override it, because Cloudflare overwrites
+// whatever value arrived on the inbound connection before forwarding.
+// `True-Client-IP` is Cloudflare's equivalent header for accounts with that
+// feature enabled, checked as a second-choice alias. Render's own support
+// recommends exactly these two headers over X-Forwarded-For for this reason
+// (see SMART_WARNING_FIX_PLAN.md's P0-1 write-up for the sourcing).
+//
+// X-Forwarded-For is kept only as a last-resort fallback for a deployment
+// that somehow isn't behind Cloudflare (local dev against a bare Node
+// process has no proxy at all, so this rarely matters there either) — it is
+// NOT trusted as a primary source. Render appends to an inbound
+// X-Forwarded-For rather than clearing it, so a client can put arbitrary
+// text in front of it, and which position in the list is "real" is not
+// reliably documented behavior worth depending on. If this header is ever
+// the only signal available in production, that is a deployment to fix (get
+// behind Cloudflare, or have whatever proxy sits in front set
+// CF-Connecting-IP itself) — not a case to harden further here.
 function clientIp(req) {
+  const cf = req.headers['cf-connecting-ip'] || req.headers['true-client-ip'];
+  if (cf) return String(cf).split(',')[0].trim();
   return (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
 }
 

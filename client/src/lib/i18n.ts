@@ -31,6 +31,10 @@ export type StringKey =
   | 'sos.personalSent'
   | 'sos.personalSentNone'
   | 'sos.personalFailed'
+  | 'sos.personalReplayed'
+  | 'sos.personalSkippedOne'
+  | 'sos.personalSkippedMany'
+  | 'sos.locationPending'
   | 'overlay.titleTemplate'
   | 'overlay.triggeredBy'
   | 'overlay.acknowledgeBtn'
@@ -446,6 +450,10 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'sos.personalSent': 'SOS sent — {count} of your Circle notified',
     'sos.personalSentNone': 'SOS recorded — nobody in your Circle could be reached. Add an email address in your Circle so they can be.',
     'sos.personalFailed': 'Could not reach your Circle — call for help directly',
+    'sos.personalReplayed': 'SOS already sent — your Circle was told',
+    'sos.personalSkippedOne': '{name} could not be reached — no email on file',
+    'sos.personalSkippedMany': '{count} contacts could not be reached — no email on file',
+    'sos.locationPending': 'Sent without an exact location — still trying to get a GPS fix',
     'overlay.titleTemplate': '{type} ALERT',
     'overlay.triggeredBy': 'Triggered by {sender} at {time}',
     'overlay.acknowledgeBtn': 'Acknowledge (this device)',
@@ -507,10 +515,10 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'emergencyReport.cancel': 'Cancel',
     'emergencyReport.submit': 'Send Alert',
     'emergencyReport.sending': 'Sending…',
-    'emergencyReport.sent': "Sent. We'll pass this to the right responders.",
+    'emergencyReport.sent': 'Received. Recorded and sent to our team — call the number above if you need help now.',
     'emergencyReport.failed': 'Could not send — please call the number above directly.',
-    'emergencyReport.sentHeading': 'Alert sent',
-    'emergencyReport.sentSub': 'Your report has been received and is being passed on.',
+    'emergencyReport.sentHeading': 'Report received',
+    'emergencyReport.sentSub': 'Recorded and sent to our team — this does not dispatch police, fire or ambulance. If you need help now, call the number above.',
     'emergencyReport.fieldIncident': 'Incident',
     'emergencyReport.fieldDescription': 'Description',
     'emergencyReport.descBoth': 'Text and voice note',
@@ -858,6 +866,10 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'sos.personalSent': 'SOS imetumwa — watu {count} wa Circle yako wamearifiwa',
     'sos.personalSentNone': 'SOS imehifadhiwa — hakuna aliyeweza kuarifiwa katika Circle yako. Ongeza barua pepe kwenye Circle yako ili waweze kuarifiwa.',
     'sos.personalFailed': 'Imeshindwa kuwasiliana na Circle yako — piga simu kuomba msaada moja kwa moja',
+    'sos.personalReplayed': 'SOS tayari imetumwa — Circle yako imearifiwa',
+    'sos.personalSkippedOne': '{name} hakuweza kuarifiwa — hana barua pepe iliyosajiliwa',
+    'sos.personalSkippedMany': 'Watu {count} hawakuweza kuarifiwa — hawana barua pepe iliyosajiliwa',
+    'sos.locationPending': 'Imetumwa bila mahali kamili — bado inatafuta mtandao wa GPS',
     'overlay.titleTemplate': 'DHARURA YA {type}',
     'overlay.triggeredBy': 'Imeanzishwa na {sender} saa {time}',
     'overlay.acknowledgeBtn': 'Nimeona (kifaa hiki)',
@@ -919,10 +931,10 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'emergencyReport.cancel': 'Ghairi',
     'emergencyReport.submit': 'Tuma Tahadhari',
     'emergencyReport.sending': 'Inatuma…',
-    'emergencyReport.sent': 'Imetumwa. Tutawasilisha kwa wahusika sahihi.',
+    'emergencyReport.sent': 'Imepokelewa. Imerekodiwa na kutumwa kwa timu yetu — piga namba iliyo hapo juu ukihitaji msaada sasa hivi.',
     'emergencyReport.failed': 'Imeshindwa kutuma — tafadhali piga namba iliyo hapo juu moja kwa moja.',
-    'emergencyReport.sentHeading': 'Tahadhari imetumwa',
-    'emergencyReport.sentSub': 'Taarifa yako imepokelewa na inawasilishwa.',
+    'emergencyReport.sentHeading': 'Taarifa imepokelewa',
+    'emergencyReport.sentSub': 'Imerekodiwa na kutumwa kwa timu yetu — haiwezi kutuma polisi, zimamoto au gari la wagonjwa. Ukihitaji msaada sasa hivi, piga namba iliyo hapo juu.',
     'emergencyReport.fieldIncident': 'Tukio',
     'emergencyReport.fieldDescription': 'Maelezo',
     'emergencyReport.descBoth': 'Maandishi na ujumbe wa sauti',

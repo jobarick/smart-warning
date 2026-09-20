@@ -301,9 +301,25 @@ async function raiseAlert(orgId, alert, worker = null, origin = 'unknown', actor
 
 /**
  * How old a replayed alert may be and still be treated as live. Mirrors
- * STALE_REPLAY_MS in the client's outbox.
+ * STALE_REPLAY_MS in the client's outbox — but only ever exactly at the
+ * default: the client bundles its copy at build time and has no env var of
+ * its own, so raising this one in production without also shipping a
+ * matching client build only widens the window in which the two disagree.
+ * In DB-backed org mode (the real deployment target) that mismatch mostly
+ * doesn't matter — the server already diverts a stale replay via
+ * fileStaleReplay() below before it ever reaches a broadcast the client
+ * would need to judge for itself; the client's own copy exists for the
+ * legacy no-database single-room mode, where nothing server-side does that
+ * diverting. Configurable because how long a device may plausibly sit in a
+ * dead zone with a real, still-ongoing emergency is a judgement call about
+ * the deployment's actual network conditions (see docs/ROADMAP_P1.md on
+ * low-bandwidth Tanzania scenarios), not a universal constant — but the
+ * default is deliberately unchanged here, this is flexibility, not a
+ * decision that 10 minutes was wrong.
  */
-const STALE_REPLAY_MS = 10 * 60 * 1000;
+const STALE_REPLAY_MS = Number(process.env.STALE_REPLAY_MS) > 0
+  ? Number(process.env.STALE_REPLAY_MS)
+  : 10 * 60 * 1000;
 
 /**
  * A second 'alert' from the SAME connection this soon after the first is a
@@ -320,6 +336,41 @@ const STALE_REPLAY_MS = 10 * 60 * 1000;
  * second, distinct id from the same tap.
  */
 const ALERT_COOLDOWN_MS = 500;
+
+/**
+ * Ceiling on how many 'alert' messages one connection may send in a rolling
+ * window — independent of, and in addition to, ALERT_COOLDOWN_MS above.
+ *
+ * The cooldown exists only to swallow a double-tap artifact; it was never a
+ * volume limit; a connection sending a fresh, distinct alert id every 501ms
+ * sails straight through it, and every one of those ids is a "first time" as
+ * far as db.recordAlert's dedup is concerned — each fans out to Postgres,
+ * Web Push, FCM, and Nearby Help's responder notifications for real. guards.js's
+ * HTTP rate limiters do not reach this path at all: the relay is a separate
+ * ingestion point over its own WebSocket connection.
+ *
+ * Sized generously against real usage, not tightly against abuse — a real
+ * person cannot plausibly raise more than a handful of genuine emergencies in
+ * a minute, and a device replaying a legitimate multi-alert outbox backlog
+ * after a long outage (see client/src/lib/outbox.ts) resends each id every
+ * FLUSH_MS until echoed, which this must never mistake for a flood. Scoped
+ * per-connection, deliberately: a per-org cap would throttle unrelated real
+ * people raising separate, genuine alerts through the same relay process
+ * during a mass event, which would be actively dangerous.
+ */
+const ALERT_VOLUME_WINDOW_MS = 60_000;
+const ALERT_VOLUME_MAX = 20;
+
+/** True once this connection has sent more than ALERT_VOLUME_MAX alerts in
+ *  the last ALERT_VOLUME_WINDOW_MS — and records this attempt either way, so
+ *  the window is a real rolling window rather than one that resets on a miss. */
+function overAlertVolumeLimit(ws) {
+  const now = Date.now();
+  const recent = (ws.alertTimestamps || []).filter((t) => now - t < ALERT_VOLUME_WINDOW_MS);
+  recent.push(now);
+  ws.alertTimestamps = recent;
+  return recent.length > ALERT_VOLUME_MAX;
+}
 
 /**
  * A device has reconnected carrying an alert raised a long time ago.
@@ -445,6 +496,15 @@ function attach(server) {
 
       if (msg.kind === 'alert' || msg.kind === 'all-clear') {
         if (msg.kind === 'alert') {
+          // Checked before anything else in this branch: both paths below (a
+          // stale replay filed as a report, and a live alert raised for real)
+          // do real, costly work — a DB write at minimum, and for a live
+          // alert a full Postgres + Web Push + FCM + Nearby Help fan-out — so
+          // the volume ceiling has to sit ahead of both, not just the live path.
+          if (overAlertVolumeLimit(ws)) {
+            console.warn(`[!] #${ws.connId} exceeded the alert volume ceiling (${ALERT_VOLUME_MAX}/${ALERT_VOLUME_WINDOW_MS / 1000}s) — dropping`);
+            return;
+          }
           // An alert a device held while it had no signal. If it is recent the
           // emergency is plausibly still running and it is raised for real;
           // if it is old it goes to the supervisor instead of every siren.
@@ -650,4 +710,8 @@ module.exports = {
   rosterList,
   clientCount,
   closeOrgClients,
+  // Exported for _tests/safety.test.js, which pins actual behavior against
+  // these rather than a hardcoded copy that could silently drift from them.
+  ALERT_VOLUME_MAX,
+  ALERT_VOLUME_WINDOW_MS,
 };

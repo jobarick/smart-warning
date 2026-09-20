@@ -34,11 +34,24 @@ if (!process.env.JWT_SECRET) {
 const TOKEN_TTL = '30d';
 const BCRYPT_ROUNDS = 10;
 
+// A real bcrypt hash of nothing in particular, compared against when the
+// email in a login attempt does not exist — so that branch takes the same
+// ~50-100ms bcrypt.compare costs on a real account instead of returning
+// near-instantly. Without this, login's response time itself answers "does
+// this email have an account", which the identical error body was supposed
+// to hide (see login() below). Computed once at boot, not per request — it
+// never needs to match anything, only to make bcrypt do real work.
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync('not-a-real-password', BCRYPT_ROUNDS);
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function signToken(user) {
   return jwt.sign(
-    { sub: user.id, org: user.org_id, role: user.role, kind: user.kind || 'org_member' },
+    // `tv` (token_version) is what makes a password reset actually revoke
+    // every token issued before it, not just change what future logins mint
+    // — see userFromToken below and db.js's setUserPassword, which bumps
+    // this column in the same statement as the password itself.
+    { sub: user.id, org: user.org_id, role: user.role, kind: user.kind || 'org_member', tv: user.token_version || 0 },
     JWT_SECRET,
     { expiresIn: TOKEN_TTL },
   );
@@ -178,9 +191,14 @@ async function updateOrg(orgId, body = {}) {
 
 async function login({ email, password }) {
   const user = await db.getUserByEmail(email);
-  // Same error whether the email is unknown or the password is wrong.
-  const ok = user && (await bcrypt.compare(password || '', user.password_hash));
-  if (!ok) throw httpError(401, 'invalid email or password');
+  // Same error whether the email is unknown or the password is wrong — and,
+  // for the same reason, the same amount of work either way. bcrypt.compare
+  // always runs, against the real hash for a known account or DUMMY_PASSWORD_HASH
+  // for an unknown one, so a known email cannot be picked out of a crowd by
+  // timing responses against a list: without this, an unknown email skipped
+  // bcrypt entirely and returned in a fraction of the time a known one took.
+  const ok = await bcrypt.compare(password || '', user ? user.password_hash : DUMMY_PASSWORD_HASH);
+  if (!user || !ok) throw httpError(401, 'invalid email or password');
   const org = await db.getOrgById(user.org_id);
   return { token: signToken(user), user: publicUser(user, org) };
 }
@@ -414,6 +432,15 @@ async function userFromToken(token) {
   if (!payload) return null;
   const user = await db.getUserById(payload.sub);
   if (!user) return null;
+  // A token signed under an old password. `payload.tv` is absent on a token
+  // minted before this claim existed, which reads as 0 — the same as
+  // token_version's own column default — so this deploy does not itself log
+  // out every session that was already live; only an actual password reset,
+  // from here on, does. Checked before anything else about the user is
+  // trusted, for the same reason org membership is re-read from the row
+  // rather than the token: the token is a claim, not a fact, and this is the
+  // one fact about it that can go stale mid-lifetime rather than at expiry.
+  if ((payload.tv || 0) !== (user.token_version || 0)) return null;
   // Read from the row, not the token: a token outlives changes to the account
   // it names, and org membership is the thing every guard downstream trusts.
   const org = user.org_id ? await db.getOrgById(user.org_id) : null;

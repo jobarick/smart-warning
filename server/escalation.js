@@ -63,8 +63,22 @@ async function escalateOne(incident) {
     severity: incident.severity,
     tag: 'sw-alert',
   };
-  push.notifyOrg(incident.org_id, notification).catch((e) => console.error('[push] notifyOrg (escalation):', e.message));
-  fcm.notifyOrg(incident.org_id, notification).catch((e) => console.error('[fcm] notifyOrg (escalation):', e.message));
+  // Recorded the same way relay.js's raiseAlert() records the original
+  // alert's own delivery outcome — a re-notify that silently failed used to
+  // exist only as a console.error nobody ever queries again, indistinguishable
+  // from a re-notify that quietly succeeded. "Was anyone actually told this
+  // is still unacknowledged" is now answerable from incident_events here too.
+  const recordNotified = (channel, detail) => db.recordIncidentEvent?.({
+    incidentId: incident.id, orgId: incident.org_id, kind: 'notified', actorRole: 'system',
+    detail: { channel, escalationLevel: level, ...detail },
+  }).catch((e) => console.error(`[db] recordIncidentEvent(notified/${channel}):`, e.message));
+
+  push.notifyOrg(incident.org_id, notification)
+    .then((result) => recordNotified('web-push', result))
+    .catch((e) => { console.error('[push] notifyOrg (escalation):', e.message); recordNotified('web-push', { error: e.message }); });
+  fcm.notifyOrg(incident.org_id, notification)
+    .then((result) => recordNotified('fcm', result))
+    .catch((e) => { console.error('[fcm] notifyOrg (escalation):', e.message); recordNotified('fcm', { error: e.message }); });
   console.log(`[!] escalated ${incident.id} to level ${level} (org ${incident.org_id ?? 'global'})`);
 }
 

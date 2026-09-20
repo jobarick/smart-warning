@@ -162,6 +162,14 @@ async function handle({ req, res, url, path }) {
 
   // --- Where to go for this emergency ---
   if (path === '/api/safe-route' && req.method === 'GET') {
+    // Unauthenticated by design (a worker with only a join code, or nobody
+    // at all, still needs to know where to go) but for an org-less caller
+    // this still reaches places.safeDestination()'s Overpass lookup — the
+    // same public, keyless, shared service /api/emergency/nearby already
+    // guards with this bucket, for the same reason: an anonymous flood here
+    // risks Overpass rate-limiting or banning this deployment's IP, which
+    // would degrade the feature for every real user, not just cost money.
+    if (!allowPlaces(req)) { sendJson(res, 429, { error: 'too many requests, please wait a moment' }); return true; }
     const ctx = await orgContext(req, url);
     const type = url.searchParams.get('type') || 'evacuation';
     const lat = Number(url.searchParams.get('lat'));

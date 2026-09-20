@@ -4,4 +4,13 @@
     <string name="title_activity_main">Smart Warning</string>
     <string name="package_name">com.smartwarning.app</string>
     <string name="custom_url_scheme">com.smartwarning.app</string>
+
+    <!-- IncidentLocationService's persistent notification — visible for as
+         long as an incident this device raised or is following is active, so
+         the background location access it enables is never silent. See the
+         service's own comment for why it exists at all. -->
+    <string name="incident_location_channel_name">Active incident tracking</string>
+    <string name="incident_location_channel_description">Shown while your location is being shared during an active Smart Warning incident.</string>
+    <string name="incident_location_notification_title">Smart Warning is sharing your location</string>
+    <string name="incident_location_notification_body">An incident is active. Your position keeps updating even while the screen is locked.</string>
 </resources>

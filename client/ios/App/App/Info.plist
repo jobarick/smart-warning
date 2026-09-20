@@ -47,5 +47,13 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<!-- Without a purpose string, iOS does not deny the corresponding
+	     permission the way Android does — it terminates the process outright
+	     the moment the webview asks for it. Wording mirrors the Android
+	     manifest's own justifications (see AndroidManifest.xml). -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Smart Warning uses your location so it can be included when you raise an alert, so responders and the people you trust can see where you are.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Smart Warning uses the microphone to record an optional voice note when you file an emergency report.</string>
 </dict>
 </plist>

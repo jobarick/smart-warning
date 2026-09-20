@@ -579,23 +579,103 @@ export async function deleteContact(id: string, token: string): Promise<void> {
  * notify=true contact who has an email address; a phone-only contact comes
  * back under `skipped`, never silently or falsely as delivered — there is no
  * SMS gateway in this codebase to reach them with yet.
+ *
+ * Unlike the org/relay path (see hooks/useAlertSocket.ts's outbox), this call
+ * has no durable offline queue — that is real, separate infrastructure work.
+ * What it does have: a bounded retry with a timeout, so the one failure mode
+ * that used to lose the alert outright — a slow or momentarily unreachable
+ * network at the exact moment a panicking person is pressing SOS — gets a
+ * second and third chance before giving up and telling the caller it failed.
  */
 export interface PersonalAlertResult {
   incidentId: string;
   contacted: { id: string; name: string; delivered: boolean }[];
   skipped: { id: string; name: string; reason: 'no-email' }[];
+  /** True when this exact incident id had already been recorded — a retry
+   *  that actually landed the first time, replaying safely rather than
+   *  raising or re-mailing anyone a second time. See server/routes/contacts.js. */
+  replayed?: boolean;
 }
 
+const PERSONAL_ALERT_ATTEMPTS = 3;
+const PERSONAL_ALERT_TIMEOUT_MS = 12_000;
+
 export async function sendPersonalAlert(
-  input: { type: string; severity: string; message?: string; lat?: number | null; lng?: number | null },
+  input: { id?: string; type: string; severity: string; message?: string; lat?: number | null; lng?: number | null },
   token: string,
 ): Promise<PersonalAlertResult> {
-  const res = await fetch(`${API_BASE}/api/contacts/alert`, {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= PERSONAL_ALERT_ATTEMPTS; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), PERSONAL_ALERT_TIMEOUT_MS);
+    try {
+      const res = await fetch(`${API_BASE}/api/contacts/alert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+        body: JSON.stringify(input),
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(await errorMessage(res, 'could not reach your trusted circle'));
+      return await res.json();
+    } catch (e) {
+      lastError = e;
+      // Retry only a network-level failure — the fetch itself throwing
+      // before any response arrived, including this call's own timeout
+      // aborting it. An HTTP error the server actually answered with (401,
+      // 403, 429, …) is thrown above as a plain Error, not a TypeError or an
+      // AbortError, and must never be retried: a retry cannot fix "not
+      // authenticated", and retrying a 429 would only dig the caller deeper
+      // into the very rate limit it just hit.
+      const isNetworkFailure = e instanceof TypeError || (e instanceof DOMException && e.name === 'AbortError');
+      if (!isNetworkFailure || attempt === PERSONAL_ALERT_ATTEMPTS) throw e;
+      await new Promise((r) => setTimeout(r, 500 * attempt));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  // Unreachable — the loop above always returns or throws — but keeps
+  // TypeScript satisfied that every path yields a result.
+  throw lastError;
+}
+
+/**
+ * Attach a location to a personal incident that was raised without one — the
+ * cold-open-no-GPS-fix-yet case. Best-effort: the caller does not need to
+ * check `updated` for anything beyond curiosity, since arriving too late (the
+ * incident already has a location, or is resolved) is an ordinary race, not
+ * something to handle specially. See server/routes/contacts.js's own comment.
+ */
+export async function backfillPersonalAlertLocation(
+  incidentId: string,
+  lat: number,
+  lng: number,
+  token: string,
+): Promise<{ ok: boolean; updated: boolean }> {
+  const res = await fetch(`${API_BASE}/api/contacts/alert/${encodeURIComponent(incidentId)}/location`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify({ lat, lng }),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not update the location'));
+  return res.json();
+}
+
+/**
+ * Close a personal account's own incident — "I'm safe" / a false alarm,
+ * mirrored server-side by a re-mail to the same Trusted Circle that got the
+ * original alert. See server/routes/contacts.js's resolve route.
+ */
+export async function resolvePersonalAlert(
+  incidentId: string,
+  reason: 'resolved' | 'false-alarm',
+  token: string,
+): Promise<{ ok: boolean; alreadyResolved?: boolean }> {
+  const res = await fetch(`${API_BASE}/api/contacts/alert/${encodeURIComponent(incidentId)}/resolve`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
-    body: JSON.stringify(input),
+    body: JSON.stringify({ reason }),
   });
-  if (!res.ok) throw new Error(await errorMessage(res, 'could not reach your trusted circle'));
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not tell your trusted circle this is resolved'));
   return res.json();
 }
 

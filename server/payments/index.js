@@ -424,8 +424,30 @@ async function refreshFromGateway(orderReference) {
   return tx;
 }
 
+// How many times to re-read-and-retry the subscription update below when a
+// concurrent write beat this one to it. Bounded, not infinite: sustained
+// contention on one subject's subscription row is not a scenario more
+// looping fixes, and this must eventually give up and let the caller's own
+// retry path (a redelivered webhook, the reconcile sweep) take another pass
+// with a fresh read rather than spin here.
+const SUBSCRIPTION_UPDATE_ATTEMPTS = 5;
+
 // Turn a paid transaction into entitlement. Idempotent by construction — the
 // claim below succeeds once and only once.
+//
+// The read-compute-write below (get the subscription, compute its next
+// period from it, write the result back) is a classic lost-update window:
+// two different PAID transactions for the same subject — a renewal and a
+// plan change landing close together, say — could both read the same
+// subscription row, compute from the same stale currentPeriodEnd, and the
+// second write would silently overwrite the first's period extension. That
+// is distinct from (and does not affect) the double-crediting question:
+// claimTransactionForProvisioning above already makes each individual
+// transaction provision at most once, however many times its own webhook is
+// redelivered. This closes the other race, between two DIFFERENT
+// transactions for the same subject, using optimistic concurrency
+// (subscriptions.updated_at as the version) rather than a row lock — see
+// db.js's updateSubscription/updateUserSubscription for the guard itself.
 async function applyOutcome(orderReference) {
   const tx = await db.getTransactionByReference(orderReference);
   if (!tx || tx.status !== 'paid') return false;
@@ -439,26 +461,39 @@ async function applyOutcome(orderReference) {
   if (!claimed) return false; // already provisioned by an earlier delivery
 
   try {
-    const subscription = await store.get();
-    const { start, end } = nextPeriod(subscription, tx.billingCycle);
+    let end;
+    let attempt = 0;
+    for (;;) {
+      attempt++;
+      const subscription = await store.get();
+      const period = nextPeriod(subscription, tx.billingCycle);
+      end = period.end;
 
-    await store.update({
-      tier: tx.planId,
-      previousTier: tx.planId, // the pending window is over; this is now the floor
-      status: 'active',
-      paymentMethod: tx.method,
-      provider: tx.gateway,
-      billingCycle: tx.billingCycle,
-      currency: tx.currency,
-      amount: tx.amount,
-      seats: plans.seatsFor(tx.planId),
-      referenceId: tx.orderReference,
-      externalReference: tx.externalReference,
-      currentPeriodStart: start,
-      currentPeriodEnd: end,
-      pastDueSince: null,
-      canceledAt: null,
-    });
+      // eslint-disable-next-line no-await-in-loop
+      const updated = await store.update({
+        tier: tx.planId,
+        previousTier: tx.planId, // the pending window is over; this is now the floor
+        status: 'active',
+        paymentMethod: tx.method,
+        provider: tx.gateway,
+        billingCycle: tx.billingCycle,
+        currency: tx.currency,
+        amount: tx.amount,
+        seats: plans.seatsFor(tx.planId),
+        referenceId: tx.orderReference,
+        externalReference: tx.externalReference,
+        currentPeriodStart: period.start,
+        currentPeriodEnd: period.end,
+        pastDueSince: null,
+        canceledAt: null,
+      }, subscription?.updatedAt);
+
+      if (updated) break;
+      if (attempt >= SUBSCRIPTION_UPDATE_ATTEMPTS) {
+        throw new Error(`subscription update lost the race ${SUBSCRIPTION_UPDATE_ATTEMPTS} times in a row for ${describe(subject)}`);
+      }
+      console.warn(`[payments] subscription for ${describe(subject)} changed concurrently — retrying (attempt ${attempt})`);
+    }
 
     console.log(`[payments] ${tx.planId} activated for ${describe(subject)} until ${end.toISOString()} (${tx.orderReference})`);
     return true;
@@ -678,4 +713,5 @@ module.exports = {
   PaymentError,
   PUSH_TIMEOUT_MS,
   RECONCILE_AFTER_MS,
+  SUBSCRIPTION_UPDATE_ATTEMPTS,
 };

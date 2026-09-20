@@ -468,6 +468,15 @@ async function init() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS kind    TEXT NOT NULL DEFAULT 'org_member';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS country TEXT;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS locale  TEXT NOT NULL DEFAULT 'en';
+    -- Bumped by setUserPassword, and carried in every JWT this user is issued
+    -- (see auth.js's signToken/userFromToken). A token signed before a
+    -- password reset names the version it was signed under; a mismatch means
+    -- the account changed its password since, and the token is rejected even
+    -- though it has not yet expired. Existing tokens issued before this
+    -- column existed carry no claim at all, which is treated the same as 0 —
+    -- this column's own default — so the deploy that adds it does not itself
+    -- invalidate every session that was already live.
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 0;
 
     -- Every collection attempt, successful or not.
     --
@@ -970,8 +979,12 @@ async function consumePasswordReset(tokenHash) {
  */
 async function setUserPassword(userId, passwordHash) {
   if (!pool) return null;
+  // token_version bumped in the same statement as the password itself, not a
+  // separate call — the two must never be able to land as two different
+  // transactions, or a crash between them would leave a new password
+  // protected by every token issued under the old one.
   const { rows } = await pool.query(
-    `UPDATE users SET password_hash = $2 WHERE id = $1 RETURNING *`,
+    `UPDATE users SET password_hash = $2, token_version = token_version + 1 WHERE id = $1 RETURNING *`,
     [userId, passwordHash],
   );
   if (!rows[0]) return null;
@@ -1357,6 +1370,61 @@ async function resolveActive(allClear, orgId) {
   );
 }
 
+/**
+ * Resolve one personal account's own incident — the individual-account
+ * equivalent of resolveActive above, scoped to a single incident id and
+ * user_id rather than "every active incident in an org": a personal account
+ * has no org-wide single-active-incident concept (see recordAlert's userId
+ * param and incidents.user_id's own column comment), and unlike an org this
+ * endpoint is reachable by the account that raised the alert calling it
+ * directly, so it must never resolve a DIFFERENT user's incident even if
+ * that id is guessed.
+ *
+ * The UPDATE only matches a row that is both this user's and still active,
+ * so a retried request (a flaky send, a second tap on "All clear") is a
+ * no-op rather than a second resolution — RETURNING is empty on every call
+ * after the first, which is exactly how the caller tells "just resolved it"
+ * apart from "already was, nothing to re-notify about".
+ */
+async function resolvePersonalIncident({ id, userId, reason, resolvedBy }) {
+  if (!pool) return null;
+  const resolution = reason === 'false-alarm' ? 'false-alarm' : 'resolved';
+  const { rows } = await pool.query(
+    `UPDATE incidents
+        SET status = 'resolved', resolved_at = now(), resolved_by = $3, resolution = $4
+      WHERE id = $1 AND user_id = $2 AND status = 'active'
+      RETURNING *`,
+    [String(id), userId, resolvedBy || null, resolution],
+  );
+  return rows[0] || null;
+}
+
+/**
+ * Attach a location to a personal incident that was raised without one — the
+ * cold-open-no-GPS-fix-yet case: SOS must never wait on a location before
+ * firing (see App.tsx's trigger()), so the incident is often created with
+ * lat/lng both null, and a fix that arrives moments later had nowhere to go.
+ *
+ * Only ever fills a gap, never overwrites a real reading: the WHERE clause
+ * requires lat/lng to still be null, so a slow, late-arriving fix can never
+ * clobber a location the alert already had. Scoped by user_id like
+ * resolvePersonalIncident above, for the same reason. Returns the updated
+ * row only when this call actually supplied the first location — the
+ * caller's cue that Nearby Help, which was skipped at raise time for lack of
+ * one, is now worth attempting.
+ */
+async function backfillPersonalIncidentLocation({ id, userId, lat, lng }) {
+  if (!pool) return null;
+  const { rows } = await pool.query(
+    `UPDATE incidents
+        SET lat = $3, lng = $4
+      WHERE id = $1 AND user_id = $2 AND status = 'active' AND lat IS NULL AND lng IS NULL
+      RETURNING *`,
+    [String(id), userId, lat, lng],
+  );
+  return rows[0] || null;
+}
+
 async function listIncidents({ limit = 50, status, orgId } = {}) {
   if (!pool) return [];
   const capped = Math.max(1, Math.min(Number(limit) || 50, 500));
@@ -1535,6 +1603,24 @@ async function deletePushSubscription(endpoint, owner = null) {
   } else {
     ({ rowCount } = await pool.query(`DELETE FROM push_subscriptions WHERE endpoint = $1`, [endpoint]));
   }
+  return rowCount;
+}
+
+/**
+ * Every stored Web Push subscription, gone at once — used only by
+ * scripts/rotate-vapid-keys.js. A subscription's applicationServerKey is the
+ * VAPID public key it was created against; once that key changes, sending to
+ * an old subscription with the new private key fails at the push service
+ * (typically 401/403, since the JWT no longer matches what the subscription
+ * was registered under) rather than the 404/410 push.js's own pruning
+ * already watches for — so a rotation that didn't also clear these would
+ * leave every one of them permanently undeliverable and never cleaned up.
+ * Each browser reissues a fresh subscription the next time it opens the app
+ * with push enabled; nothing server-side can do that for it.
+ */
+async function deleteAllPushSubscriptions() {
+  if (!pool) return 0;
+  const { rowCount } = await pool.query(`DELETE FROM push_subscriptions`);
   return rowCount;
 }
 
@@ -1960,7 +2046,19 @@ async function getUserSubscription(userId) {
   return publicSubscription(rows[0]);
 }
 
-async function updateUserSubscription(userId, patch = {}) {
+/**
+ * @param expectedUpdatedAt Optimistic-concurrency guard: when given, the
+ *   UPDATE only matches a row whose updated_at still equals this value — see
+ *   payments/index.js's applyOutcome(), the one caller that actually needs
+ *   it (two different paid transactions for the same subject racing on its
+ *   subscription row). Omitted, this behaves exactly as before: every other
+ *   caller (revertPending, applyClawback, the billing UI's own edits, …)
+ *   keeps its unconditional last-write-wins update, which was never the bug.
+ *   A mismatch is reported the same way "no such row" already is — null —
+ *   because to every existing caller that never passes this, the two cases
+ *   were already indistinguishable.
+ */
+async function updateUserSubscription(userId, patch = {}, expectedUpdatedAt = undefined) {
   if (!pool || !userId) return null;
   await ensureUserSubscription(userId);
 
@@ -1974,9 +2072,15 @@ async function updateUserSubscription(userId, patch = {}) {
   if (sets.length === 0) return getUserSubscription(userId);
 
   values.push(userId);
+  const userIdParam = values.length;
+  let guard = '';
+  if (expectedUpdatedAt !== undefined) {
+    values.push(expectedUpdatedAt);
+    guard = ` AND updated_at IS NOT DISTINCT FROM $${values.length}`;
+  }
   const { rows } = await pool.query(
     `UPDATE subscriptions SET ${sets.join(', ')}, updated_at = now()
-      WHERE user_id = $${values.length} AND kind = 'individual' RETURNING *`,
+      WHERE user_id = $${userIdParam} AND kind = 'individual'${guard} RETURNING *`,
     values,
   );
   // Deliberately no mirror onto organizations: a person's plan is not a site's.
@@ -1997,14 +2101,14 @@ function subscriptionsFor(subject) {
     return {
       get: () => getUserSubscription(subject.userId),
       ensure: () => ensureUserSubscription(subject.userId),
-      update: (patch) => updateUserSubscription(subject.userId, patch),
+      update: (patch, expectedUpdatedAt) => updateUserSubscription(subject.userId, patch, expectedUpdatedAt),
     };
   }
   if (subject.kind === 'organization' && subject.orgId) {
     return {
       get: () => getSubscription(subject.orgId),
       ensure: () => ensureSubscription(subject.orgId),
-      update: (patch) => updateSubscription(subject.orgId, patch),
+      update: (patch, expectedUpdatedAt) => updateSubscription(subject.orgId, patch, expectedUpdatedAt),
     };
   }
   return null;
@@ -2034,7 +2138,9 @@ const SUBSCRIPTION_FIELDS = {
   trialEndsAt: 'trial_ends_at',
 };
 
-async function updateSubscription(orgId, patch = {}) {
+// See updateUserSubscription's own doc comment for what expectedUpdatedAt is
+// and why only payments/index.js's applyOutcome() passes it.
+async function updateSubscription(orgId, patch = {}, expectedUpdatedAt = undefined) {
   if (!pool || !orgId) return null;
   await ensureSubscription(orgId);
 
@@ -2048,22 +2154,33 @@ async function updateSubscription(orgId, patch = {}) {
   if (sets.length === 0) return getSubscription(orgId);
 
   values.push(orgId);
+  const orgIdParam = values.length;
+  let guard = '';
+  if (expectedUpdatedAt !== undefined) {
+    values.push(expectedUpdatedAt);
+    guard = ` AND updated_at IS NOT DISTINCT FROM $${values.length}`;
+  }
   const { rows } = await pool.query(
     `UPDATE subscriptions SET ${sets.join(', ')}, updated_at = now()
-     WHERE org_id = $${values.length} RETURNING *`,
+     WHERE org_id = $${orgIdParam}${guard} RETURNING *`,
     values,
   );
+  const row = rows[0];
+  // A concurrency-guard mismatch (or, unreachable in practice given
+  // ensureSubscription above, no row at all) — nothing to mirror, nothing to
+  // report as updated. The caller (applyOutcome) is the one that knows
+  // whether this means "retry" or "fine, someone else already did it".
+  if (!row) return null;
 
   // Keep the organizations mirror in step. This is the SUBSCRIBED tier and
   // status — a reporting convenience, deliberately not an access decision.
   if (patch.tier !== undefined || patch.status !== undefined) {
-    const row = rows[0];
     await pool.query(
       `UPDATE organizations SET tier = $1, subscription_status = $2 WHERE id = $3`,
       [row.tier, row.status, orgId],
     );
   }
-  return publicSubscription(rows[0]);
+  return publicSubscription(row);
 }
 
 function publicTransaction(row) {
@@ -2520,6 +2637,8 @@ module.exports = {
   countContacts,
   recordAlert,
   resolveActive,
+  resolvePersonalIncident,
+  backfillPersonalIncidentLocation,
   listIncidents,
   getIncident,
   recordIncidentEvent,
@@ -2532,6 +2651,7 @@ module.exports = {
   listPushSubscriptions,
   listPushSubscriptionsForUser,
   deletePushSubscription,
+  deleteAllPushSubscriptions,
   getKv,
   setKv,
   close,

@@ -1,13 +1,35 @@
 # Self-hosted OSRM
 
+**Status: not deployed, legacy/optional fallback only.** Production routing
+is Mapbox Directions (see `b663f46`, "Make Mapbox Directions the worldwide
+routing provider; drop OSRM Blueprint service") — `render.yaml` deliberately
+declares no `smart-warning-osrm` service. This directory is kept as optional
+infrastructure for whoever wants to stand up a self-hosted fallback later,
+not as something currently running.
+
 Replaces the public `router.project-osrm.org` demo server that
-`server/routing.js` used to default to. See that file's header comment for
-what routing is (and, more importantly, is **not**) allowed to do to the
-alert path — nothing here changes that contract, it only changes who answers
-the request.
+`server/routing.js` used to default to before Mapbox. See that file's header
+comment for what routing is (and, more importantly, is **not**) allowed to do
+to the alert path — nothing here changes that contract, it only changes who
+answers the request.
 
 **Scope: Tanzania only**, deliberately — see the comment at the top of
 [`Dockerfile`](Dockerfile) for why, and how to widen it later.
+
+## Before standing this back up
+
+A real, previously-hit constraint, not a hypothetical: Render's 512MB starter
+plan crashed this service at runtime, and a 1 CPU/2GB plan was required just
+to get it running (see `render.yaml`'s own comment). Separately verified by
+local reproduction (2026-09-20): a 512MB memory ceiling is not enough to get
+Tanzania's OSM graph (~125M nodes) through `osrm-partition` at all — it
+doesn't fail cleanly, it thrashes for hours. Budget **at least 2GB**, and
+actually test at that size before relying on this — it has not been
+re-verified end-to-end against the real Tanzania extract since. If memory
+cost is a concern, consider building the `.osrm` graph files once, offline,
+on a machine with generous RAM, and shipping a lean runtime-only image that
+only serves them — `osrm-routed` serving an already-built graph needs far
+less memory than building one.
 
 ## What this is
 

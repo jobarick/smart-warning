@@ -1,7 +1,13 @@
-# Self-hosted OSRM routing server, replacing the public
-# router.project-osrm.org demo that server/routing.js used to default to —
-# no key, no account, but explicitly best-effort with no SLA. See the
-# "Replace the OSRM demo dependency" P0 item in docs/GLOBAL_READINESS_AUDIT.md.
+# Self-hosted OSRM routing server — legacy/optional fallback only.
+#
+# NOT deployed. server/routing.js's production routing provider is Mapbox
+# Directions (see b663f46, "Make Mapbox Directions the worldwide routing
+# provider; drop OSRM Blueprint service") — render.yaml deliberately declares
+# no `smart-warning-osrm` service. This file is kept only as optional
+# infrastructure for whoever wants to stand up a self-hosted fallback later
+# (a paid-Mapbox-alternative, a fully offline deployment, etc.); see
+# osrm/README.md for how, and server/routing.js's own header for what
+# ROUTING_URL does when it's set.
 #
 # Scope: TANZANIA ONLY, on purpose. This product is Tanzania-first (pricing in
 # TZS, mobile money in TZS, +255 phone placeholders — see docs/ROADMAP_P1.md),
@@ -17,16 +23,12 @@
 FROM ghcr.io/project-osrm/osrm-backend:v26.9.0-debian AS builder
 WORKDIR /data
 
-# ⚠️ TEMPORARY DIAGNOSTIC — Liechtenstein (~3.4MB, the standard tiny extract
-# OSRM's own quickstart docs use), NOT Tanzania, while isolating why the real
-# Tanzania deploy dies ~50s into startup with zero output on both 512MB and
-# 2GB plans. If this tiny graph starts up cleanly, the problem is graph-size-
-# vs-RAM and Tanzania just needs a bigger plan. If it fails identically, the
-# problem is the deployment mechanism itself, independent of data size — and
-# a bigger plan for the real extract would have been the wrong next spend.
-# MUST be reverted to the real Tanzania line above once this is answered —
-# see the git history on this file for that line.
-ADD https://download.geofabrik.de/europe/liechtenstein-latest.osm.pbf /data/map.osm.pbf
+# Docker's own ADD-from-URL, not `RUN curl` — the osrm-backend image doesn't
+# ship curl or wget, and ADD needs neither: BuildKit fetches it directly,
+# redirects ("latest" -> a dated file) included. ~670MB as of 2026-09;
+# Geofabrik updates this URL's target in place, so a rebuild always gets a
+# current map, not a stale one.
+ADD https://download.geofabrik.de/africa/tanzania-latest.osm.pbf /data/map.osm.pbf
 
 # The modern MLD pipeline (extract, then partition, then customize) rather
 # than the older CH one (extract, then contract) — MLD is what upstream OSRM
@@ -44,11 +46,25 @@ FROM ghcr.io/project-osrm/osrm-backend:v26.9.0-debian
 WORKDIR /data
 COPY --from=builder /data /data
 EXPOSE 5000
-# ⚠️ TEMPORARY DIAGNOSTIC, round 3. Round 2's `--help` output revealed the
-# actual bug: `-a [ --algorithm ] arg (=CH) ... Can be CH, MLD.` — UPPERCASE.
-# Every attempt so far passed `--algorithm mld` in lowercase. That's a plain
-# string match against "CH"/"MLD", not case-normalized, so `mld` never
-# matched — the exact kind of thing that fails silently rather than printing
-# a usage error. This round only changes that one value to confirm the fix
-# before reverting the rest of the diagnostic scaffolding.
+# --algorithm takes CH or MLD — UPPERCASE. This is a real, previously-found
+# bug, not a style choice: `--algorithm mld` (lowercase) matches nothing
+# (osrm-routed's arg parser does a plain string compare against "CH"/"MLD",
+# not case-normalized), so it silently falls back to the default algorithm
+# instead of erroring — the exact failure this project's own diagnostic
+# history traced a runtime crash to. Verified locally (2026-09-20): a full
+# build-and-serve cycle against a real OSM extract, with this flag correct,
+# starts cleanly and answers a real /route query. Confirmed separately in the
+# same session: a 512MB memory ceiling is NOT enough to get a graph
+# Tanzania's size (~125M nodes) through osrm-partition in any practical
+# time — it doesn't error, it thrashes for hours. This matches this
+# project's own prior finding that the 512MB Render starter plan crashed at
+# runtime and a 1 CPU/2GB plan was required (see render.yaml's own comment on
+# why no OSRM service is declared there) — budget at least 2GB, and confirm
+# that's actually enough before relying on this for anything, since it was
+# never re-verified end-to-end against the real Tanzania extract at that
+# size. A pre-built-graph deployment (build the .osrm files once, offline,
+# on a machine with generous RAM; ship a lean runtime-only image that just
+# serves them) would sidestep this ceiling entirely, since osrm-routed
+# serving an already-built graph needs far less memory than building one —
+# worth considering if this is ever actually stood back up.
 CMD ["osrm-routed", "--algorithm", "MLD", "/data/map.osrm"]

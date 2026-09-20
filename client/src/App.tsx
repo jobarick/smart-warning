@@ -54,10 +54,22 @@ import { SafeRoutePanel } from './components/SafeRoutePanel';
 import { ContactSupport } from './components/ContactSupport';
 import { unsubscribe as unsubscribePush } from './lib/push';
 import { nativePushSupported, registerForPush, unregisterFromPush, attachHandlers } from './lib/nativePush';
+import { startIncidentLocation, stopIncidentLocation } from './lib/nativeForegroundService';
 import { STALE_REPLAY_MS } from './lib/outbox';
 import * as trackBuffer from './lib/trackBuffer';
-import { fetchHealth, fetchMe, fetchReports, escalateReport, dismissReport, recordConsent, sendPersonalAlert, type Report } from './lib/api';
+import {
+  fetchHealth, fetchMe, fetchReports, escalateReport, dismissReport, recordConsent,
+  sendPersonalAlert, resolvePersonalAlert, backfillPersonalAlertLocation, type Report,
+} from './lib/api';
 import { fetchSubscription } from './lib/billing';
+
+// How long the pending-location note may show after SOS fires with no GPS
+// fix yet, and how long a late fix is still worth backfilling. Short on
+// purpose: this is about the ordinary few-second gap between "SOS pressed"
+// and "GPS's first fix since the app opened", not a general offline/retry
+// window — that is the outbox's job for the org path, and there is no
+// equivalent promise being made here for the personal path either.
+const LOCATION_BACKFILL_WINDOW_MS = 20_000;
 
 // ---------------------------------------------------------------------------
 // Deferred surfaces
@@ -699,6 +711,50 @@ export default function App() {
   // did not seem to register. That second press is a real emergency and
   // must never be silently swallowed; matches the server's own ALERT_COOLDOWN_MS.
   const lastTriggerAt = useRef(0);
+
+  // The one alert most recently raised with no location yet, if any — set at
+  // the moment SOS fires so late-arriving GPS has somewhere to go, cleared as
+  // soon as that happens or after a while if it never does. A ref: it is read
+  // from inside an effect keyed on telemetry, which must not itself be a
+  // dependency of trigger() or every position update would redefine the
+  // callback SosPanel holds a reference to.
+  const pendingLocationRef = useRef<{ incidentId: string; personal: boolean } | null>(null);
+  const [locationPending, setLocationPending] = useState(false);
+
+  useEffect(() => {
+    const pending = pendingLocationRef.current;
+    if (!pending || telemetry.lat == null || telemetry.lng == null) return;
+    pendingLocationRef.current = null;
+    setLocationPending(false);
+    if (pending.personal) {
+      void backfillPersonalAlertLocation(pending.incidentId, telemetry.lat, telemetry.lng, token || '')
+        .catch((e) => console.error('[personal-alert] location backfill failed:', e.message));
+    }
+    // The org path has no backfill call of its own — see SMART_WARNING_FIX_PLAN.md's
+    // P1-1 write-up: a fix that arrives shortly after already reaches the
+    // live roster through the existing heartbeat effect below, which is what
+    // a supervisor actually watches during an incident.
+  }, [telemetry.lat, telemetry.lng, token]);
+
+  // Hold a foreground-service slot for the duration of any active org
+  // incident — not just on this device if it was the one that raised the
+  // alarm, but on every device that sees it, since the live roster a
+  // supervisor watches depends on every worker's heartbeat still reaching
+  // the relay, not only the raiser's. Personal accounts have no live roster
+  // for this to serve (see P1-1's note on why the org and personal paths
+  // diverge here) and are excluded. See nativeForegroundService.ts and
+  // IncidentLocationService.java for what this does and why it is scoped to
+  // Android only for now.
+  useEffect(() => {
+    if (isPersonal || !alarm.alert) return;
+    void startIncidentLocation();
+    return () => void stopIncidentLocation();
+    // Keyed on the alert's id, a stable primitive, rather than the alert
+    // object itself — a new object with the same id on every heartbeat
+    // re-render must not stop and restart the service each time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPersonal, alarm.alert?.id]);
+
   const trigger = useCallback(
     (type: AlertType, severity: Severity, message: string) => {
       const now = Date.now();
@@ -714,21 +770,47 @@ export default function App() {
         sender: settings.deviceName,
         timestamp: Date.now(),
       };
+
+      const hasFix = settings.shareLocation && telemetry.lat != null && telemetry.lng != null;
+      if (settings.shareLocation && !hasFix) {
+        pendingLocationRef.current = { incidentId: alert.id, personal: isPersonal };
+        setLocationPending(true);
+        setTimeout(() => {
+          if (pendingLocationRef.current?.incidentId !== alert.id) return; // superseded or already resolved
+          pendingLocationRef.current = null;
+          setLocationPending(false);
+        }, LOCATION_BACKFILL_WINDOW_MS);
+      } else {
+        pendingLocationRef.current = null;
+        setLocationPending(false);
+      }
+
       // The local siren/overlay must fire immediately either way — it must
       // never wait on a network round trip for the one thing this device can
       // do entirely on its own.
       if (isPersonal) {
         handleWire(alert);
         setPersonalSendStatus({ phase: 'sending' });
+        // Reuses the same id the local overlay is already showing (alert.id),
+        // not a second, server-generated one — see api.ts's sendPersonalAlert:
+        // this is what lets a retry after a lost response replay safely
+        // instead of raising and re-mailing the Trusted Circle a second time,
+        // and what lets allClear() below resolve the exact incident this
+        // device is looking at.
         void sendPersonalAlert(
           {
-            type, severity, message: message || undefined,
+            id: alert.id, type, severity, message: message || undefined,
             lat: settings.shareLocation ? telemetry.lat : null,
             lng: settings.shareLocation ? telemetry.lng : null,
           },
           token || '',
         )
-          .then((result) => setPersonalSendStatus({ phase: 'sent', contactedCount: result.contacted.filter((c) => c.delivered).length }))
+          .then((result) => setPersonalSendStatus({
+            phase: 'sent',
+            contactedCount: result.contacted.filter((c) => c.delivered).length,
+            skipped: result.skipped,
+            replayed: result.replayed === true,
+          }))
           .catch((e) => {
             console.error('[personal-alert]', e.message);
             setPersonalSendStatus({ phase: 'failed' });
@@ -750,10 +832,29 @@ export default function App() {
         timestamp: Date.now(),
         reason,
       };
-      if (!send(msg)) handleWire(msg);
+      if (isPersonal) {
+        // A personal account has no relay room to broadcast an all-clear
+        // into (see isPersonal/runSocket above), so send(msg) below would
+        // always silently fail here anyway. Until this branch existed,
+        // "All clear" and "I raised this by mistake" on a personal account
+        // only ever cleared the overlay on THIS device — a Trusted Circle
+        // that had already received the panic email had no way to ever
+        // learn it was over. Clear the local overlay immediately either way,
+        // matching trigger()'s own "never wait on a network round trip for
+        // what this device can do alone" rule; the resolve email follows in
+        // the background.
+        const incidentId = alarm.alert?.id;
+        handleWire(msg);
+        if (incidentId) {
+          void resolvePersonalAlert(incidentId, reason, token || '')
+            .catch((e) => console.error('[personal-alert] resolve failed:', e.message));
+        }
+      } else if (!send(msg)) {
+        handleWire(msg);
+      }
       setPersonalSendStatus(null);
     },
-    [send, handleWire, settings.deviceName],
+    [send, handleWire, settings.deviceName, isPersonal, alarm.alert, token],
   );
 
   // Tell the site this supervisor is on their way.
@@ -1139,6 +1240,7 @@ export default function App() {
                 onTrigger={trigger}
                 locale={settings.locale}
                 personalStatus={isPersonal ? personalSendStatus : undefined}
+                locationPending={locationPending}
                 focusType={focusType}
               />
               {/* Below the SOS, never above it. Billing is the least important

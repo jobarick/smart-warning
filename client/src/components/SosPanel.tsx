@@ -11,6 +11,17 @@ import { Icon } from './Icon';
 export interface PersonalSendStatus {
   phase: 'sending' | 'sent' | 'failed';
   contactedCount?: number;
+  /** Trusted Circle members who could not be reached — a phone-only contact
+   *  with no email, most commonly, since there is no SMS gateway yet. Must be
+   *  shown, not just folded into contactedCount, or "3 of 4 notified" reads
+   *  as a minor shortfall instead of "one specific person still doesn't know". */
+  skipped?: { id: string; name: string; reason: 'no-email' }[];
+  /** True when this alert had already been recorded — an internal retry
+   *  (see lib/api.ts's sendPersonalAlert) landed on a request whose earlier
+   *  attempt actually succeeded, so contactedCount/skipped are both empty
+   *  here on purpose: nothing was re-attempted. Shown as "already sent"
+   *  rather than misread as "reached nobody". */
+  replayed?: boolean;
 }
 
 interface Props {
@@ -19,6 +30,12 @@ interface Props {
   onTrigger: (type: AlertType, severity: Severity, message: string) => void;
   locale: Locale;
   personalStatus?: PersonalSendStatus | null;
+  /** True right after SOS fires with no GPS fix yet — App.tsx clears this
+   *  once a fix arrives (and, for a personal account, backfills the incident
+   *  with it) or after a short window if one never does. Shown for every
+   *  account kind, not just personal: an org's own supervisor deserves to
+   *  know an alert went out without a position too. */
+  locationPending?: boolean;
   /**
    * Pre-selects a type from outside — the authenticated emergency grid's
    * "Report through Smart Warning" button uses this to hand off into the
@@ -31,7 +48,7 @@ interface Props {
 
 const SEVERITIES: Severity[] = ['low', 'medium', 'high', 'critical'];
 
-export function SosPanel({ profile, disabled, onTrigger, locale, personalStatus, focusType }: Props) {
+export function SosPanel({ profile, disabled, onTrigger, locale, personalStatus, locationPending, focusType }: Props) {
   const [selected, setSelected] = useState<AlertType | null>(null);
   const [severity, setSeverity] = useState<Severity>('high');
   const [message, setMessage] = useState('');
@@ -104,20 +121,48 @@ export function SosPanel({ profile, disabled, onTrigger, locale, personalStatus,
           : chosen ? t(locale, 'sos.severityLabel', { severity: t(locale, SEVERITY_KEY[severity]) }) : t(locale, 'sos.choosePrompt')}
       </p>
 
+      {/* SOS must never wait on GPS to fire (see App.tsx's trigger()), so a
+          cold app open or a weak fix can send an alert with no location at
+          all. This says so plainly rather than leaving it silent — a
+          supervisor or a Trusted Circle member reading "location not
+          available" later should not be the first the person themself hears
+          of it. Cleared automatically once a fix arrives or after a short
+          window either way; see App.tsx's locationPending/pendingLocationRef. */}
+      {locationPending && (
+        <p className="sos-personal-status sos-personal-status-sending" role="status" aria-live="polite">
+          {t(locale, 'sos.locationPending')}
+        </p>
+      )}
+
       {/* Section 11 of the product brief: the person must always know whether
           help was actually told, never be left guessing. Only meaningful for
           a personal account — see App.tsx's isPersonal / sendPersonalAlert;
           an org account's own delivery signal is SystemFooter's sync state. */}
       {personalStatus && (
-        <p className={`sos-personal-status sos-personal-status-${personalStatus.phase}`} role="status" aria-live="polite">
-          {personalStatus.phase === 'sending' && t(locale, 'sos.personalSending')}
-          {personalStatus.phase === 'sent' && (
-            personalStatus.contactedCount
-              ? t(locale, 'sos.personalSent', { count: String(personalStatus.contactedCount) })
-              : t(locale, 'sos.personalSentNone')
+        <>
+          <p className={`sos-personal-status sos-personal-status-${personalStatus.phase}`} role="status" aria-live="polite">
+            {personalStatus.phase === 'sending' && t(locale, 'sos.personalSending')}
+            {personalStatus.phase === 'sent' && (
+              personalStatus.replayed
+                ? t(locale, 'sos.personalReplayed')
+                : personalStatus.contactedCount
+                  ? t(locale, 'sos.personalSent', { count: String(personalStatus.contactedCount) })
+                  : t(locale, 'sos.personalSentNone')
+            )}
+            {personalStatus.phase === 'failed' && t(locale, 'sos.personalFailed')}
+          </p>
+          {/* A contact the server could not reach (no email on file) must
+              stay visible on its own, not disappear into a smaller-than-
+              expected count — that count alone reads as "a bit short", not
+              as "this specific person still doesn't know". */}
+          {personalStatus.phase === 'sent' && personalStatus.skipped && personalStatus.skipped.length > 0 && (
+            <p className="sos-personal-status sos-personal-status-skipped" role="status">
+              {personalStatus.skipped.length === 1
+                ? t(locale, 'sos.personalSkippedOne', { name: personalStatus.skipped[0].name })
+                : t(locale, 'sos.personalSkippedMany', { count: String(personalStatus.skipped.length) })}
+            </p>
           )}
-          {personalStatus.phase === 'failed' && t(locale, 'sos.personalFailed')}
-        </p>
+        </>
       )}
 
       <div className={`sos-types ${flash ? 'flash' : ''}`} role="group" aria-label="Emergency type">

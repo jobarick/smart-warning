@@ -8,7 +8,7 @@ const db = require('../db');
 const plans = require('../billing/plans');
 const entitlements = require('../billing/entitlements');
 const { sendJson } = require('../http');
-const { requireAuth } = require('../guards');
+const { requireAuth, allowPlaces } = require('../guards');
 
 function num(v) {
   const n = Number(v);
@@ -17,6 +17,13 @@ function num(v) {
 
 async function handle({ req, res, url, path }) {
   if (path !== '/api/weather' || req.method !== 'GET') return false;
+
+  // Unauthenticated by design (see below) and hitting a real provider per
+  // request beyond the cache's ~1.1km grid — the same allowPlaces bucket
+  // routes/emergency.js already uses for the same reason (an anonymous
+  // caller varying lat/lng slightly could otherwise drive unlimited outbound
+  // calls, running up cost or provider rate limits for every real user).
+  if (!allowPlaces(req)) { sendJson(res, 429, { error: 'too many requests, please wait a moment' }); return true; }
 
   const lat = num(url.searchParams.get('lat'));
   const lng = num(url.searchParams.get('lng'));
