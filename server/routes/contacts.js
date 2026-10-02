@@ -19,13 +19,28 @@ const db = require('../db');
 const auth = require('../auth');
 const mailer = require('../mailer');
 const nearbyHelp = require('../nearbyHelp');
+const plans = require('../billing/plans');
+const entitlements = require('../billing/entitlements');
 const { sendJson, readJson } = require('../http');
 const { requireAuth, allowPersonalAlert } = require('../guards');
 const { UUID_RE, ALERT_TYPES, SEVERITIES, numOrNull, titleCase } = require('../wire');
 
 // Enough for a household and then some. A cap exists so one account cannot
-// turn an alarm into a bulk-mail run.
+// turn an alarm into a bulk-mail run, which is why even the paid plans have
+// one: they are sold as 'up to 50' (UNLIMITED_CONTACTS is the feature's wire
+// name, kept as it is). The paid figure used to be the same 10 as Free, so
+// the plan sold more contacts than it ever allowed.
 const MAX_CONTACTS = 10;
+const PAID_MAX_CONTACTS = 50;
+
+// How many contacts this person may keep. Only ever consulted when ADDING
+// one: an alarm always goes to every contact already on the list, whatever
+// the plan is now, because alerting is never gated (billing/entitlements.js).
+async function contactLimit(user) {
+  const store = db.subscriptionsFor?.({ kind: 'individual', userId: user.id, orgId: null });
+  const subscription = store ? await store.get() : null;
+  return entitlements.can(subscription, plans.FEATURES.UNLIMITED_CONTACTS) ? PAID_MAX_CONTACTS : MAX_CONTACTS;
+}
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -87,7 +102,7 @@ async function handle({ req, res, path }) {
     const contacts = await db.listContacts(user.id);
     sendJson(res, 200, {
       contacts,
-      max: MAX_CONTACTS,
+      max: await contactLimit(user),
       // Restated on every response so no client has to hardcode the caveat.
       notice: 'Personal emergency contacts are people you trust. They are not an emergency service and cannot dispatch help.',
     });
@@ -97,8 +112,9 @@ async function handle({ req, res, path }) {
   if (path === '/api/contacts' && req.method === 'POST') {
     const user = await personalUser(req, res);
     if (!user) return true;
-    if (await db.countContacts(user.id) >= MAX_CONTACTS) {
-      sendJson(res, 409, { error: `you can have up to ${MAX_CONTACTS} emergency contacts` });
+    const limit = await contactLimit(user);
+    if (await db.countContacts(user.id) >= limit) {
+      sendJson(res, 409, { error: `you can have up to ${limit} emergency contacts on your plan`, max: limit });
       return true;
     }
     const parsed = parseContact(await readJson(req));
@@ -368,4 +384,4 @@ async function handle({ req, res, path }) {
   return false;
 }
 
-module.exports = { handle, MAX_CONTACTS };
+module.exports = { handle, MAX_CONTACTS, PAID_MAX_CONTACTS };
