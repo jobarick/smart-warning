@@ -114,15 +114,19 @@ async function handle({ req, res, path }) {
 
     const ctx = await requireAuth(req);
     const orgId = ctx ? ctx.orgId : await orgIdFromRequest(req, body);
-    if (!orgId) { sendJson(res, 401, { error: 'org credentials required' }); return true; }
+    // A personal account belongs to no organisation, so requiring an org id
+    // here refused every personal acceptance (401) and no record of it was
+    // ever kept. The signed-in user is identity enough on their own.
+    const userId = ctx?.user?.id ?? null;
+    if (!orgId && !userId) { sendJson(res, 401, { error: 'credentials required' }); return true; }
 
     const points = Array.isArray(body.points)
       ? body.points.filter((p) => typeof p === 'string').slice(0, 20).map((p) => p.slice(0, 64))
       : [];
 
     await db.recordConsent({
-      orgId,
-      userId: ctx?.user?.id ?? null,
+      orgId: orgId ?? null,
+      userId,
       // For a worker there is no account, so record the name they joined
       // under. Not an identity, but it is what the roster shows.
       subject: ctx?.user?.email ?? (typeof body.subject === 'string' ? body.subject.slice(0, 120) : null),

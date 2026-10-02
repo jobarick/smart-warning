@@ -2498,6 +2498,12 @@ async function deleteUser(userId) {
     [userId],
   );
 
+  // consents.user_id has no foreign key (an organisation's rows go with the
+  // organisation by org_id instead), so a personal account's acceptances,
+  // which carry its email as the subject, would outlive the account. Removed
+  // with it, as the organisation's are with the organisation.
+  await pool.query(`DELETE FROM consents WHERE user_id = $1 AND org_id IS NULL`, [userId]);
+
   const { rowCount } = await pool.query(`DELETE FROM users WHERE id = $1`, [userId]);
   if (rowCount === 0) return null;
   return counts[0];
