@@ -1825,6 +1825,16 @@ body {
 .push-toggle.is-on { color: var(--cmd-safe); border-color: color-mix(in srgb, var(--cmd-safe) 45%, var(--panel-border)); }
 .push-toggle:disabled { opacity: 0.6; cursor: default; }
 
+/* On a phone the name, its badge and four buttons do not fit on one line.
+   They used to be forced to: .org-info could shrink to nothing while its
+   no-wrap badge stayed full width, so "Personal account" printed over the
+   buttons beside it and "Leave" ran off the right edge. Give the account its
+   own line and let the buttons wrap beneath it. */
+@media (max-width: 560px) {
+  .org-bar { flex-wrap: wrap; row-gap: 8px; }
+  .org-info { flex: 1 1 100%; margin-right: 0; overflow: hidden; }
+}
+
 /* ---------- system status bar + footer ---------- */
 /* The spec's palette (#10B981 / #F59E0B / #EF4444) is expressed through the
    existing --cmd-safe / --cmd-warn / --cmd-crit tokens, which already carry
@@ -2923,7 +2933,6 @@ body {
 .trial-days { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
 .trial-after { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
 .trial-after b { color: var(--text); }
-.trial-local { opacity: 0.85; }
 
 /* ---------- desktop / wide-viewport adaptation ----------
    Everything above is tuned for a phone held in one hand — a narrow column,

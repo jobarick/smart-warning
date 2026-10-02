@@ -355,7 +355,6 @@ export type StringKey =
   | 'trial.daysLeftOne'
   | 'trial.daysLeftMany'
   | 'trial.afterLabel'
-  | 'trial.aboutTzs'
   | 'trial.continueCta'
   | 'trial.endedBody'
   | 'trial.subscribeToKeep'
@@ -774,7 +773,6 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'trial.daysLeftOne': '{days} day remaining',
     'trial.daysLeftMany': '{days} days remaining',
     'trial.afterLabel': 'After your trial: {price}',
-    'trial.aboutTzs': 'about {amount} TZS',
     'trial.continueCta': 'Continue with Smart Warning',
     'trial.endedBody': 'Emergency alerts, your location during an incident, the emergency numbers and the safety guides all keep working.',
     'trial.subscribeToKeep': 'Subscribe for {price} to keep the rest.',
@@ -1190,7 +1188,6 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'trial.daysLeftOne': 'Imebaki siku {days}',
     'trial.daysLeftMany': 'Zimebaki siku {days}',
     'trial.afterLabel': 'Baada ya jaribio lako: {price}',
-    'trial.aboutTzs': 'takriban TZS {amount}',
     'trial.continueCta': 'Endelea na Smart Warning',
     'trial.endedBody': 'Tahadhari za dharura, eneo lako wakati wa tukio, namba za dharura na miongozo ya usalama zote zinaendelea kufanya kazi.',
     'trial.subscribeToKeep': 'Jisajili kwa {price} ili kuendelea na yaliyobaki.',
