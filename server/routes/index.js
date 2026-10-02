@@ -66,7 +66,13 @@ async function handle(req, res) {
   } catch (err) {
     const status = err.status || 500;
     if (status >= 500) console.error('[api] error:', err.message);
-    return sendJson(res, status, { error: status >= 500 ? 'internal error' : err.message });
+    // A 5xx message is hidden by default: an unexpected error can carry a
+    // driver message naming a host or a query. Errors written for the person
+    // reading them say so with `expose`, so a 501 'card payments are not
+    // configured' or a 503 'please try again' is not flattened to 'internal
+    // error', which tells somebody at a checkout nothing they can act on.
+    const shown = status < 500 || err.expose === true;
+    return sendJson(res, status, { error: shown ? err.message : 'internal error' });
   }
 }
 
