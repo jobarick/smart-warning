@@ -142,6 +142,20 @@ function makeClickpesa({ pushResult = null, queryResult = null, pushError = null
   };
 }
 
+// A gateway fake with a checksum key configured, and a helper that signs a
+// callback body with it the way ClickPesa would.
+const CHECKSUM_KEY = 'test-checksum-key';
+function signedClickpesa(opts) {
+  return {
+    ...makeClickpesa(opts),
+    checksumConfigured: () => true,
+    verifyChecksum: (payload) => realClickpesa.verifyChecksum(payload, null, CHECKSUM_KEY),
+  };
+}
+function signed(body) {
+  return { ...body, checksum: realClickpesa.createChecksum(body, CHECKSUM_KEY) };
+}
+
 // Load a fresh copy of payments/index.js against the given fakes.
 function loadPayments({ db, clickpesa }) {
   delete require.cache[require.resolve('../payments/index.js')];
@@ -327,14 +341,15 @@ test('a renewal that is still pending does not downgrade a paying customer', asy
 test('money clawed back after settlement goes past_due, not straight to free', async (t) => {
   t.after(reset);
   const db = makeDb();
-  const clickpesa = makeClickpesa({ queryResult: { id: 'cp', status: 'SUCCESS', outcome: 'paid' } });
+  const clickpesa = signedClickpesa({ queryResult: { id: 'cp', status: 'SUCCESS', outcome: 'paid' } });
   const payments = loadPayments({ db, clickpesa });
 
   const { orderReference } = await payments.initiateMobileMoney({ orgId: 'org1', planId: 'business', phoneNumber: '0713455454' });
   await payments.handleClickPesaWebhook({ data: { orderReference, status: 'SUCCESS' } });
   assert.strictEqual((await db.getSubscription('org1')).status, 'active');
 
-  await payments.handleClickPesaWebhook({ event: 'PAYOUT REVERSED', data: { orderReference, status: 'REVERSED' } });
+  // Signed, as only a signed reversal is acted on.
+  await payments.handleClickPesaWebhook(signed({ event: 'PAYOUT REVERSED', data: { orderReference, status: 'REVERSED' } }));
 
   const sub = await db.getSubscription('org1');
   assert.strictEqual(sub.status, 'past_due');
@@ -595,4 +610,71 @@ test('an organisation cannot buy the personal plan', async (t) => {
     (e) => e.statusCode === 400 && e.wrongAudience === true,
   );
   assert.strictEqual(db._transactions.size, 0);
+});
+
+// --- Reversals must be signed; no cancelling mid-payment --------------------
+
+test('an unsigned reversal callback cannot take a paid plan back', async (t) => {
+  t.after(reset);
+  const db = makeDb();
+  const payments = loadPayments({ db, clickpesa: makeClickpesa({ queryResult: { id: 'cp', status: 'SUCCESS', outcome: 'paid' } }) });
+
+  const { orderReference } = await payments.initiateMobileMoney({ orgId: 'org1', planId: 'team', phoneNumber: '0713455454' });
+  await payments.handleClickPesaWebhook({ data: { orderReference, status: 'SUCCESS' } });
+
+  // Anyone who learns an order reference can post this.
+  const out = await payments.handleClickPesaWebhook({ event: 'PAYOUT REVERSED', data: { orderReference, status: 'REVERSED' } });
+  assert.strictEqual(out.ignored, 'unverified reversal');
+  assert.strictEqual((await db.getSubscription('org1')).status, 'active');
+  assert.strictEqual((await db.getTransactionByReference(orderReference)).status, 'paid');
+});
+
+test('a reversal with a wrong signature is ignored too', async (t) => {
+  t.after(reset);
+  const db = makeDb();
+  const payments = loadPayments({ db, clickpesa: signedClickpesa({ queryResult: { id: 'cp', status: 'SUCCESS', outcome: 'paid' } }) });
+
+  const { orderReference } = await payments.initiateMobileMoney({ orgId: 'org1', planId: 'team', phoneNumber: '0713455454' });
+  await payments.handleClickPesaWebhook({ data: { orderReference, status: 'SUCCESS' } });
+
+  const forged = { event: 'PAYOUT REVERSED', data: { orderReference, status: 'REVERSED' }, checksum: 'f'.repeat(64) };
+  assert.strictEqual((await payments.handleClickPesaWebhook(forged)).ignored, 'unverified reversal');
+  // Tampering with a genuinely signed body breaks it as well.
+  const tampered = signed({ event: 'PAYOUT REVERSED', data: { orderReference: 'SOMETHINGELSE', status: 'REVERSED' } });
+  tampered.data = { orderReference, status: 'REVERSED' };
+  assert.strictEqual((await payments.handleClickPesaWebhook(tampered)).ignored, 'unverified reversal');
+  assert.strictEqual((await db.getSubscription('org1')).status, 'active');
+});
+
+test('cancelling while a payment is pending is refused and changes nothing', async (t) => {
+  t.after(reset);
+  const db = makeDb();
+  const payments = loadPayments({ db, clickpesa: makeClickpesa() });
+  const entitlements = require('../billing/entitlements');
+
+  const periodEnd = new Date(Date.now() + 10 * 86400e3);
+  await db.updateSubscription('org1', { tier: 'team', previousTier: 'team', status: 'active', currentPeriodEnd: periodEnd });
+  await payments.initiateMobileMoney({ orgId: 'org1', planId: 'enterprise', phoneNumber: '0713455454' });
+
+  await assert.rejects(
+    () => payments.cancelSubscription({ kind: 'organization', orgId: 'org1', userId: null }),
+    (e) => e.statusCode === 409 && e.pending === true,
+  );
+  const sub = await db.getSubscription('org1');
+  assert.strictEqual(sub.status, 'pending_payment');
+  assert.strictEqual(entitlements.effectiveTier(sub), 'team', 'still served what was paid for, never the unpaid plan');
+});
+
+test('cancelling a paid plan keeps it until the period ends', async (t) => {
+  t.after(reset);
+  const db = makeDb();
+  const payments = loadPayments({ db, clickpesa: makeClickpesa() });
+  const entitlements = require('../billing/entitlements');
+
+  const periodEnd = new Date(Date.now() + 10 * 86400e3);
+  await db.updateSubscription('org1', { tier: 'team', previousTier: 'team', status: 'active', currentPeriodEnd: periodEnd });
+  const sub = await payments.cancelSubscription({ kind: 'organization', orgId: 'org1', userId: null });
+  assert.strictEqual(sub.status, 'canceled');
+  assert.strictEqual(entitlements.effectiveTier(sub), 'team');
+  assert.strictEqual(entitlements.effectiveTier(sub, periodEnd.getTime() + 1000), 'free');
 });

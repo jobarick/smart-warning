@@ -602,7 +602,21 @@ async function handleClickPesaWebhook(body) {
 
   // A reversal after settlement is the one case the gateway tells us about
   // that a status query would report as historic rather than current.
+  //
+  // It cannot be confirmed by asking: ClickPesa's payment query only ever
+  // reports SUCCESS, SETTLED, PROCESSING, PENDING or FAILED. And its documented
+  // REVERSED/REFUNDED events belong to payouts, not to the collections this
+  // app makes. So the body is all there is, and an unsigned body is exactly
+  // what anyone can post here. Acting on one let a forged callback push a
+  // paying customer into past_due and, after the grace period, to free. Only
+  // a callback carrying a valid checksum is trusted to take a plan back; any
+  // other one is logged for a person to look at in the ClickPesa dashboard.
   if (clickpesa.CLAWBACK.has(rawStatus) && tx.status === 'paid') {
+    const signed = clickpesa.checksumConfigured() && Boolean(body?.checksum) && clickpesa.verifyChecksum(body);
+    if (!signed) {
+      console.warn(`[payments] unsigned ${rawStatus} callback for paid ${orderReference} ignored; check the ClickPesa dashboard if this was a real reversal`);
+      return { ok: true, ignored: 'unverified reversal' };
+    }
     await db.updateTransactionStatus({ orderReference, status: 'reversed', rawStatus });
     await applyClawback(subjectOf(tx), `${event || rawStatus} on ${orderReference}`);
     return { ok: true, applied: 'clawback' };
@@ -736,6 +750,13 @@ async function cancelSubscription(subject) {
   if (!store) throw new PaymentError('no billing subject for this account', 400);
   const sub = await store.get();
   if (!sub || sub.tier === 'free') throw new PaymentError('there is no paid subscription to cancel', 400);
+  // While a payment is pending, `tier` is the plan being bought, not the one
+  // paid for. Cancelling then served that unpaid plan until the period ended
+  // (canceled keeps `tier` until currentPeriodEnd). The prompt resolves within
+  // minutes, so ask the person to wait rather than guess what to cancel.
+  if (sub.status === 'pending_payment') {
+    throw new PaymentError('a payment is still being confirmed; try cancelling again once it has finished', 409, { pending: true });
+  }
   await store.update({ status: 'canceled', canceledAt: new Date() });
   return store.get();
 }
