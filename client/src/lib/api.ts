@@ -91,13 +91,19 @@ export interface Health {
   orgs: boolean;
 }
 
-// Whether this backend runs in multi-tenant orgs/accounts mode. Falls back to
-// orgs-off (legacy single-room) if the backend can't be reached.
+// Whether this backend runs in multi-tenant orgs/accounts mode, or null when
+// it cannot be reached at all.
+//
+// Unreachable is deliberately NOT reported as orgs-off. It used to be, which
+// meant that whenever the hosted backend was down every visitor to the public
+// site was dropped into legacy single-room mode: no landing page, no sign-in,
+// and an SOS that could only sound on their own device. "No answer" says
+// nothing about what kind of backend this is; the caller decides how to wait.
 //
 // Health moved to /api/health so that "/" can serve the app when the client is
 // hosted by the backend itself; "/" is still tried for older backends, where it
 // returns the same payload.
-export async function fetchHealth(): Promise<Health> {
+export async function fetchHealth(): Promise<Health | null> {
   for (const path of ['/api/health', '/']) {
     try {
       const res = await fetch(`${API_BASE}${path}`);
@@ -108,7 +114,7 @@ export async function fetchHealth(): Promise<Health> {
       /* try the next one */
     }
   }
-  return { persistence: false, orgs: false };
+  return null;
 }
 
 function authHeaders(token?: string): Record<string, string> {

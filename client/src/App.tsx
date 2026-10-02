@@ -356,8 +356,23 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const health = await fetchHealth();
+      let health = await fetchHealth();
       if (cancelled) return;
+      if (!health) {
+        // Backend unreachable. A stored login only exists on a deployment
+        // that has accounts, so a signed-in person keeps their own shell
+        // (with its offline queue) instead of being moved into legacy
+        // single-room mode. Signed-out visitors stay on the landing page,
+        // which needs no backend, while this keeps asking.
+        if (loadSession()) setOrgsMode(true);
+        let delay = 3000;
+        while (!health && !cancelled) {
+          await new Promise((r) => setTimeout(r, delay));
+          delay = Math.min(delay * 2, 30000);
+          health = await fetchHealth();
+        }
+        if (cancelled || !health) return;
+      }
       setOrgsMode(health.orgs);
       // A stale/expired supervisor token shouldn't strand us on a blank app.
       const s = loadSession();
