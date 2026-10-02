@@ -13,6 +13,13 @@ const { BILLING_ENFORCE } = require('../config');
 const { sendJson, readJson, readText } = require('../http');
 const { guardOrg, requireAuth, allowWebhook } = require('../guards');
 
+function quotedMonthly(subject, subscription) {
+  const tier = subscription?.tier && subscription.tier !== 'free' && plans.isPlan(subscription.tier)
+    ? plans.canonicalId(subscription.tier)
+    : plans.TRIAL_TIER[subject.kind === 'individual' ? 'individual' : 'org'];
+  return plans.getPlan(tier)?.price ?? plans.MONTHLY_PRICE;
+}
+
 async function handle({ req, res, url, path }) {
   // The pricing table. Public on purpose — a price behind a login is a price
   // nobody can compare, and there is nothing confidential in a rate card.
@@ -70,8 +77,11 @@ async function handle({ req, res, url, path }) {
         ? await db.listTransactions({ orgId: subject.orgId, limit: 20 })
         : [],
       // The price the client should quote, from the configured value rather
-      // than a number typed into a screen somewhere.
-      pricing: { monthly: plans.MONTHLY_PRICE, currencies: plans.CURRENCIES },
+      // than a number typed into a screen somewhere. It is the monthly price of
+      // THIS account's plan: the paid tier it is on, otherwise the tier its
+      // trial serves. It used to be Personal's price for everyone, so an
+      // organisation on its Team trial was told it would pay  a month.
+      pricing: { monthly: quotedMonthly(subject, subscription), currencies: plans.CURRENCIES },
       enforcement: BILLING_ENFORCE,
     });
     return true;

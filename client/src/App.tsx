@@ -675,7 +675,12 @@ export default function App() {
   // Profile tab's occurrence history — but only for an org account. A personal
   // account has no org to scope a history query to (the server refuses it
   // outright, see guardOrg), and a worker has no bearer token at all.
-  const history = useIncidentHistory(shownView === 'command' || (tab === 'profile' && !!org), incidentTick, token);
+  // On an accounts deployment the history endpoints need a signed-in
+  // coordinator, so don't poll them without one: a signed-out browser that
+  // remembered the command view used to ask every 15s and get 401 each time.
+  // A legacy single-room relay (orgsMode false) serves history with no login.
+  const canReadHistory = !!token || orgsMode === false;
+  const history = useIncidentHistory(canReadHistory && (shownView === 'command' || (tab === 'profile' && !!org)), incidentTick, token);
 
   // Public reports awaiting review. Only supervisors can see or act on them,
   // and the relay pokes us (reportTick) whenever the queue changes.
