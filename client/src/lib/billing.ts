@@ -16,6 +16,7 @@ export type Tier = 'free' | 'personal' | 'personal_pro' | 'team' | 'business' | 
 export type Currency = 'TZS' | 'USD';
 export type Cycle = 'monthly' | 'annual';
 export type SubscriptionStatus =
+  | 'trialing'
   | 'active'
   | 'pending_payment'
   | 'past_due'
@@ -224,6 +225,11 @@ export function formatMoney(amount: number | null, currency: Currency): string {
 export function describeStatus(e: Entitlements | null): string {
   if (!e) return '';
   switch (e.status) {
+    // Was missing, so a trial fell through to the default and read 'Active'.
+    case 'trialing':
+      return e.trial.active
+        ? `Free trial, ${e.trial.daysLeft} day${e.trial.daysLeft === 1 ? '' : 's'} left`
+        : 'Free trial ended';
     case 'pending_payment':
       return 'Payment pending, waiting for confirmation';
     case 'past_due':

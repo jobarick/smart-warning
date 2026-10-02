@@ -101,11 +101,17 @@ function addMonths(date, months) {
 
 // Extend from the end of the period already paid for when there is one, so
 // renewing early does not throw away the remainder. Otherwise from now.
+//
+// A trial counts the same way: paying on day 10 of a 30-day trial starts the
+// paid period when the trial ends, rather than forfeiting the 20 days left.
 function nextPeriod(subscription, cycle, from = new Date()) {
-  const existingEnd = subscription?.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null;
+  const endOfWhatTheyHave = subscription?.currentPeriodEnd ?? subscription?.trialEndsAt ?? null;
+  const existingEnd = endOfWhatTheyHave ? new Date(endOfWhatTheyHave) : null;
   const start = existingEnd && existingEnd > from ? existingEnd : from;
-  const months = cycle === 'annual' ? 12 : 1;
-  const end = addMonths(start, months);
+  // The calendar length the term buys, from the catalogue. This used to be
+  // `annual ? 12 : 1`, so a quarterly (3 month) or half-year (6 month)
+  // payment was charged as such and credited as one month.
+  const end = addMonths(start, plans.monthsFor(cycle));
   return { start, end };
 }
 
@@ -128,7 +134,14 @@ function rejoin(tx, msisdn) {
   };
 }
 
-function validatePlanRequest({ planId, currency, cycle }) {
+// Which plans each kind of account can actually use. A person has no site, no
+// roster and no command centre, so Team/Business/Enterprise sold to a personal
+// account took the money and delivered nothing (every coordinator route answers
+// 403 for them). The reverse, an organisation on Personal, would drop its
+// dashboard. Refused here so no client can get round it.
+const AUDIENCE_FOR = { individual: 'individual', organization: 'business' };
+
+function validatePlanRequest({ planId, currency, cycle, subject = null }) {
   const plan = plans.getPlan(planId);
   if (!plan) throw new PaymentError(`unknown plan: ${planId}`, 400);
   if (plan.contactOnly) {
@@ -140,6 +153,16 @@ function validatePlanRequest({ planId, currency, cycle }) {
   const amount = plans.priceFor(planId, currency, cycle);
   if (amount == null) throw new PaymentError(`${plan.name} has no ${currency} price`, 400);
   if (amount <= 0) throw new PaymentError(`${plan.name} is free, no payment needed`, 400, { free: true });
+  const audience = subject ? AUDIENCE_FOR[subject.kind] : null;
+  if (audience && plan.audience !== audience) {
+    throw new PaymentError(
+      subject.kind === 'individual'
+        ? `${plan.name} is for organisations; a personal account can choose Personal`
+        : `${plan.name} is a personal plan; an organisation can choose Team, Business or Enterprise`,
+      400,
+      { wrongAudience: true },
+    );
+  }
   return { plan, amount };
 }
 
@@ -183,7 +206,7 @@ async function initiateMobileMoney(input) {
   const store = storeFor(subject);
   if (!store) throw new PaymentError('no billing subject for this payment', 400);
 
-  const { plan, amount } = validatePlanRequest({ planId, currency, cycle });
+  const { plan, amount } = validatePlanRequest({ planId, currency, cycle, subject });
 
   const msisdn = phone.normalize(phoneNumber);
   if (!msisdn) throw new PaymentError('that does not look like a Tanzanian mobile number', 400);
@@ -299,7 +322,7 @@ async function initiateCard({ orgId, planId, cycle = 'monthly', currency = 'USD'
   if (!db.enabled()) throw new PaymentError('payments require a database', 501);
   if (!stripe.enabled()) throw new PaymentError('card payments are not configured on this deployment', 501);
 
-  const { plan, amount } = validatePlanRequest({ planId, currency, cycle });
+  const { plan, amount } = validatePlanRequest({ planId, currency, cycle, subject: { kind: 'organization', orgId, userId: null } });
   const subscription = await db.ensureSubscription(orgId);
   const orderReference = clickpesa.makeOrderReference('SWC');
 
