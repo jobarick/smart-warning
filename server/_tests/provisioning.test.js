@@ -411,3 +411,108 @@ test('provisioning failure releases the claim so it can be retried', async (t) =
   assert.strictEqual(await payments.applyOutcome(orderReference), true);
   assert.strictEqual((await db.getSubscription('org1')).tier, 'team');
 });
+
+// --- Failed payments during a trial, and expiry of personal plans -----------
+//
+// Both found by a live end-to-end run on 2026-10-02: a trial account whose
+// payment failed or timed out was reverted to 'active' with no period end
+// (paid tier forever), and the expiry sweep never touched personal plans.
+
+test('a failed payment during a trial returns the account to its trial, not to a paid plan', async (t) => {
+  t.after(reset);
+  const db = makeDb();
+  const clickpesa = makeClickpesa({ queryResult: { id: 'cp', status: 'FAILED', outcome: 'failed' } });
+  const payments = loadPayments({ db, clickpesa });
+  const entitlements = require('../billing/entitlements');
+
+  const trialEndsAt = new Date(Date.now() + 5 * 86400e3);
+  await db.updateUserSubscription('u1', { tier: 'personal', previousTier: 'free', status: 'trialing', trialEndsAt });
+
+  const { orderReference } = await payments.initiateMobileMoney({ userId: 'u1', planId: 'personal', phoneNumber: '0713455454' });
+  await payments.handleClickPesaWebhook({ data: { orderReference, status: 'FAILED' } });
+
+  const sub = await db.getUserSubscription('u1');
+  assert.strictEqual(sub.status, 'trialing');
+  assert.strictEqual(entitlements.effectiveTier(sub), 'personal', 'the trial keeps running');
+  const afterTrial = trialEndsAt.getTime() + 1000;
+  assert.strictEqual(entitlements.effectiveTier(sub, afterTrial), 'free', 'and still ends when it was going to');
+});
+
+test('an organisation trial whose payment is never authorised stays a trial', async (t) => {
+  t.after(reset);
+  const db = makeDb();
+  const createdLongAgo = () => ({ id: 'cp', status: 'PROCESSING', outcome: 'pending' });
+  const payments = loadPayments({ db, clickpesa: makeClickpesa({ queryResult: createdLongAgo }) });
+  const entitlements = require('../billing/entitlements');
+
+  const trialEndsAt = new Date(Date.now() + 86400e3);
+  await db.updateSubscription('org1', { tier: 'team', previousTier: 'free', status: 'trialing', trialEndsAt });
+  const { orderReference } = await payments.initiateMobileMoney({ orgId: 'org1', planId: 'business', phoneNumber: '0713455454' });
+  // Age the attempt past the USSD window, as the reconciler would find it.
+  db._transactions.get(orderReference).createdAt = new Date(Date.now() - payments.PUSH_TIMEOUT_MS - 1000).toISOString();
+  await payments.refreshFromGateway(orderReference);
+
+  const sub = await db.getSubscription('org1');
+  assert.strictEqual((await db.getTransactionByReference(orderReference)).status, 'failed');
+  assert.strictEqual(sub.status, 'trialing');
+  assert.strictEqual(entitlements.effectiveTier(sub, trialEndsAt.getTime() + 1000), 'free');
+});
+
+test('a failed renewal leaves a past-due or cancelled subscription where it was', async (t) => {
+  t.after(reset);
+  const db = makeDb();
+  const clickpesa = makeClickpesa({ queryResult: { id: 'cp', status: 'FAILED', outcome: 'failed' } });
+  const payments = loadPayments({ db, clickpesa });
+
+  const pastDueSince = new Date(Date.now() - 3 * 86400e3);
+  await db.updateSubscription('org1', { tier: 'team', previousTier: 'team', status: 'past_due', pastDueSince, currentPeriodEnd: pastDueSince });
+  const a = await payments.initiateMobileMoney({ orgId: 'org1', planId: 'team', phoneNumber: '0713455454' });
+  await payments.handleClickPesaWebhook({ data: { orderReference: a.orderReference, status: 'FAILED' } });
+  const pd = await db.getSubscription('org1');
+  assert.strictEqual(pd.status, 'past_due', 'a failed retry must not restart or end the grace period');
+  assert.strictEqual(new Date(pd.pastDueSince).getTime(), pastDueSince.getTime());
+
+  const periodEnd = new Date(Date.now() + 10 * 86400e3);
+  await db.updateUserSubscription('u2', { tier: 'personal', previousTier: 'personal', status: 'canceled', canceledAt: new Date(), currentPeriodEnd: periodEnd });
+  const b = await payments.initiateMobileMoney({ userId: 'u2', planId: 'personal', phoneNumber: '0754000111' });
+  await payments.handleClickPesaWebhook({ data: { orderReference: b.orderReference, status: 'FAILED' } });
+  assert.strictEqual((await db.getUserSubscription('u2')).status, 'canceled');
+});
+
+test('the expiry sweep expires personal plans, not only organisations', async (t) => {
+  t.after(reset);
+  const db = makeDb();
+  const payments = loadPayments({ db, clickpesa: makeClickpesa() });
+  const entitlements = require('../billing/entitlements');
+
+  const yesterday = new Date(Date.now() - 86400e3);
+  await db.updateUserSubscription('u3', { tier: 'personal', previousTier: 'personal', status: 'active', currentPeriodEnd: yesterday });
+  await db.updateSubscription('org9', { tier: 'team', previousTier: 'team', status: 'active', currentPeriodEnd: yesterday });
+  db.listExpiredSubscriptions = async () => [...db._subscriptions.values()]
+    .filter((s) => s.status === 'active' && s.tier !== 'free' && s.currentPeriodEnd && new Date(s.currentPeriodEnd) < new Date())
+    .map((s) => ({ ...s }));
+
+  const out = await payments.reconcile();
+  assert.strictEqual(out.expired, 2);
+  const personal = await db.getUserSubscription('u3');
+  assert.strictEqual(personal.status, 'past_due');
+  assert.strictEqual((await db.getSubscription('org9')).status, 'past_due');
+  // Grace first, then free.
+  assert.strictEqual(entitlements.effectiveTier(personal), 'personal');
+  assert.strictEqual(entitlements.effectiveTier(personal, Date.now() + entitlements.GRACE_MS + 60e3), 'free');
+  // A second sweep finds nothing left to do.
+  assert.strictEqual((await payments.reconcile()).expired, 0);
+});
+
+test('a trial the old bug left marked active with no paid period is read as a trial', () => {
+  const entitlements = require('../billing/entitlements');
+  const now = Date.now();
+  const corrupted = { tier: 'personal', previousTier: 'personal', status: 'active', currentPeriodEnd: null, trialEndsAt: new Date(now + 86400e3) };
+  assert.strictEqual(entitlements.effectiveTier(corrupted, now), 'personal');
+  assert.strictEqual(entitlements.effectiveTier(corrupted, now + 2 * 86400e3), 'free');
+  // A genuinely paid plan always has a period end and is untouched.
+  const paid = { tier: 'personal', status: 'active', currentPeriodEnd: new Date(now + 86400e3), trialEndsAt: new Date(now - 86400e3) };
+  assert.strictEqual(entitlements.effectiveTier(paid, now), 'personal');
+  // Free with a trial date is just free.
+  assert.strictEqual(entitlements.effectiveTier({ tier: 'free', status: 'active', trialEndsAt: new Date(now - 86400e3) }, now), 'free');
+});

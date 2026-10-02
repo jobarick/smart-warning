@@ -506,6 +506,23 @@ async function applyOutcome(orderReference) {
   }
 }
 
+// The status a subscription had before a payment attempt moved it to
+// pending_payment. Not stored separately: initiating only overwrites
+// status/tier, so the fields that describe the earlier state are still on the
+// row, and each one is cleared only by a successful payment.
+//
+// This used to be a flat 'active', which turned a trial into a paid plan with
+// no end date the moment a payment failed or timed out — nothing ever expires
+// an 'active' row without a current_period_end, so the trial tier became
+// permanent for anyone who started a payment and ignored the prompt.
+function statusBeforePending(sub) {
+  if (sub.pastDueSince) return 'past_due';
+  if (sub.canceledAt) return 'canceled';
+  if (sub.currentPeriodEnd) return 'active';
+  if (sub.trialEndsAt) return 'trialing';
+  return 'active';
+}
+
 // A pending attempt that came to nothing. The subscription returns to whatever
 // it was before — never to free, unless free is where it started.
 async function revertPending(subjectOrOrgId) {
@@ -516,7 +533,7 @@ async function revertPending(subjectOrOrgId) {
   if (!store) return;
   const sub = await store.get();
   if (!sub || sub.status !== 'pending_payment') return;
-  await store.update({ tier: sub.previousTier, status: 'active' });
+  await store.update({ tier: sub.previousTier, status: statusBeforePending(sub) });
 }
 
 // Money that came back out after we had been paid. This is not a failed
@@ -668,10 +685,17 @@ async function reconcile() {
   try {
     const lapsed = await db.listExpiredSubscriptions(50);
     for (const sub of lapsed) {
+      // Through the subject's own store, not updateSubscription(orgId): a
+      // personal subscription has no org id, so that call was a silent no-op
+      // and a personal plan stayed 'active' forever after its period ended.
+      // The row also kept coming back at the head of this query, so enough of
+      // them would have crowded organisations out of the LIMIT entirely.
+      const store = storeFor(subjectOf(sub));
+      if (!store) continue;
       // past_due rather than straight to free: the grace period in
       // entitlements.js is what keeps a failed renewal from locking a
       // supervisor out of their own incident history overnight.
-      await db.updateSubscription(sub.orgId, { status: 'past_due', pastDueSince: new Date() });
+      await store.update({ status: 'past_due', pastDueSince: new Date() });
       expired++;
     }
   } catch (e) {
