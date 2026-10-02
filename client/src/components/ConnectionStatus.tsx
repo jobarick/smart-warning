@@ -18,6 +18,8 @@ interface Props {
   onToggleTheme: () => void;
   locale: Locale;
   onToggleLocale: () => void;
+  /** A personal account: no command centre, and no relay to be connected to. */
+  personal?: boolean;
 }
 
 const STATUS_LABEL: Record<SocketStatus, string> = {
@@ -26,13 +28,21 @@ const STATUS_LABEL: Record<SocketStatus, string> = {
   closed: 'Offline, retrying',
 };
 
-export function ConnectionStatus({ status, deviceCount, audioArmed, onArmAudio, view, onViewChange, onLogoClick, userName, theme, onToggleTheme, locale, onToggleLocale }: Props) {
+// A personal account has no relay connection; its status is the device's own.
+const PERSONAL_LABEL: Record<SocketStatus, string> = {
+  open: 'Online',
+  connecting: 'Offline',
+  closed: 'Offline',
+};
+
+export function ConnectionStatus({ status, deviceCount, audioArmed, onArmAudio, view, onViewChange, onLogoClick, userName, theme, onToggleTheme, locale, onToggleLocale, personal = false }: Props) {
   return (
     <div className="status-bar">
       <button type="button" className="brand" onClick={onLogoClick} aria-label="Smart Warning home">
         <Logo size={20} className="brand-logo" decorative />
         <span className="brand-name">Smart Warning</span>
       </button>
+      {!personal && (
       <div className="view-toggle" role="tablist" aria-label="View">
         <button role="tab" aria-selected={view === 'worker'} className={view === 'worker' ? 'active' : ''} onClick={() => onViewChange('worker')}>
           {userName.trim() || 'Me'}
@@ -41,6 +51,7 @@ export function ConnectionStatus({ status, deviceCount, audioArmed, onArmAudio, 
           Safety Coordinator
         </button>
       </div>
+      )}
       <div className="status-items">
         <button
           className="theme-toggle"
@@ -60,9 +71,9 @@ export function ConnectionStatus({ status, deviceCount, audioArmed, onArmAudio, 
         </button>
         <span className={`conn conn-${status}`}>
           <span className="conn-dot" />
-          {STATUS_LABEL[status]}
+          {(personal ? PERSONAL_LABEL : STATUS_LABEL)[status]}
         </span>
-        {status === 'open' && (
+        {status === 'open' && !personal && (
           <span className="device-count" data-testid="device-count">
             {deviceCount} device{deviceCount === 1 ? '' : 's'} online
           </span>
