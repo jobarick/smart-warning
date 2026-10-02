@@ -498,6 +498,35 @@ export default function App() {
   const isPersonal = session?.kind === 'supervisor' && session.user.kind === 'individual';
   const runSocket = runApp && !isPersonal;
 
+  // A personal account has no site to coordinate, so the command centre has
+  // nothing to show it: every request it makes answers 403. Keep it on its own
+  // home, including after a reload with the coordinator view remembered or a
+  // typed /dashboard address.
+  //
+  // shownView is what renders and what decides which data loads. It is never
+  // 'command' for a personal account, even for the one render before the
+  // effect below has moved the stored view back, which is when the dashboard's
+  // incidents/stats/reports requests used to fire and come back 403.
+  const shownView: AppView = isPersonal ? 'worker' : view;
+  useEffect(() => {
+    if (!isPersonal) return;
+    if (path === '/dashboard' || path === '/setup') replace('/');
+    else if (view === 'command') setView('worker');
+  }, [isPersonal, path, view, replace]);
+
+  // With no socket, the relay status was permanently 'connecting', so a
+  // personal account read 'Connecting…' and 'Reconnecting' forever. Its alerts
+  // go over ordinary requests, so the honest signal is whether this device is
+  // online at all.
+  const [online, setOnline] = useState(() => navigator.onLine);
+  useEffect(() => {
+    const up = () => setOnline(true);
+    const down = () => setOnline(false);
+    window.addEventListener('online', up);
+    window.addEventListener('offline', down);
+    return () => { window.removeEventListener('online', up); window.removeEventListener('offline', down); };
+  }, []);
+
   const handleWire = useCallback(
     (m: WireMessage) => {
       // Any message at all is proof the relay is alive — including the roster
@@ -603,7 +632,7 @@ export default function App() {
     (): WorkerInfo => ({
       id: sessionId.current,
       name: settings.deviceName,
-      role: view === 'command' ? 'supervisor' : 'worker',
+      role: shownView === 'command' ? 'supervisor' : 'worker',
       status: selfStatus,
       zone: settings.zone,
       battery: telemetry.battery,
@@ -614,7 +643,7 @@ export default function App() {
       safeFor,
       updatedAt: Date.now(),
     }),
-    [settings.deviceName, settings.zone, settings.shareLocation, view, selfStatus, telemetry, safeFor],
+    [settings.deviceName, settings.zone, settings.shareLocation, shownView, selfStatus, telemetry, safeFor],
   );
 
   const { status, deviceCount, roster, joinRejected, send, sendHeartbeat, queued, queuedSince } = useAlertSocket(
@@ -646,12 +675,12 @@ export default function App() {
   // Profile tab's occurrence history — but only for an org account. A personal
   // account has no org to scope a history query to (the server refuses it
   // outright, see guardOrg), and a worker has no bearer token at all.
-  const history = useIncidentHistory(view === 'command' || (tab === 'profile' && !!org), incidentTick, token);
+  const history = useIncidentHistory(shownView === 'command' || (tab === 'profile' && !!org), incidentTick, token);
 
   // Public reports awaiting review. Only supervisors can see or act on them,
   // and the relay pokes us (reportTick) whenever the queue changes.
   useEffect(() => {
-    if (view !== 'command' || !token) {
+    if (shownView !== 'command' || !token) {
       setReports([]);
       return;
     }
@@ -662,7 +691,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [view, token, reportTick]);
+  }, [shownView, token, reportTick]);
 
   const onEscalateReport = useCallback(
     async (id: string, type: AlertType, severity: Severity) => {
@@ -684,7 +713,7 @@ export default function App() {
   // command roster reflects SOS / location / battery without waiting for the tick.
   useEffect(() => {
     sendHeartbeat();
-  }, [selfStatus, safeFor, telemetry.lat, telemetry.lng, telemetry.battery, settings.zone, settings.deviceName, view, sendHeartbeat]);
+  }, [selfStatus, safeFor, telemetry.lat, telemetry.lng, telemetry.battery, settings.zone, settings.deviceName, shownView, sendHeartbeat]);
 
   // While the relay is unreachable during a live incident, keep the positions
   // on the device. The relay records a movement track only between an alert and
@@ -978,7 +1007,7 @@ export default function App() {
 
   // Optional fullscreen on alert (worker view only — the command view shouldn't take over).
   useEffect(() => {
-    if (view !== 'worker') return;
+    if (shownView !== 'worker') return;
     if (alarmActive && settings.autoFullscreen && !document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(() => {});
     }
@@ -986,7 +1015,7 @@ export default function App() {
       document.exitFullscreen().catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [alarmActive, view]);
+  }, [alarmActive, shownView]);
 
   // Still checking the backend — brief splash to avoid a flash of the wrong UI.
   //
@@ -1090,7 +1119,7 @@ export default function App() {
   // The user's screens run inside a fixed shell: the chrome stays put and the
   // active tab scrolls inside it. Scoped to this view — the command centre has
   // its own carefully-fitted layout and must not inherit a scroll container.
-  const tabbed = view === 'worker' && !showSettings && !showAbout && !showSupport && !showBilling;
+  const tabbed = shownView === 'worker' && !showSettings && !showAbout && !showSupport && !showBilling;
 
   return (
     <div className={`app${tabbed ? ' app-tabbed' : ''}`}>
@@ -1101,13 +1130,14 @@ export default function App() {
         now={now}
       />
       <ConnectionStatus
-        status={status}
+        status={isPersonal ? (online ? 'open' : 'closed') : status}
+        personal={isPersonal}
         deviceCount={deviceCount}
         audioArmed={armed}
         onArmAudio={() => void arm()}
-        view={view}
+        view={shownView}
         onViewChange={(v) => navigate(v === 'command' ? '/dashboard' : '/')}
-        onLogoClick={() => navigate(view === 'command' ? '/dashboard' : '/')}
+        onLogoClick={() => navigate(shownView === 'command' ? '/dashboard' : '/')}
         userName={settings.deviceName}
         theme={settings.theme}
         onToggleTheme={() => patchSettings({ theme: settings.theme === 'dark' ? 'light' : 'dark' })}
@@ -1195,7 +1225,7 @@ export default function App() {
             sirenTesting={sirenTesting}
           />
         </main>
-      ) : view === 'command' && showTools ? (
+      ) : shownView === 'command' && showTools ? (
         <main className="worker">
           <button className="btn back-btn" onClick={() => window.history.back()}>
             <Icon name="arrow-left" /> Back to command centre
@@ -1206,7 +1236,7 @@ export default function App() {
             <FeedbackCenter token={token} />
           </Suspense>
         </main>
-      ) : view === 'command' ? (
+      ) : shownView === 'command' ? (
         <Suspense fallback={<PanelFallback label="command centre" />}>
         <CommandDashboard
           roster={roster}
@@ -1354,7 +1384,7 @@ export default function App() {
           Back button as the single way out rather than competing with it. */}
       {tabbed && <TabBar tab={tab} onChange={(t) => navigate(TAB_PATHS[t])} alertCount={log.length} active={alarmActive} locale={settings.locale} />}
 
-      {view === 'worker' && alarm.alert && (
+      {shownView === 'worker' && alarm.alert && (
         <AlertOverlay
           alert={alarm.alert}
           acknowledged={alarm.acknowledged}
@@ -1377,7 +1407,7 @@ export default function App() {
         />
       )}
 
-      <SystemFooter connected={status === 'open'} lastSync={lastSync} now={now} queued={queued} queuedSince={queuedSince} />
+      <SystemFooter connected={isPersonal ? online : status === 'open'} personal={isPersonal} lastSync={lastSync} now={now} queued={queued} queuedSince={queuedSince} />
     </div>
   );
 }

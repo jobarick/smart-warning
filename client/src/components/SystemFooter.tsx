@@ -7,6 +7,8 @@ interface Props {
   queued: number;
   /** When the oldest of those was first attempted, or null when none are. */
   queuedSince: number | null;
+  /** A personal account has no relay, so there is no sync time to show. */
+  personal?: boolean;
 }
 
 // Seconds matter here: this line exists to prove the connection is alive, and a
@@ -45,7 +47,7 @@ const ANNOUNCE_AFTER_MS = 4000;
  * pressed SOS with no signal must never be shown a screen that looks like it
  * worked — they are owed the difference between "sent" and "held, still trying".
  */
-export function SystemFooter({ connected, lastSync, now, queued, queuedSince }: Props) {
+export function SystemFooter({ connected, lastSync, now, queued, queuedSince, personal = false }: Props) {
   const stale = lastSync !== null && now - lastSync > 30_000;
   const holding = queued > 0 && queuedSince !== null && now - queuedSince > ANNOUNCE_AFTER_MS;
   const ok = connected && !stale && !holding;
@@ -56,13 +58,19 @@ export function SystemFooter({ connected, lastSync, now, queued, queuedSince }: 
         <span className="sysfoot-dot" />
         {holding
           ? `${queued} held ${held(now - queuedSince!)}, will send when reconnected`
-          : ok
-            ? 'System operational'
-            : connected
-              ? 'No recent updates'
-              : 'Reconnecting'}
+          : personal
+            // Only the device's own connection is known here, so say that and
+            // no more than that.
+            ? (connected ? 'Online' : 'Offline')
+            : ok
+              ? 'System operational'
+              : connected
+                ? 'No recent updates'
+                : 'Reconnecting'}
       </span>
-      <span className="sysfoot-sync">{lastSync ? `Sync ${clock(lastSync)}` : 'Awaiting first sync'}</span>
+      {!personal && (
+        <span className="sysfoot-sync">{lastSync ? `Sync ${clock(lastSync)}` : 'Awaiting first sync'}</span>
+      )}
     </footer>
   );
 }
