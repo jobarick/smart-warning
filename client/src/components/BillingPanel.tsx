@@ -22,6 +22,7 @@ export function BillingPanel({ token, onBack, locale }: Props) {
   const [cycle] = useState<Cycle>('monthly');
   const [plans, setPlans] = useState<Plan[]>([]);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [subjectKind, setSubjectKind] = useState<'individual' | 'organization' | null>(null);
   const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [methods, setMethods] = useState<PaymentMethods | null>(null);
@@ -38,6 +39,7 @@ export function BillingPanel({ token, onBack, locale }: Props) {
       setPlans(cat.plans);
       setMethods(cat.payments);
       setSubscription(mine.subscription);
+      setSubjectKind(mine.subject?.kind ?? null);
       setEntitlements(mine.entitlements);
       setTransactions(mine.transactions);
       setError(null);
@@ -47,6 +49,13 @@ export function BillingPanel({ token, onBack, locale }: Props) {
   }, [currency, cycle, token]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Only plans this account can use. A personal account has no site to run,
+  // so Team/Business/Enterprise took its money and unlocked nothing; the
+  // server now refuses that purchase too, this just stops offering it. Free
+  // stays visible to everyone as the baseline every plan is compared with.
+  const offered = plans.filter((plan) => plan.id === 'free' || !subjectKind
+    || plan.audience === (subjectKind === 'individual' ? 'individual' : 'business'));
 
   const onCard = useCallback(async (plan: Plan) => {
     setBusy(true);
@@ -143,8 +152,10 @@ export function BillingPanel({ token, onBack, locale }: Props) {
       {error && <p className="bill-error" role="alert">{error}</p>}
 
       <div className="bill-grid">
-        {plans.map((plan) => {
-          const isCurrent = plan.id === current;
+        {offered.map((plan) => {
+          // A trial is the plan on approval, not a purchase: it keeps its pay
+          // button, otherwise someone on trial has nothing to buy here at all.
+          const isCurrent = plan.id === current && entitlements?.status !== 'trialing';
           return (
             <article key={plan.id} className={`bill-card${isCurrent ? ' current' : ''}`}>
               <header>

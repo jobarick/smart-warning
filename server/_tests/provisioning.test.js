@@ -516,3 +516,83 @@ test('a trial the old bug left marked active with no paid period is read as a tr
   // Free with a trial date is just free.
   assert.strictEqual(entitlements.effectiveTier({ tier: 'free', status: 'active', trialEndsAt: new Date(now - 86400e3) }, now), 'free');
 });
+
+// --- Bundle length, plan audience, paying during a trial --------------------
+
+test('each billing term buys its own calendar length', () => {
+  const { nextPeriod } = require('../payments/index.js');
+  const from = new Date('2026-01-15T10:00:00Z');
+  const months = (cycle) => {
+    const { start, end } = nextPeriod(null, cycle, from);
+    return (end.getUTCFullYear() - start.getUTCFullYear()) * 12 + (end.getUTCMonth() - start.getUTCMonth());
+  };
+  assert.strictEqual(months('monthly'), 1);
+  assert.strictEqual(months('quarterly'), 3, 'a quarter was being credited as one month');
+  assert.strictEqual(months('half_year'), 6, 'a half year was being credited as one month');
+  assert.strictEqual(months('annual'), 12);
+});
+
+test('a quarterly payment activates three months, end to end', async (t) => {
+  t.after(reset);
+  const db = makeDb();
+  const clickpesa = makeClickpesa({ queryResult: { id: 'cp', status: 'SUCCESS', outcome: 'paid' } });
+  const payments = loadPayments({ db, clickpesa });
+
+  const { orderReference, amount } = await payments.initiateMobileMoney({ userId: 'uq', planId: 'personal', phoneNumber: '0713455454', cycle: 'quarterly' });
+  assert.strictEqual(amount, require('../billing/plans').priceFor('personal', 'TZS', 'quarterly'));
+  await payments.handleClickPesaWebhook({ data: { orderReference, status: 'SUCCESS' } });
+
+  const sub = await db.getUserSubscription('uq');
+  const expected = new Date(sub.currentPeriodStart);
+  expected.setMonth(expected.getMonth() + 3);
+  assert.strictEqual(new Date(sub.currentPeriodEnd).toDateString(), expected.toDateString());
+});
+
+test('paying during a trial starts the paid period when the trial ends', async (t) => {
+  t.after(reset);
+  const db = makeDb();
+  const clickpesa = makeClickpesa({ queryResult: { id: 'cp', status: 'SUCCESS', outcome: 'paid' } });
+  const payments = loadPayments({ db, clickpesa });
+
+  const trialEndsAt = new Date(Date.now() + 20 * 86400e3);
+  await db.updateUserSubscription('ut', { tier: 'personal', previousTier: 'free', status: 'trialing', trialEndsAt });
+  const { orderReference } = await payments.initiateMobileMoney({ userId: 'ut', planId: 'personal', phoneNumber: '0713455454' });
+  await payments.handleClickPesaWebhook({ data: { orderReference, status: 'SUCCESS' } });
+
+  const sub = await db.getUserSubscription('ut');
+  assert.strictEqual(sub.status, 'active');
+  assert.strictEqual(new Date(sub.currentPeriodStart).getTime(), trialEndsAt.getTime(), 'the 20 trial days left are kept');
+  const expected = new Date(trialEndsAt);
+  expected.setMonth(expected.getMonth() + 1);
+  assert.strictEqual(new Date(sub.currentPeriodEnd).toDateString(), expected.toDateString());
+});
+
+test('a personal account cannot buy an organisation plan, and nothing is charged', async (t) => {
+  t.after(reset);
+  const db = makeDb();
+  let pushed = 0;
+  const clickpesa = { ...makeClickpesa(), async initiateUssdPush() { pushed++; return { id: 'x', status: 'PROCESSING', outcome: 'pending' }; } };
+  const payments = loadPayments({ db, clickpesa });
+
+  for (const planId of ['team', 'business', 'enterprise']) {
+    await assert.rejects(
+      () => payments.initiateMobileMoney({ userId: 'u-solo', planId, phoneNumber: '0713455454' }),
+      (e) => e.statusCode === 400 && e.wrongAudience === true && /organisations/.test(e.message),
+    );
+  }
+  assert.strictEqual(pushed, 0, 'no USSD prompt may reach the handset');
+  assert.strictEqual(db._transactions.size, 0, 'no transaction is recorded');
+  const sub = await db.getUserSubscription('u-solo');
+  assert.ok(!sub || sub.status !== 'pending_payment', 'the subscription is not moved to pending');
+});
+
+test('an organisation cannot buy the personal plan', async (t) => {
+  t.after(reset);
+  const db = makeDb();
+  const payments = loadPayments({ db, clickpesa: makeClickpesa() });
+  await assert.rejects(
+    () => payments.initiateMobileMoney({ orgId: 'org-p', planId: 'personal', phoneNumber: '0713455454' }),
+    (e) => e.statusCode === 400 && e.wrongAudience === true,
+  );
+  assert.strictEqual(db._transactions.size, 0);
+});
