@@ -77,9 +77,17 @@ function effectiveTier(subscription, now = Date.now()) {
   const previous = plans.isPlan(subscription.previousTier) ? plans.canonicalId(subscription.previousTier) : 'free';
   const status = subscription.status;
 
-  if (status === 'active') return tier;
+  // An 'active' paid tier with no paid period but a trial date is a trial that
+  // payments.revertPending() used to mislabel 'active' after a failed or
+  // abandoned payment. Every real activation sets currentPeriodEnd, so this
+  // shape only ever came from that bug. Read it as the trial it was, so rows
+  // already written that way stop being premium forever without a data fix.
+  const trialMislabelledActive = status === 'active' && tier !== 'free'
+    && toMs(subscription.currentPeriodEnd) == null && toMs(subscription.trialEndsAt) != null;
 
-  if (status === 'trialing') {
+  if (status === 'active' && !trialMislabelledActive) return tier;
+
+  if (status === 'trialing' || trialMislabelledActive) {
     const ends = toMs(subscription.trialEndsAt);
     // A trial with no end date has no way to expire, and an account that can
     // never lapse is a pricing bug that would be invisible for a month. Treat
