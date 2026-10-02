@@ -79,6 +79,9 @@ class PaymentError extends Error {
     // anything >= 500 as an internal error whose message is not shown to the
     // caller. Setting both keeps a 400 here readable at the client.
     this.status = statusCode;
+    // Every PaymentError message is written for the customer, including the
+    // 5xx ones (not configured, gateway did not respond); see routes/index.js.
+    this.expose = true;
     Object.assign(this, extra);
   }
 }
