@@ -38,6 +38,21 @@ const numOrNull = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null
 // way for the database to be the reason the health check is slow.
 let liveness = { ok: null, at: null, error: null };
 
+// An error on an IDLE pooled connection (the database restarting, a pooler
+// such as Supabase's closing a connection it considers idle, a network blip)
+// is emitted by node-postgres as an 'error' event on the pool. With no
+// listener, Node treats that as an unhandled error and the whole process
+// exits, taking the alert relay down with it over something the pool already
+// recovers from on its own: the broken connection is discarded and the next
+// query opens a fresh one. Queries in flight are unaffected by this handler;
+// they still reject to their own callers.
+if (pool) {
+  pool.on('error', (e) => {
+    liveness = { ok: false, at: Date.now(), error: e.message };
+    console.error(`[db] idle connection lost (${e.message}); continuing, the next query reconnects`);
+  });
+}
+
 async function checkLiveness() {
   if (!pool) { liveness = { ok: false, at: Date.now(), error: 'no database configured' }; return liveness; }
   try {
