@@ -46,10 +46,10 @@ spend a SEV1 response on these:
    either check fails. This is the only automated detection that exists today
    — check [open canary issues](https://github.com/jobarick/smart-warning/issues?q=is%3Aissue+is%3Aopen+label%3Acanary-failure)
    first.
-2. **Render's own health check** (`healthCheckPath: /api/health` in
-   `render.yaml`) restarts the service if it stops answering, which can mask
-   or resolve a transient crash before the canary's next 10-minute tick.
-   Check the Render **Events** tab for restarts you didn't trigger.
+2. **Railway's own health check** (`/api/health`, set on the service) gates
+   each deploy and the restart policy restarts a crashed process, which can
+   mask or resolve a transient crash before the canary's next 10-minute tick.
+   Check the service's **Deployments** list for restarts you didn't trigger.
 3. **The visitor feedback widget** (`POST /api/feedback/visitor`) or a direct
    email to whatever `FEEDBACK_TO` is set to — currently the only inbound
    channel a real user has. There is no support ticketing system.
@@ -66,7 +66,7 @@ guessing at a cause.
 
 ```bash
 # 1. Is the backend answering, and does it think its own DB is fine?
-curl -s https://smart-warning-relay-6lf3.onrender.com/api/health
+curl -s https://smart-warning-production.up.railway.app/api/health
 ```
 
 Read the response as a checklist, not a blob:
@@ -77,8 +77,8 @@ Read the response as a checklist, not a blob:
 - `clients` — a live WebSocket count. `0` when you expect nonzero devices
   connected is itself a signal, independent of the JSON's own fields.
 - `uptime` — a very small number means the process just restarted (crash
-  loop, or Render's own health check restarted it). Check Render's Events
-  tab next.
+  loop, or Railway's restart policy restarted it). Check the Railway
+  service's Deployments list next.
 
 ```bash
 # 2. Is the frontend serving the current build, or something stale?
@@ -95,8 +95,8 @@ been misdiagnosed as "the Git integration stopped working" more than once
 ```bash
 # 3. Which host actually regressed?
 ```
-Check Render's **Logs** tab for the backend, and Vercel's **Deployments**
-list for the frontend. They fail independently — a Render outage does not
+Check the Railway service's **Logs** for the backend, and Vercel's **Deployments**
+list for the frontend. They fail independently — a Railway outage does not
 take Vercel down and vice versa, so confirm which one before acting.
 
 ⚠️ **A dead origin can still render a full page in a browser that visited it
@@ -117,17 +117,16 @@ in — these aren't hypothetical, they've each cost a real session before.
 ### Backend unreachable / crash-looping
 `server/auth.js` fails fast at boot if `JWT_SECRET` is missing on a hosted
 deployment with a database configured — so a missing-secret crash shows up as
-Render restart-looping the service, not a silent bad state. Check Render
-**Events** for repeated restarts, then **Environment** for what's actually
-set versus what `render.yaml` expects (`DATABASE_URL`, `JWT_SECRET` at
-minimum).
+Railway restart-looping the service, not a silent bad state. Check the
+service's **Deployments** for repeated failures, then **Variables** for what's
+actually set (`DATABASE_URL`, `JWT_SECRET` at minimum; full list in
+`DEPLOYMENT.md`).
 
 ### `database.ok: false`
 The raw driver error is deliberately not exposed on the public health
-endpoint (it can name a host or username), so this needs Render's **Logs**.
+endpoint (it can name a host or username), so this needs the Railway service's **Logs**.
 Most likely causes given the current setup: Supabase's pooled connection
-string was swapped for the direct one (Render's plan doesn't hold a
-long-lived connection the way a VPS would — must be the pooled/6543 string),
+string was swapped for the direct one (must be the pooled/6543 string),
 or Supabase itself is down (check Supabase's own status page, since this app
 has no control over that).
 
@@ -147,32 +146,32 @@ Rollback before anything else.
 `client/.env.production` (`VITE_WS_URL`) and `client/vercel.json`'s CSP
 `connect-src` **must change together**. Updating only one means the browser
 blocks the very backend the client is correctly pointed at. This bit the
-2026-09-02 Render migration once already.
+2026-09-02 Render migration once already; the 2026-10-04 move to Railway
+changed both, plus `BACKEND_HEALTH_URL` in the canary.
 
 ### The entire hosting account is gone
-The most severe realistic scenario, and it already happened once
-(2026-09-02, the Render account itself, not just its database, was
-deleted). The sequence that recovered from it:
-1. New Render Blueprint pointed at `jobarick/smart-warning` — `render.yaml`
-   is already correct and provisions only the web service (it no longer
-   provisions a database at all; Postgres is Supabase, unaffected by
-   anything happening to Render).
-2. Re-enter every env var **by hand** in the new service's Environment tab —
-   nothing automated does this. Minimum to be functional again:
-   `DATABASE_URL` (Supabase's pooled/6543 connection string), `JWT_SECRET`.
-   Full list and what breaks without each one is in `DEPLOYMENT.md`.
-3. Confirm via the **Logs** tab, not just `curl` — a freshly created
-   `*.onrender.com` subdomain can show `ERR_CONNECTION_RESET` or a TLS
-   handshake failure for a while after its first successful deploy, purely
-   from edge/certificate propagation, even though the logs already show a
-   clean healthy boot. Don't debug the app if the logs are clean and only
-   the public URL is unreachable — wait.
-4. The backend's hostname changes when the service is new
-   (`smart-warning-relay.onrender.com` → `smart-warning-relay-6lf3.onrender.com`
-   last time). Update **both** `client/.env.production` (`VITE_WS_URL`) and
-   `client/vercel.json`'s CSP `connect-src` together — one without the other
-   means the browser blocks the very backend the client is correctly pointed
-   at — then push.
+The most severe realistic scenario, and it has happened twice: on 2026-09-02
+the Render account itself, not just its database, was deleted, and in
+2026-10 the Render account was closed for good and the backend moved to
+Railway. Postgres is Supabase, so neither touched the data. To rebuild the
+backend on a fresh Railway project:
+1. New project → **Deploy from GitHub repo** `jobarick/smart-warning`, branch
+   `main`. On the service: Root Directory `server` (it builds
+   `server/Dockerfile`), health check path `/api/health`, region EU West.
+2. Set the variables in the service's **Variables** tab. Minimum to be
+   functional again: `DATABASE_URL` (Supabase's pooled/6543 connection
+   string), `JWT_SECRET`. Full list, and what breaks without each one, is in
+   `DEPLOYMENT.md`. Do not set `TRUST_CLOUDFLARE_IP` on Railway.
+3. **Settings → Networking → Generate Domain**, then confirm the boot in the
+   **Logs** (`[db] connected`, `Alert backend listening`) as well as with
+   `curl …/api/health`. A freshly generated domain can return Railway's
+   "Application not found" for a short while; if the logs are clean, wait
+   rather than debugging the app.
+4. The hostname changes with a new service. Update `client/.env.production`
+   (`VITE_WS_URL`), `client/vercel.json`'s CSP `connect-src` and
+   `BACKEND_HEALTH_URL` in `.github/workflows/canary.yml` together, then push.
+   One without the others means the browser blocks the very backend the
+   client is correctly pointed at, or the canary watches a dead host.
 
 Budget this as hours, not minutes. Last time the answer to "do we need the
 old production data" was a deliberate "no," not a recovery — but that was a
@@ -187,9 +186,9 @@ drill" below for what is actually provable about restoring it.
 Promote**. This is the fast path and takes effect immediately; it does not
 require a new commit or a revert.
 
-**Render:** no one-click promote. Either `git revert` the bad commit on
-`main` and push (triggers a normal auto-deploy), or use Render's **Manual
-Deploy → Deploy a specific commit** against the last known-good SHA. There is
+**Railway:** either `git revert` the bad commit on `main` and push (triggers
+a normal auto-deploy), or open the service's **Deployments** list and
+**Redeploy** the last known-good deployment. There is
 no staging environment to test the rollback against first — see the "no
 preview/staging tier" finding in the audit doc.
 

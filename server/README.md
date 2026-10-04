@@ -85,7 +85,7 @@ the app when the client is bundled.
 
 | Method | Path | Notes |
 |---|---|---|
-| `GET` | `/api/health` | `{service, clients, persistence, orgs, client, uptime}`. Render's health check. |
+| `GET` | `/api/health` | `{service, clients, persistence, orgs, client, uptime}`. The host's health check. |
 | `GET` | `/` | The app when `client/dist` exists, otherwise the health payload. |
 | `POST` | `/api/auth/signup` | `{orgName, name, email, password, phone, industry?, address?, country?, adminName?, contactEmail?}` → creates the org and its first supervisor. **`phone` is required** — an organization is an account of record, not a throwaway login. |
 | `POST` | `/api/auth/login` | `{email, password}` → `{token, user}`. |
