@@ -209,6 +209,10 @@ async function initiateMobileMoney(input) {
   const store = storeFor(subject);
   if (!store) throw new PaymentError('no billing subject for this payment', 400);
 
+  // ClickPesa's USSD push takes TZS only (its initiate request's currency enum
+  // is "TZS"). A USD request would be recorded and the customer held at
+  // pending_payment only for the gateway to reject it, so refuse it here.
+  if (currency !== 'TZS') throw new PaymentError('mobile money is charged in Tanzanian shillings (TZS)', 400);
   const { plan, amount } = validatePlanRequest({ planId, currency, cycle, subject });
 
   const msisdn = phone.normalize(phoneNumber);

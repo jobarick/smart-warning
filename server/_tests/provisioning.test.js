@@ -678,3 +678,19 @@ test('cancelling a paid plan keeps it until the period ends', async (t) => {
   assert.strictEqual(entitlements.effectiveTier(sub), 'team');
   assert.strictEqual(entitlements.effectiveTier(sub, periodEnd.getTime() + 1000), 'free');
 });
+
+test('mobile money is TZS only, as ClickPesa requires, and nothing is recorded for USD', async (t) => {
+  t.after(reset);
+  const db = makeDb();
+  let pushed = 0;
+  const clickpesa = { ...makeClickpesa(), async initiateUssdPush() { pushed++; return { id: 'x', status: 'PROCESSING', outcome: 'pending' }; } };
+  const payments = loadPayments({ db, clickpesa });
+  await assert.rejects(
+    () => payments.initiateMobileMoney({ orgId: 'org-usd', planId: 'team', phoneNumber: '0713455454', currency: 'USD' }),
+    (e) => e.statusCode === 400 && /TZS/.test(e.message),
+  );
+  assert.strictEqual(pushed, 0);
+  assert.strictEqual(db._transactions.size, 0);
+  const sub = await db.getSubscription('org-usd');
+  assert.ok(!sub || sub.status !== 'pending_payment');
+});
