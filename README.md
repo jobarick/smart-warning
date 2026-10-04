@@ -48,16 +48,19 @@ legal pages.
 > to be ignored, check the Root Directory setting before anything else.**
 
 **2. Backend → an always-on host.** The backend reads `process.env.PORT` and
-exposes a `/` health check, so it runs as-is on Render, Railway, Fly.io, etc.
+exposes a `/api/health` check, so it runs as-is on Railway, Fly.io, etc.
 Postgres is **Supabase**, not a host-provisioned database (moved off Render's
 paid Postgres plan 2026-09) — create a project at supabase.com and use its
 pooled connection string (port 6543) as `DATABASE_URL`; the schema
 self-creates on first boot (`server/db.js`), so there's no migration step.
-- **Render:** New → Blueprint on this repo. `render.yaml` provisions the web
-  service only now; set `DATABASE_URL` yourself in the dashboard's
-  Environment tab to your Supabase connection string. Copy the service's
-  public URL for step 3.
-- **Railway / Fly / Cloud Run:** use `server/Dockerfile`, then set the same
+- **Railway (production):** New Project → Deploy from GitHub repo → this repo.
+  In the service's Settings set **Root Directory = `server`** (without it the
+  build runs from the repo root and fails), **Healthcheck Path =
+  `/api/health`**, and keep app sleeping off. Railway then builds
+  `server/Dockerfile`. Set `PORT=3001`, `DATABASE_URL` (Supabase) and the other
+  secrets in the Variables tab, then Networking → Generate Domain on port 3001
+  and use that address in step 3.
+- **Fly / Cloud Run:** use `server/Dockerfile` the same way, with the same
   `DATABASE_URL`. Omit it and the backend runs relay-only (no persistence) —
   still fully functional for live alerts.
 

@@ -203,10 +203,11 @@ starting from the pre-migration schema.
 
 ## Deploying
 
-`render.yaml` at the repo root describes the whole app as one service: it
-builds the client, installs the server, and starts `node server/index.js` with
-a Postgres instance attached. Because the client is served from the same origin
-as the API there are no cross-host URLs to keep in sync, and no CORS.
+Production runs this folder on Railway (Root Directory `server`, built from
+`server/Dockerfile`), with Postgres on Supabase and the client on Vercel. Without
+`client/dist` the server runs API-only, and the client reads its backend URL
+from `VITE_WS_URL` in `client/.env.production`; that address must also be in
+`client/vercel.json`'s `connect-src`. The root README has the full steps.
 
-Hosting the client elsewhere still works — without `client/dist` the server
-runs API-only, and the client reads its backend URL from `VITE_WS_URL`.
+The server can still serve the built client itself from the same origin
+(`CLIENT_DIST`, or `../client/dist` when present), which needs no CORS.

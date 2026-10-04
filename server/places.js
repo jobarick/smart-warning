@@ -132,7 +132,7 @@ out center ${Math.max(remaining * 4, 20)};`;
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         // Overpass asks that clients identify themselves.
-        'User-Agent': 'SmartWarning/1.0 (emergency alerting; +https://smart-warning-relay-6lf3.onrender.com)',
+        'User-Agent': 'SmartWarning/1.0 (emergency alerting; +https://smart-warning.vercel.app)',
       },
       body: 'data=' + encodeURIComponent(query),
       signal: controller.signal,
