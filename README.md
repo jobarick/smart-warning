@@ -11,19 +11,14 @@ A web app (PWA) for instant emergency alerts across all connected devices — de
 ## Structure
 
 - `server/` — Node.js **backend** (port **3001**): a WebSocket relay *and* a REST history API. Broadcasts every alert / all-clear to all connected clients, tracks the live device roster, and — when a `DATABASE_URL` is configured — persists every alert as a durable **incident** (with resolution, location, and stats) in Postgres. With no `DATABASE_URL` it runs in-memory only, exactly like before.
-- `server-python/` — **Python (FastAPI + uvicorn) relay** — a drop-in equivalent of the *relay* half: same WebSocket protocol, same JSON messages, same port 3001. It does not include the REST/persistence layer. Use *either* server, not both (they both bind 3001).
 - `client/` — React + TypeScript + Vite PWA (dev port **5300**). Trigger panel, warning settings, alert overlay, and history log.
 
 ## Run
 
-Pick one relay server:
+Start the backend:
 
 ```
-# Option A — Node relay
 cd server && npm install && npm start
-
-# Option B — Python relay (FastAPI + uvicorn)
-cd server-python && pip install -r requirements.txt && uvicorn relay:app --host 0.0.0.0 --port 3001
 ```
 
 Then start the client:

@@ -1,0 +1,14 @@
+# Never bake secrets into an image. A developer's server/.env can hold the
+# production DATABASE_URL and payment keys; configure them on the host instead.
+.env
+.env.*
+!.env.example
+
+# Installed inside the image by `npm ci`, never copied from the host (a host
+# install may be for another OS or Node version).
+node_modules
+tools/backup-drill/node_modules
+
+# Not needed to run the server.
+_tests
+*.log
