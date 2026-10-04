@@ -16,7 +16,7 @@ app between emergencies.
 | # | Artefact | Where it goes | Who reads it |
 |---|---|---|---|
 | 1 | `google-services.json` | `client/android/app/google-services.json` | The Android build |
-| 2 | Service account JSON | `FIREBASE_SERVICE_ACCOUNT` env var on Render | The backend sender |
+| 2 | Service account JSON | `FIREBASE_SERVICE_ACCOUNT` variable on Railway | The backend sender |
 
 Both come from the same Firebase project. Neither is committed — see
 [Why nothing is committed](#why-nothing-is-committed).
@@ -67,7 +67,7 @@ service account rather than a legacy server key.
 
 ## 4. Give it to the backend
 
-On Render → your service → **Environment**, add **one** of:
+On Railway → service `smart-warning` → **Variables**, add **one** of:
 
 **Option A — base64 (recommended).** Hosting panels mangle the multi-line PEM
 inside the JSON; base64 avoids the problem entirely.
@@ -123,13 +123,13 @@ Instead of:
 ## 5. Verify
 
 ```bash
-curl https://smart-warning-relay-6lf3.onrender.com/api/health
+curl https://smart-warning-production.up.railway.app/api/health
 ```
 
 `channels.nativePush` must be `true`. For more detail:
 
 ```bash
-curl https://smart-warning-relay-6lf3.onrender.com/api/push/device
+curl https://smart-warning-production.up.railway.app/api/push/device
 ```
 
 Returns `{ "enabled": true, "project": "...", "reason": null }`.

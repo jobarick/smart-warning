@@ -24,7 +24,7 @@ permissions:
   contents: read
 
 env:
-  BACKEND_HEALTH_URL: https://smart-warning-relay-6lf3.onrender.com/api/health
+  BACKEND_HEALTH_URL: https://smart-warning-production.up.railway.app/api/health
   FRONTEND_URL: https://smart-warning.vercel.app/
   CANARY_LABEL: canary-failure
 
@@ -48,6 +48,15 @@ jobs:
           if [ "$http_status" != "200" ]; then
             echo "reason=Backend health endpoint returned HTTP $http_status" >> "$GITHUB_OUTPUT"
             echo "::error::backend returned HTTP $http_status"
+            exit 1
+          fi
+
+          # A host that answers 200 for some other app (Railway's "Application
+          # not found" page, a parked domain) must not count as healthy.
+          service=$(echo "$json" | jq -r '.service // "null"' 2>/dev/null || echo "not-json")
+          if [ "$service" != "alert-backend" ]; then
+            echo "reason=$BACKEND_HEALTH_URL answered, but not as the Smart Warning backend (service=$service)" >> "$GITHUB_OUTPUT"
+            echo "::error::unexpected service ($service)"
             exit 1
           fi
 

@@ -72,8 +72,8 @@ CHROME_PATH="/c/Program Files/Google/Chrome/Application/chrome.exe" \
 
 ## Deploy
 
-- [ ] `git push origin main` — Vercel and Render both build from this
-- [ ] Wait for **both**. Render takes minutes; Vercel takes seconds.
+- [ ] `git push origin main` — Vercel (client) and Railway (backend) both build from this
+- [ ] Wait for **both**. Railway takes minutes; Vercel takes seconds.
 
 ## After the deploy
 
@@ -82,7 +82,7 @@ CHROME_PATH="/c/Program Files/Google/Chrome/Application/chrome.exe" \
 curl -s https://smart-warning.vercel.app/ | grep -oE 'assets/index-[A-Za-z0-9_-]+\.js'
 
 # the backend is healthy and reports the channels you expect
-curl -s https://smart-warning-relay-6lf3.onrender.com/api/health
+curl -s https://smart-warning-production.up.railway.app/api/health
 
 # the legal redirects still redirect
 curl -sI https://smart-warning.vercel.app/privacy | grep -iE 'HTTP/|location'

@@ -14,14 +14,14 @@ const mailer = require('./mailer');
 // is worse than "tokens don't survive a restart": on more than one instance,
 // each mints its own secret, so a token's validity depends on which instance
 // happens to answer the next request. Fail loudly at boot instead of letting
-// that surface as random, hard-to-diagnose 401s. `RENDER` is set automatically
-// on every Render service, so this catches the real deployment even if
-// NODE_ENV was never set explicitly — Render already provides JWT_SECRET via
-// render.yaml, so this is a safety net for a future misconfiguration or a
-// move to another host, not something expected to fire today.
+// that surface as random, hard-to-diagnose 401s. The Dockerfile sets
+// NODE_ENV=production, and Railway sets RAILWAY_ENVIRONMENT on every service,
+// so this catches the real deployment either way. JWT_SECRET is set on
+// Railway, so this is a safety net for a future misconfiguration, not
+// something expected to fire today.
 const JWT_SECRET = process.env.JWT_SECRET || require('crypto').randomBytes(32).toString('hex');
 if (!process.env.JWT_SECRET) {
-  const isHostedDeployment = process.env.NODE_ENV === 'production' || !!process.env.RENDER;
+  const isHostedDeployment = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT;
   if (isHostedDeployment && db.enabled()) {
     throw new Error(
       '[auth] JWT_SECRET is required on a hosted deployment with a database configured — '

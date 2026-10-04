@@ -18,8 +18,8 @@
 // charge: the first genuine payment should be made by a person, through the
 // app, watching their own phone.
 //
-// Run it locally with the values you are about to put on Render, or on Render
-// itself via its shell, to tell "credentials are wrong" apart from "the app is
+// Run it locally with the values you are about to put on Railway, or against
+// the deployment's own variables with `railway run`, to tell "credentials are wrong" apart from "the app is
 // wrong" in one step.
 const path = require('node:path');
 
@@ -68,7 +68,7 @@ Set them and run again. Locally:
 
   $env:CLICKPESA_CLIENT_ID="..."; $env:CLICKPESA_API_KEY="..."; node server/tools/clickpesa-check.js
 
-On Render: Dashboard > smart-warning-relay > Environment > Add Environment
+On Railway: project smart-warning > service smart-warning > Variables > New
 Variable, then let it redeploy. See docs/PAYMENTS_SETUP.md.
 `);
     process.exitCode = 1;
@@ -172,7 +172,7 @@ Credentials are good and collection is live.
 
 Remaining, in the ClickPesa dashboard:
   • Register the webhook:
-    https://smart-warning-relay-6lf3.onrender.com/api/payments/mobile-money/webhook
+    https://smart-warning-production.up.railway.app/api/payments/mobile-money/webhook
   • Optionally set a checksum key and add it as CLICKPESA_CHECKSUM_KEY.
     Not load-bearing — every callback is verified against the gateway before
     anything is provisioned — but it lets a forged callback be rejected on

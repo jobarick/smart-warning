@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 //
-// Test an SMTP_URL before putting it anywhere near Render.
+// Test an SMTP_URL before putting it on the production backend.
 //
 //   node tools/smtp-check.js "smtps://user:pass@smtp.example.com:465"
 //   node tools/smtp-check.js                     # reads SMTP_URL from the env
@@ -12,7 +12,7 @@
 //
 // Why this exists: a wrong SMTP_URL on this project produced ESOCKET at the
 // CONN phase in production, and the round trip to find that out was — change
-// the variable, wait for Render to restart, wait for the drain timer, read
+// the variable, wait for the backend to redeploy, wait for the drain timer, read
 // /api/health. Minutes per attempt, for a question answerable in seconds from
 // a laptop.
 //
@@ -35,7 +35,7 @@ const EXPLAIN = {
     + '     Swap whichever half is wrong and try again (--probe does this for you).',
   ECONNECTION:
     'Could not open a connection at all — wrong host, or the port is blocked.\n'
-    + '     Render blocks outbound port 25 entirely; use 465 or 587.',
+    + '     Most hosts (Railway included) block outbound port 25; use 465 or 587.',
   ETIMEDOUT:
     'Connected (or tried to) and then silence. A firewall dropping the packets,\n'
     + '     or the wrong port on a host that simply never answers.',
@@ -148,8 +148,8 @@ async function main() {
   const r = await check(url);
   if (r.ok) {
     console.log('OK — connected and authenticated. This URL will work.\n');
-    console.log('Set it on Render, and the queued mail drains by itself within a minute:');
-    console.log('  curl -s https://smart-warning-relay-6lf3.onrender.com/api/health\n');
+    console.log('Set it on Railway, and the queued mail drains by itself within a minute:');
+    console.log('  curl -s https://smart-warning-production.up.railway.app/api/health\n');
     process.exit(0);
   }
 

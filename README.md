@@ -49,8 +49,8 @@ legal pages.
 
 **2. Backend → an always-on host.** The backend reads `process.env.PORT` and
 exposes a `/api/health` check, so it runs as-is on Railway, Fly.io, etc.
-Postgres is **Supabase**, not a host-provisioned database (moved off Render's
-paid Postgres plan 2026-09) — create a project at supabase.com and use its
+Postgres is **Supabase**, not a host-provisioned database (moved off a
+host-provisioned plan 2026-09) — create a project at supabase.com and use its
 pooled connection string (port 6543) as `DATABASE_URL`; the schema
 self-creates on first boot (`server/db.js`), so there's no migration step.
 - **Railway (production):** New Project → Deploy from GitHub repo → this repo.
@@ -66,7 +66,7 @@ self-creates on first boot (`server/db.js`), so there's no migration step.
 
 **3. Point the client at the relay.** On the Vercel project, set an environment
 variable `VITE_WS_URL` to the relay's public URL, e.g.
-`wss://smart-warning-relay-6lf3.onrender.com`, and redeploy. Without it the client
+`wss://smart-warning-production.up.railway.app`, and redeploy. Without it the client
 falls back to `ws(s)://<same-host>:3001` (the LAN behaviour).
 
 **4. Security is built in when a database is configured.** With `DATABASE_URL`
@@ -82,7 +82,7 @@ When a database is configured the backend is **multi-tenant**:
 
 - **Supervisors** create an account (email + password) which also creates an
   **organization** and its short **join code**. Sessions are JWTs signed with
-  `JWT_SECRET` (auto-generated on Render; set it yourself elsewhere).
+  `JWT_SECRET` (set it on the host; the server refuses to start without it).
 - **Workers** join with the org's code and a display name — no account needed,
   fast under pressure.
 - Every alert, roster entry, incident and stat is **scoped to one org**: a room
@@ -164,4 +164,4 @@ protocol is unchanged apart from an org `join` handshake on connect.
 
 - **Push notifications** (orgs mode) reach devices even when the app is closed: each device can opt in with the bell toggle, and alerts/all-clears are delivered via the Web Push API. Requires HTTPS, notification permission, and — on iOS — an installed (Add to Home Screen) PWA. Without opting in, alerts still arrive whenever the app is open.
 - iOS ignores `navigator.vibrate` and may require the tab to be foregrounded for audio.
-- In no-database (LAN) mode the relay trusts all clients on the network; use orgs mode (a database) for authenticated, isolated deployments. Hosts like Render/Vercel provide TLS.
+- In no-database (LAN) mode the relay trusts all clients on the network; use orgs mode (a database) for authenticated, isolated deployments. Hosts like Railway/Vercel provide TLS.

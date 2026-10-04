@@ -94,7 +94,7 @@ is a number a customer recognises on a USSD prompt in a way 2,483 TZS is not.
 3. Copy the **Client ID** and **API Key**.
 4. Optional but recommended: generate a **Checksum Key** for the application.
 
-### Set on the host (Render → Environment)
+### Set on the host (Railway → service `smart-warning` → Variables)
 
 ```
 CLICKPESA_CLIENT_ID=your-client-id
@@ -102,7 +102,7 @@ CLICKPESA_API_KEY=your-api-key
 CLICKPESA_CHECKSUM_KEY=your-checksum-key      # optional
 ```
 
-Paste the values without surrounding quotes. Render stores them literally, and
+Paste the values without surrounding quotes. Railway stores them literally, and
 a quoted value is sent to the gateway with the quotes still attached — which
 comes back as `Invalid client details` and looks exactly like a wrong key.
 
@@ -126,7 +126,7 @@ There is deliberately no option to raise a real charge from the command line.
 The first genuine payment should be made by a person, through the app, watching
 their own handset.
 
-Run it locally with the values you are about to set, or from Render's shell to
+Run it locally with the values you are about to set, or with `railway run` to
 confirm what the deployment itself sees.
 
 ### Register the webhook
@@ -134,7 +134,7 @@ confirm what the deployment itself sees.
 Point the application's webhook at:
 
 ```
-https://smart-warning-relay-6lf3.onrender.com/api/payments/mobile-money/webhook
+https://smart-warning-production.up.railway.app/api/payments/mobile-money/webhook
 ```
 
 Subscribe to **PAYMENT RECEIVED** and **PAYMENT FAILED**.
@@ -172,7 +172,7 @@ prompt to Mixx by Yas and says so on screen, rather than failing at the gateway.
 
 1. Get the secret key from **Developers → API keys** (`sk_live_…` / `sk_test_…`).
 2. Add a webhook endpoint at
-   `https://smart-warning-relay-6lf3.onrender.com/api/payments/card/webhook`
+   `https://smart-warning-production.up.railway.app/api/payments/card/webhook`
    subscribed to `checkout.session.completed`,
    `checkout.session.async_payment_succeeded`,
    `checkout.session.async_payment_failed`, `checkout.session.expired` and
@@ -258,11 +258,11 @@ Useful during a manual test:
 
 ```bash
 # Is mobile money configured on this deployment?
-curl -s https://smart-warning-relay-6lf3.onrender.com/api/health | jq .channels
+curl -s https://smart-warning-production.up.railway.app/api/health | jq .channels
 
 # Watch a payment resolve
 curl -s -H "Authorization: Bearer $TOKEN" \
-  "https://smart-warning-relay-6lf3.onrender.com/api/payments/status?reference=SW..."
+  "https://smart-warning-production.up.railway.app/api/payments/status?reference=SW..."
 ```
 
 ---

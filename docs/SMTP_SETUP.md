@@ -11,7 +11,7 @@ itself — no migration, no manual step, no code change.
 >
 > Parses the URL with the **same code the server uses**, connects, and says
 > which scheme/port pair works — in seconds, on a laptop, instead of minutes per
-> guess waiting for Render to restart. It only connects and authenticates: it
+> guess waiting for the backend to redeploy. It only connects and authenticates: it
 > never sends a message and never prints the password.
 >
 > **The scheme and the port must agree.** This is the single most common
@@ -28,7 +28,7 @@ itself — no migration, no manual step, no code change.
 > - `smtp://` on **465** → **ETIMEDOUT** (and before this project set socket
 >   timeouts, an *infinite hang* that took the HTTP response with it)
 >
-> Port **25 is blocked outbound on Render** and will never connect.
+> Port **25 is blocked outbound on most hosts (Railway included)**; use 465 or 587.
 >
 > **`EAUTH` is good news** — the connection works and only the credentials are
 > wrong. For Gmail that means an App Password, not the account password.
@@ -38,7 +38,7 @@ itself — no migration, no manual step, no code change.
 >
 > ### Reading the state without a dashboard login
 >
-> `curl -s https://smart-warning-relay-6lf3.onrender.com/api/health` →
+> `curl -s https://smart-warning-production.up.railway.app/api/health` →
 > `channels.mailQueue` = `{ pending, sent, failed, at, lastError }`
 >
 > - **`sent: 0` with `pending` climbing** — nothing has ever been delivered.
@@ -83,7 +83,7 @@ code that runs in production.
 
 ## Configure it
 
-On Render → your service → **Environment**:
+On Railway → service `smart-warning` → **Variables**:
 
 | Variable | Required | Example |
 |---|---|---|
@@ -112,7 +112,7 @@ Credentials are redacted in that line by design.
 ## Verify
 
 ```bash
-curl https://smart-warning-relay-6lf3.onrender.com/api/health
+curl https://smart-warning-production.up.railway.app/api/health
 ```
 
 `channels.mail` is `true` and `channels.mailProvider` names the provider.
