@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchSubscription, type SubscriptionView } from '../lib/billing';
+import { fetchSubscription, formatMoney, type SubscriptionView } from '../lib/billing';
 import { t } from '../lib/i18n';
 import type { Locale } from '../types';
 import { Icon } from './Icon';
@@ -43,7 +43,11 @@ export function TrialBanner({ token, onUpgrade, locale }: Props) {
   const trial = ent.trial;
   const forOrg = subject?.kind === 'organization';
   const price = pricing?.monthly;
-  const priceLabel = price ? `$${price.USD}/${t(locale, 'bill.perMonth')}` : null;
+  // Shillings first: this is a Tanzania-first product and TZS is what the
+  // USSD prompt will ask for. Dollars only when there is no shilling price.
+  const priceLabel = price
+    ? `${price.TZS ? formatMoney(price.TZS, 'TZS') : formatMoney(price.USD, 'USD')} ${t(locale, 'bill.perMonth')}`
+    : null;
 
   if (trial?.active) {
     return (
@@ -53,7 +57,6 @@ export function TrialBanner({ token, onUpgrade, locale }: Props) {
         {priceLabel && (
           <p className="trial-after">
             {t(locale, 'trial.afterLabel', { price: priceLabel })}
-            {price?.TZS ? <span className="trial-local"> · {t(locale, 'trial.aboutTzs', { amount: price.TZS.toLocaleString() })}</span> : null}
           </p>
         )}
         <button className="btn trial-cta" onClick={onUpgrade}>{t(locale, 'trial.continueCta')}</button>
