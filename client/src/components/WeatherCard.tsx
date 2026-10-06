@@ -126,7 +126,7 @@ export function WeatherCard({ token, locale }: Props) {
       <h2 className="weather-heading"><Icon name="bell" /> {t(locale, 'weather.heading')}</h2>
 
       <div className="weather-current">
-        <span className="weather-temp">{current.tempC != null ? `${Math.round(current.tempC)}°C` : '—'}</span>
+        <span className="weather-temp">{current.tempC != null ? `${Math.round(current.tempC)}°C` : 'N/A'}</span>
         <span className="weather-condition">{t(locale, CONDITION_KEY[current.condition])}</span>
         {current.windKph != null && (
           <span className="weather-wind">{t(locale, 'weather.wind', { kph: String(Math.round(current.windKph)) })}</span>
@@ -153,8 +153,8 @@ export function WeatherCard({ token, locale }: Props) {
             {daily.map((d, i) => (
               <div className="weather-forecast-day" key={d.date}>
                 <span>{i === 0 ? t(locale, 'weather.today') : new Date(d.date).toLocaleDateString(locale, { weekday: 'short' })}</span>
-                <b>{d.tempMaxC != null ? `${Math.round(d.tempMaxC)}°` : '—'}</b>
-                <span className="weather-forecast-min">{d.tempMinC != null ? `${Math.round(d.tempMinC)}°` : '—'}</span>
+                <b>{d.tempMaxC != null ? `${Math.round(d.tempMaxC)}°` : 'N/A'}</b>
+                <span className="weather-forecast-min">{d.tempMinC != null ? `${Math.round(d.tempMinC)}°` : 'N/A'}</span>
               </div>
             ))}
           </div>

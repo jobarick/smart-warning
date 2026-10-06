@@ -181,7 +181,7 @@ const PLANS = [
     rank: 3,
     name: 'Business',
     audience: 'business',
-    tagline: 'Multi-site operations that answer to an auditor.',
+    tagline: 'Operations across many sites that answer to an auditor.',
     seats: 250,
     minSeats: 51,
     price: BUSINESS_PRICE,

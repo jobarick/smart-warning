@@ -63,7 +63,7 @@ async function handle({ req, res, path }) {
     const ctx = await guardOrg(req, res);
     if (ctx === false) return true;
     if (!ctx) { sendJson(res, 501, { error: 'invites require a database' }); return true; }
-    if (!allowOrgInvite(req)) { sendJson(res, 429, { error: 'too many invites sent — please wait a while' }); return true; }
+    if (!allowOrgInvite(req)) { sendJson(res, 429, { error: 'too many invites sent, please wait a while' }); return true; }
     const body = await readJson(req);
     const result = await auth.inviteToOrg({
       orgId: ctx.orgId,

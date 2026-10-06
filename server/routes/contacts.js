@@ -231,7 +231,7 @@ async function handle({ req, res, path }) {
         skipped.push({ id: contact.id, name: contact.name, reason: 'no-email' });
         continue;
       }
-      const subject = `DHARURA — ${raiser} anahitaji msaada / needs help`;
+      const subject = `DHARURA: ${raiser} anahitaji msaada / needs help`;
       const body2 = [
         `${raiser} ametuma taarifa ya dharura kupitia Smart Warning.`,
         `${raiser} has raised an emergency alert on Smart Warning.`,
@@ -244,12 +244,12 @@ async function handle({ req, res, path }) {
         '',
         `Umeorodheshwa kama mtu wa kuaminika (Trusted Circle) wa ${raiser}.`,
         `You are listed as one of ${raiser}'s trusted contacts.`,
-        'Hii SI huduma ya dharura — haiwezi kutuma polisi, zimamoto au ambulansi.',
+        'Hii SI huduma ya dharura. Haiwezi kutuma polisi, zimamoto au ambulansi.',
         'This is not an emergency service and cannot dispatch police, fire or ambulance.',
         'Piga namba za dharura ikiwa unahitaji msaada wa haraka.',
         'Call the local emergency number if immediate help is needed.',
         '',
-        '— Smart Warning',
+        'Smart Warning',
       ].filter((line) => line !== null).join('\n');
 
       const result = await mailer.send({
@@ -351,8 +351,8 @@ async function handle({ req, res, path }) {
     for (const contact of contacts) {
       if (!contact.email) continue;
       const subject = falseAlarm
-        ? `Taarifa ya uongo — ${raiser} / False alarm — ${raiser}`
-        : `Hali salama — ${raiser} / All clear — ${raiser}`;
+        ? `Taarifa ya uongo: ${raiser} / False alarm: ${raiser}`
+        : `Hali salama: ${raiser} / All clear: ${raiser}`;
       const body2 = [
         falseAlarm
           ? `${raiser} anasema taarifa ya awali ya dharura ilikuwa ya makosa.`
@@ -364,7 +364,7 @@ async function handle({ req, res, path }) {
         `Aina ya awali / Original type: ${titleCase(incident.type)}`,
         `Muda / Time: ${new Date().toISOString()}`,
         '',
-        '— Smart Warning',
+        'Smart Warning',
       ].join('\n');
 
       mailer.send({

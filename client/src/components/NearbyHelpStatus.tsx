@@ -46,7 +46,7 @@ export function NearbyHelpStatus({ incidentId }: Props) {
         {responding.length > 0 && ` · ${responding.length} responding`}
       </p>
       {responding.length > 0 && nearest.distanceM != null && (
-        <p className="nearby-status-eta">Nearest: ~{nearest.distanceM}m away — help is on the way</p>
+        <p className="nearby-status-eta">Nearest: ~{nearest.distanceM}m away. Help is on the way</p>
       )}
     </div>
   );
