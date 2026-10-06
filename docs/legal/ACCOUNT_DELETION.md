@@ -1,4 +1,4 @@
-# Account & Data Deletion — Smart Warning
+# Account & Data Deletion · Smart Warning
 
 **App:** Smart Warning (`com.smartwarning.app`)
 
@@ -7,7 +7,7 @@ it, as required by the Google Play Developer Program policies.
 
 ## Delete from inside the app
 
-**If you have a personal account** — one that is not part of an organization:
+**If you have a personal account** (one that is not part of an organization):
 
 1. Open Smart Warning and sign in.
 2. Go to **About & legal**.
@@ -26,8 +26,8 @@ Deletion is immediate and cannot be undone.
 ## Request deletion without the app
 
 If you joined an organization with a team code, your records are part of that
-organization's safety record — its incident history and roll call refer to
-them — so they cannot be removed individually without breaking it. Ask your
+organization's safety record (its incident history and roll call refer to
+them), so they cannot be removed individually without breaking it. Ask your
 Safety Coordinator, or contact us and we will action the request within
 **30 days**:
 
@@ -41,9 +41,9 @@ to if you are in one, so we can identify the right records.
 
 Deleting an organization permanently removes:
 
-- All Safety Coordinator accounts and their sign-in credentials
+- All Safety Coordinator accounts and their sign in credentials
 - Organization membership records
-- Incident history, including alerts, roll-call answers and all-clears
+- Incident history, including alerts, roll call answers and all clears
 - Location records captured during incidents
 - Incident reports, including those submitted through a public link
 - Feedback, queued email and device push registrations
@@ -51,7 +51,7 @@ Deleting an organization permanently removes:
 
 ## What is kept, and why
 
-Payment records — plan, amount, currency and a transaction reference — are
+Payment records (plan, amount, currency and a transaction reference) are
 retained for accounting and tax purposes as required by law. They are detached
 from the deleted organization and contain no location data and no personal
 identifiers beyond the transaction itself.

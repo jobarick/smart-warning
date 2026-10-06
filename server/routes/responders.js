@@ -79,7 +79,7 @@ async function handle({ req, res, path }) {
     if (!status) { sendJson(res, 400, { error: "status must be 'accepted' or 'declined'" }); return true; }
 
     const offer = await db.respondToOffer({ offerId: respondMatch[1], responderId: ctx.user.id, status });
-    if (!offer) { sendJson(res, 404, { error: 'no matching offer — it may already have been answered' }); return true; }
+    if (!offer) { sendJson(res, 404, { error: 'no matching offer, it may already have been answered' }); return true; }
 
     db.recordIncidentEvent?.({
       incidentId: offer.incident_id, orgId: null, kind: status === 'accepted' ? 'responder-accepted' : 'responder-declined',

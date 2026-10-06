@@ -63,7 +63,7 @@ const COUNTRIES = {
       { number: '110', icon: '🌊', category: 'coastguard', sw: { label: 'Maziwa, Bahari & Victoria', description: 'Dharura zinazohusiana na maji au bahari' }, en: { label: 'Lakes, Sea & Victoria', description: 'Water and marine emergencies' } },
       { number: '111', icon: '🚓', category: 'security', sw: { label: 'Kuzuia Uhalifu', description: 'Toa taarifa za uhalifu (Crime Stoppers)' }, en: { label: 'Crime Stoppers', description: 'Report and help prevent crime' } },
       { number: '112', icon: '🚨', category: 'police', sw: { label: 'Polisi', description: 'Dharura za kipolisi' }, en: { label: 'Police', description: 'Police emergencies' } },
-      { number: '113', icon: '📢', category: null, sw: { label: 'TAKUKURU', description: 'Kuripoti rushwa' }, en: { label: 'TAKUKURU (Anti-Corruption)', description: 'Report corruption' } },
+      { number: '113', icon: '📢', category: null, sw: { label: 'TAKUKURU', description: 'Kuripoti rushwa' }, en: { label: 'TAKUKURU (Anticorruption)', description: 'Report corruption' } },
       { number: '114', icon: '🚒', category: 'fire', sw: { label: 'Zimamoto na Uokoaji', description: 'Moto na uokoaji' }, en: { label: 'Fire & Rescue', description: 'Fire and rescue emergencies' } },
       { number: '115', icon: '🚑', category: 'ambulance', sw: { label: 'Gari la Wagonjwa', description: 'Huduma ya ambulansi' }, en: { label: 'Ambulance', description: 'Medical emergencies' } },
       { number: '116', icon: '👶', category: null, sw: { label: 'Msaada wa Watoto', description: 'Dharura na msaada kwa mtoto' }, en: { label: 'Child Helpline', description: 'Child emergencies and support' } },
@@ -72,9 +72,9 @@ const COUNTRIES = {
       // of this file's owner-supplied data: not independently verified against
       // an authoritative source.
       { number: '117', icon: '🩺', category: null, sw: { label: 'Afya', description: 'Huduma na dharura za afya' }, en: { label: 'Health', description: 'Health services and emergencies' } },
-      { number: '119', icon: '💊', category: null, sw: { label: 'Kupambana na Dawa za Kulevya', description: 'Kuripoti masuala ya dawa za kulevya' }, en: { label: 'Anti-Drugs', description: 'Report drug-related emergencies' } },
+      { number: '119', icon: '💊', category: null, sw: { label: 'Kupambana na Dawa za Kulevya', description: 'Kuripoti masuala ya dawa za kulevya' }, en: { label: 'Drug Control', description: 'Report drug related emergencies' } },
       { number: '190', icon: '🏝️', category: 'disaster', sw: { label: 'Zanzibar', description: 'Huduma za maafa Zanzibar' }, en: { label: 'Zanzibar', description: 'Zanzibar disaster services' } },
-      { number: '195', icon: '🚫', category: null, sw: { label: 'Kupinga Usafirishaji Haramu wa Binadamu', description: 'Toa taarifa za usafirishaji haramu wa binadamu' }, en: { label: 'Anti-Trafficking', description: 'Report human trafficking' } },
+      { number: '195', icon: '🚫', category: null, sw: { label: 'Kupinga Usafirishaji Haramu wa Binadamu', description: 'Toa taarifa za usafirishaji haramu wa binadamu' }, en: { label: 'Human Trafficking', description: 'Report human trafficking' } },
       { number: '199', icon: '🏥', category: null, sw: { label: 'Magonjwa ya Mlipuko', description: 'Dharura za magonjwa ya mlipuko' }, en: { label: 'Epidemic Diseases', description: 'Epidemic and outbreak emergencies' } },
       // Not in the owner's new list, but a real published number this file
       // already had — kept rather than silently dropped.

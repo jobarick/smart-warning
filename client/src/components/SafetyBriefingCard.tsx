@@ -27,8 +27,8 @@ export function SafetyBriefingCard({ premium }: Props) {
       <section className="briefing briefing-locked">
         <h2 className="briefing-heading"><Icon name="check-circle" /> Weekly safety briefing</h2>
         <p className="briefing-teaser">
-          Premium members get a dated, seasonal safety briefing here each week — this week's is about{' '}
-          <b>{briefing.guideTitle.toLowerCase()}</b> — plus official Tanzania Meteorological Authority
+          Premium members get a dated, seasonal safety briefing here each week. This week's is about{' '}
+          <b>{briefing.guideTitle.toLowerCase()}</b>, plus official Tanzania Meteorological Authority
           bulletins once that integration is live.
         </p>
       </section>

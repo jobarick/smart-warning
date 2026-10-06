@@ -269,10 +269,10 @@ async function requestPasswordReset({ email }) {
     '',
     token,
     '',
-    'If you did not ask for this, you can ignore this message — your password',
+    'If you did not ask for this, you can ignore this message. Your password',
     'has not changed, and the link above stops working after an hour.',
     '',
-    'Smart Warning — by Idefenda Lab',
+    'Smart Warning, by Idefenda Lab',
   ].join('\n');
 
   const res = await mailer.send({
@@ -345,7 +345,7 @@ async function inviteToOrg({ orgId, orgName, email, invitedByUserId, invitedByNa
   if (existing) throw httpError(409, 'that email already belongs to an account');
 
   if (await db.countPendingInvites(orgId) >= MAX_PENDING_INVITES) {
-    throw httpError(409, `you can have up to ${MAX_PENDING_INVITES} pending invites at once — revoke an old one first`);
+    throw httpError(409, `you can have up to ${MAX_PENDING_INVITES} pending invites at once. Revoke an old one first`);
   }
 
   const token = crypto.randomBytes(32).toString('base64url');
@@ -364,17 +364,17 @@ async function inviteToOrg({ orgId, orgName, email, invitedByUserId, invitedByNa
     `Hello,`,
     '',
     `${invitedByName || 'A Safety Coordinator'} has invited you to join "${orgName}" on Smart Warning,`,
-    'as a Safety Coordinator — you will be able to see who is on site and',
+    'as a Safety Coordinator. You will be able to see who is on site and',
     'manage alerts alongside them.',
     '',
     'To accept, open this link within the next 7 days:',
     '',
     link,
     '',
-    'If you were not expecting this, you can ignore this message — nothing',
+    'If you were not expecting this, you can ignore this message. Nothing',
     'happens until the link above is used.',
     '',
-    'Smart Warning — by Idefenda Lab',
+    'Smart Warning, by Idefenda Lab',
   ].join('\n');
 
   const res = await mailer.send({

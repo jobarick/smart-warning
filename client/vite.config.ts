@@ -33,7 +33,7 @@ export default defineConfig({
       },
       devOptions: { enabled: true },
       manifest: {
-        name: 'Smart Warning — Emergency Alert System',
+        name: 'Smart Warning: Emergency Alert System',
         short_name: 'Smart Warning',
         description:
           'Instant emergency alerts with red warning border, flashing lights, and customizable sirens across all connected devices.',

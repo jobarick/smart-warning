@@ -85,7 +85,7 @@ async function handle({ req, res, url, path }) {
       return true;
     }
     if (audio && (audio.length > MAX_AUDIO_B64 || !BASE64_RE.test(audio))) {
-      sendJson(res, 413, { error: 'voice note is too long or not valid audio — please keep it under a minute' });
+      sendJson(res, 413, { error: 'voice note is too long or not valid audio, please keep it under a minute' });
       return true;
     }
 

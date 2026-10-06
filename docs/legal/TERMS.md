@@ -1,6 +1,6 @@
-# Smart Warning — Terms & Conditions
+# Smart Warning: Terms & Conditions
 
-**Version 1.2 — effective 5 August 2026**
+**Version 1.2, effective 5 August 2026**
 
 <!-- Generated from client/src/lib/terms.ts by tools/generate-legal.js.
      Do not edit by hand: this must stay identical to the text shown in the
@@ -25,7 +25,7 @@ Actual response depends on factors including but not limited to:
 - Organization configuration
 - Safety Coordinator availability
 - Emergency service availability
-- Third-party providers
+- Third party providers
 
 If your life is in immediate danger, contact your local emergency services immediately whenever possible.
 
@@ -67,13 +67,13 @@ The Service may be unavailable because of:
 - Device malfunction
 - Maintenance
 - Power failures
-- Third-party service interruptions
+- Third party service interruptions
 - Natural disasters
 - Events beyond reasonable control
 
-## 7. Third-Party Services
+## 7. Third Party Services
 
-Smart Warning may rely on third-party services including:
+Smart Warning may rely on third party services including:
 
 - Mapping providers
 - GPS providers
@@ -83,11 +83,11 @@ Smart Warning may rely on third-party services including:
 - Email providers
 - Mobile network operators
 
-Smart Warning is not responsible for failures caused solely by third-party services.
+Smart Warning is not responsible for failures caused solely by third party services.
 
 ## 8. Safety Guidance
 
-Maps, evacuation routes, recommendations, estimated arrival times, hospitals, police stations, assembly points, and other guidance are provided to assist decision-making.
+Maps, evacuation routes, recommendations, estimated arrival times, hospitals, police stations, assembly points, and other guidance are provided to assist decision making.
 
 Users must always exercise their own judgment and follow official emergency instructions where available.
 
@@ -113,7 +113,7 @@ You may request access to, correction of, or deletion of your personal data at a
 
 A Safety Coordinator who administers an organization may delete that organization from within the application. Deleting an organization permanently removes its account, its members, its incident history, its stored location records and its reports. This cannot be undone.
 
-A personal account — one that is not part of an organization — may be deleted from within the application by its own holder. Deleting it permanently removes the account, its emergency contacts, its registered devices and its subscription. This cannot be undone.
+A personal account, one that is not part of an organization, may be deleted from within the application by its own holder. Deleting it permanently removes the account, its emergency contacts, its registered devices and its subscription. This cannot be undone.
 
 If you belong to an organization you did not create, your records are part of that organization’s safety record and cannot be removed individually without breaking it. Ask your Safety Coordinator, or contact us using the details in section 16 and we will action the request within 30 days.
 
@@ -121,9 +121,9 @@ Some records may be retained where a law, regulation or a legitimate safety or a
 
 ## 9b. Data retention
 
-Incident records, roll-call answers and location traces recorded during an emergency are retained for as long as the organization holding them keeps its account, because they are that organization’s safety record.
+Incident records, roll call answers and location traces recorded during an emergency are retained for as long as the organization holding them keeps its account, because they are that organization’s safety record.
 
-Location is recorded only between an alert being raised and its all-clear. It is not recorded at other times.
+Location is recorded only between an alert being raised and its all clear. It is not recorded at other times.
 
 Deleting an organization deletes those records with it.
 

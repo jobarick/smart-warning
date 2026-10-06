@@ -65,7 +65,7 @@ async function handle({ req, res, path }) {
   const inviteMatch = path.match(/^\/api\/auth\/invite\/([^/]+)$/);
   if (inviteMatch && req.method === 'GET') {
     if (!ORGS) { sendJson(res, 501, { error: 'accounts require a database (DATABASE_URL)' }); return true; }
-    if (!allowOrgInvite(req)) { sendJson(res, 429, { error: 'too many attempts — please wait a while' }); return true; }
+    if (!allowOrgInvite(req)) { sendJson(res, 429, { error: 'too many attempts, please wait a while' }); return true; }
     sendJson(res, 200, await auth.previewInvite(inviteMatch[1]));
     return true;
   }
@@ -74,7 +74,7 @@ async function handle({ req, res, path }) {
   // limit — both mint a new user row.
   if (path === '/api/auth/accept-invite' && req.method === 'POST') {
     if (!ORGS) { sendJson(res, 501, { error: 'accounts require a database (DATABASE_URL)' }); return true; }
-    if (!allowSignup(req)) { sendJson(res, 429, { error: 'too many attempts — please wait a while' }); return true; }
+    if (!allowSignup(req)) { sendJson(res, 429, { error: 'too many attempts, please wait a while' }); return true; }
     const body = await readJson(req);
     sendJson(res, 201, await auth.acceptInvite(body));
     return true;
