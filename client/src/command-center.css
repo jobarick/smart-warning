@@ -543,6 +543,14 @@
   overflow-y: auto;
   scrollbar-width: thin;
 }
+/* That scroll only happens if the blocks keep their own height. `.mc-block`
+   allows `min-height: 0`, so in this flex column they used to shrink instead,
+   and their overflowing content slid underneath the next block: during an
+   alert on a laptop-height screen, the Assessment panel sat on top of
+   "Acknowledge incident" and swallowed every click on it. */
+.mc-split > .mc-col:first-child > * {
+  flex-shrink: 0;
+}
 
 /* The right column splits its height rather than letting the map take all of
    it: positions matter, but so does seeing who is responding and what just
