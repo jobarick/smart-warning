@@ -86,7 +86,7 @@ jobs:
 
       - name: Open (or leave open) a failure issue
         if: failure()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           BACKEND_REASON: ${{ steps.backend.outputs.reason }}
           FRONTEND_REASON: ${{ steps.frontend.outputs.reason }}
@@ -126,7 +126,7 @@ jobs:
 
       - name: Close the failure issue on recovery
         if: success()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const label = process.env.CANARY_LABEL;
