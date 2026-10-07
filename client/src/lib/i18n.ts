@@ -44,6 +44,26 @@ export type StringKey =
   | 'overlay.retractConfirm'
   | 'overlay.retractBtn'
   | 'overlay.seenBy'
+  | 'delivery.sending'
+  | 'delivery.notSentTitle'
+  | 'delivery.notSentBody'
+  | 'delivery.reachedNobody'
+  | 'delivery.reachedNobodyTitle'
+  | 'delivery.sentTeam'
+  | 'delivery.sentTeamNobody'
+  | 'delivery.sentPeople'
+  | 'delivery.call'
+  | 'delivery.callNoDial'
+  | 'delivery.sms'
+  | 'delivery.smsBody'
+  | 'delivery.smsLocation'
+  | 'delivery.smsNoLocation'
+  | 'alertType.fire'
+  | 'alertType.medical'
+  | 'alertType.security'
+  | 'alertType.hazard'
+  | 'alertType.cyber'
+  | 'alertType.evacuation'
   | 'overlay.onTheWay'
   | 'overlay.etaAway'
   | 'overlay.estimated'
@@ -476,6 +496,26 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'overlay.retractConfirm': 'Tap again: this was a false alarm',
     'overlay.retractBtn': 'I raised this by mistake',
     'overlay.seenBy': '{name} has seen this alert',
+    'delivery.sending': 'Sending your alert…',
+    'delivery.notSentTitle': 'Not sent yet',
+    'delivery.notSentBody': 'Nobody has received this alert yet. Call {number} now. We keep trying to send it.',
+    'delivery.reachedNobody': 'Nobody in your Circle could be reached. Call {number} now.',
+    'delivery.reachedNobodyTitle': 'Nobody was reached',
+    'delivery.sentTeam': 'Sent to your team. {count} online now.',
+    'delivery.sentTeamNobody': 'Sent, but nobody else on your team is online right now. Call {number} if you need help now.',
+    'delivery.sentPeople': 'Sent to {count} of your Circle by email.',
+    'delivery.call': 'Call {number}',
+    'delivery.callNoDial': 'Call {number} from a phone',
+    'delivery.sms': 'Send SMS with my location',
+    'delivery.smsBody': 'EMERGENCY: {name} needs help ({type}). {location} Sent from Smart Warning at {time}.',
+    'delivery.smsLocation': 'Location: {url} (within {metres} m).',
+    'delivery.smsNoLocation': 'Location not known yet.',
+    'alertType.fire': 'Fire',
+    'alertType.medical': 'Medical emergency',
+    'alertType.security': 'Security threat',
+    'alertType.hazard': 'Hazard',
+    'alertType.cyber': 'Cyber incident',
+    'alertType.evacuation': 'Evacuation',
     'overlay.onTheWay': '{name} is on the way',
     'overlay.etaAway': 'about {min} min away',
     'overlay.estimated': '(estimated)',
@@ -905,6 +945,26 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'overlay.retractConfirm': 'Gusa tena: hii ilikuwa taarifa ya uongo',
     'overlay.retractBtn': 'Nimeleta hii kwa makosa',
     'overlay.seenBy': '{name} ameona dharura hii',
+    'delivery.sending': 'Inatuma tahadhari yako…',
+    'delivery.notSentTitle': 'Haijatumwa bado',
+    'delivery.notSentBody': 'Hakuna aliyepokea tahadhari hii bado. Piga {number} sasa. Tunaendelea kujaribu kuituma.',
+    'delivery.reachedNobody': 'Hakuna mtu wa Circle yako aliyefikiwa. Piga {number} sasa.',
+    'delivery.reachedNobodyTitle': 'Hakuna aliyefikiwa',
+    'delivery.sentTeam': 'Imetumwa kwa timu yako. {count} wako mtandaoni sasa.',
+    'delivery.sentTeamNobody': 'Imetumwa, lakini hakuna mwingine wa timu yako aliye mtandaoni sasa. Piga {number} ukihitaji msaada sasa.',
+    'delivery.sentPeople': 'Imetumwa kwa watu {count} wa Circle yako kwa barua pepe.',
+    'delivery.call': 'Piga {number}',
+    'delivery.callNoDial': 'Piga {number} kwa simu',
+    'delivery.sms': 'Tuma SMS yenye mahali nilipo',
+    'delivery.smsBody': 'DHARURA: {name} anahitaji msaada ({type}). {location} Imetumwa kutoka Smart Warning saa {time}.',
+    'delivery.smsLocation': 'Mahali: {url} (ndani ya mita {metres}).',
+    'delivery.smsNoLocation': 'Mahali bado hapajulikani.',
+    'alertType.fire': 'Moto',
+    'alertType.medical': 'Dharura ya kiafya',
+    'alertType.security': 'Tishio la usalama',
+    'alertType.hazard': 'Hatari',
+    'alertType.cyber': 'Tukio la mtandao',
+    'alertType.evacuation': 'Kuondoka eneo',
     'overlay.onTheWay': '{name} anakuja',
     'overlay.etaAway': 'takriban dakika {min}',
     'overlay.estimated': '(makadirio)',

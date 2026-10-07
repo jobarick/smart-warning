@@ -63,6 +63,9 @@ import {
 } from './lib/api';
 import { fetchSubscription } from './lib/billing';
 import { loadPendingPayment, type PendingPayment } from './lib/pendingPayment';
+import { FALLBACK_EMERGENCY_NUMBER, orgDelivery, personalDelivery, smsHref, type DeliveryState } from './lib/delivery';
+import { canDial } from './lib/emergency';
+import { t, type StringKey } from './lib/i18n';
 
 // How long the pending-location note may show after SOS fires with no GPS
 // fix yet, and how long a late fix is still worth backfilling. Short on
@@ -658,7 +661,7 @@ export default function App() {
     [settings.deviceName, settings.zone, settings.shareLocation, shownView, selfStatus, telemetry, safeFor],
   );
 
-  const { status, deviceCount, roster, joinRejected, send, sendHeartbeat, queued, queuedSince } = useAlertSocket(
+  const { status, deviceCount, roster, joinRejected, send, sendHeartbeat, queued, queuedSince, pendingAlertIds } = useAlertSocket(
     handleWire,
     getSelfInfo,
     joinCreds,
@@ -1133,6 +1136,51 @@ export default function App() {
   // Same discipline, for the plainer "someone has seen this" notice.
   const activeAckNotice = ackNotice && alarm.alert && ackNotice.incidentId === alarm.alert.id ? ackNotice : null;
 
+  // Whether the alert THIS device raised reached anyone (safety audit
+  // 2026-10-07: a held alert used to look exactly like a delivered one).
+  // Only for our own alert: one that arrived from someone else was, by
+  // definition, delivered.
+  const ownAlert = alarm.alert && (isPersonal || alarm.alert.sender === settings.deviceName) ? alarm.alert : null;
+  const delivery: DeliveryState | null = !ownAlert
+    ? null
+    : isPersonal
+      ? personalDelivery({
+          phase: personalSendStatus?.phase ?? null,
+          contactedCount: personalSendStatus?.contactedCount,
+          replayed: personalSendStatus?.replayed,
+          raisedAt: ownAlert.timestamp,
+          now,
+          online,
+        })
+      : orgDelivery({
+          alertId: ownAlert.id,
+          raisedAt: ownAlert.timestamp,
+          now,
+          pendingAlertIds,
+          socketOpen: status === 'open',
+          deviceCount,
+          online,
+        });
+  const deliveryFallback = ownAlert ? {
+    number: FALLBACK_EMERGENCY_NUMBER,
+    canDial: canDial(),
+    smsHref: smsHref({
+      name: sessionName(session) || settings.deviceName,
+      // The family member reading this SMS may not read English: the type is
+      // translated, not the profile's English label.
+      typeLabel: t(settings.locale, `alertType.${ownAlert.type}` as StringKey),
+      lat: telemetry.lat,
+      lng: telemetry.lng,
+      accuracy: telemetry.accuracy,
+      at: ownAlert.timestamp,
+      text: {
+        body: (v) => t(settings.locale, 'delivery.smsBody', v),
+        withLocation: (v) => t(settings.locale, 'delivery.smsLocation', v),
+        noLocation: t(settings.locale, 'delivery.smsNoLocation'),
+      },
+    }),
+  } : undefined;
+
   // The user's screens run inside a fixed shell: the chrome stays put and the
   // active tab scrolls inside it. Scoped to this view — the command centre has
   // its own carefully-fitted layout and must not inherit a scroll container.
@@ -1440,6 +1488,8 @@ export default function App() {
           // else's emergency.
           canRetract={alarm.alert.sender === settings.deviceName}
           onFalseAlarm={() => allClear('false-alarm')}
+          delivery={delivery}
+          fallback={deliveryFallback}
         />
       )}
 
