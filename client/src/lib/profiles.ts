@@ -1,5 +1,6 @@
-import type { AlertType } from '../types';
+import type { AlertType, Locale } from '../types';
 import { ALERT_META, SAFETY_PROTOCOL } from '../types';
+import { t, type StringKey } from './i18n';
 
 /**
  * An industry profile is a curated, relabelled view over the canonical alert
@@ -94,9 +95,23 @@ export function getProfile(id: string): IndustryProfile {
   return INDUSTRY_PROFILES.find((p) => p.id === id) ?? INDUSTRY_PROFILES[0];
 }
 
-/** Sector label for a canonical type, falling back to the engine default. */
-export function alertLabel(profile: IndustryProfile, type: AlertType): string {
-  return profile.alerts.find((a) => a.type === type)?.label ?? ALERT_META[type].label;
+// The plain names the default profile and ALERT_META use. A profile label
+// that is one of these is just the type's ordinary name, so it is translated;
+// anything else ("Code Blue", "Lockdown") is a site's own protocol term and is
+// shown exactly as that site wrote it.
+const PLAIN_NAMES = new Set([
+  'Fire', 'Medical', 'Security', 'Hazard', 'Evacuate', 'Evacuation', 'Cyber Threat',
+]);
+
+/**
+ * Sector label for a canonical type, falling back to the engine default.
+ * With a locale, the ordinary names come back translated, so the SOS buttons
+ * read Moto / Afya / Usalama in Swahili instead of always English.
+ */
+export function alertLabel(profile: IndustryProfile, type: AlertType, locale?: Locale): string {
+  const label = profile.alerts.find((a) => a.type === type)?.label ?? ALERT_META[type].label;
+  if (!locale || !PLAIN_NAMES.has(label)) return label;
+  return t(locale, `alertType.${type}` as StringKey);
 }
 
 /** Sector protocol steps for a type, falling back to the engine default. */

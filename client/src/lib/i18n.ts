@@ -64,6 +64,8 @@ export type StringKey =
   | 'alertType.hazard'
   | 'alertType.cyber'
   | 'alertType.evacuation'
+  | 'sos.typeGroup'
+  | 'sos.severityGroup'
   | 'overlay.onTheWay'
   | 'overlay.etaAway'
   | 'overlay.estimated'
@@ -511,11 +513,13 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'delivery.smsLocation': 'Location: {url} (within {metres} m).',
     'delivery.smsNoLocation': 'Location not known yet.',
     'alertType.fire': 'Fire',
-    'alertType.medical': 'Medical emergency',
-    'alertType.security': 'Security threat',
+    'alertType.medical': 'Medical',
+    'alertType.security': 'Security',
     'alertType.hazard': 'Hazard',
-    'alertType.cyber': 'Cyber incident',
-    'alertType.evacuation': 'Evacuation',
+    'alertType.cyber': 'Cyber threat',
+    'alertType.evacuation': 'Evacuate',
+    'sos.typeGroup': 'Emergency type',
+    'sos.severityGroup': 'Severity',
     'overlay.onTheWay': '{name} is on the way',
     'overlay.etaAway': 'about {min} min away',
     'overlay.estimated': '(estimated)',
@@ -960,11 +964,13 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'delivery.smsLocation': 'Mahali: {url} (ndani ya mita {metres}).',
     'delivery.smsNoLocation': 'Mahali bado hapajulikani.',
     'alertType.fire': 'Moto',
-    'alertType.medical': 'Dharura ya kiafya',
-    'alertType.security': 'Tishio la usalama',
+    'alertType.medical': 'Afya',
+    'alertType.security': 'Usalama',
     'alertType.hazard': 'Hatari',
-    'alertType.cyber': 'Tukio la mtandao',
-    'alertType.evacuation': 'Kuondoka eneo',
+    'alertType.cyber': 'Mtandao',
+    'alertType.evacuation': 'Ondoka eneo',
+    'sos.typeGroup': 'Aina ya dharura',
+    'sos.severityGroup': 'Kiwango cha hatari',
     'overlay.onTheWay': '{name} anakuja',
     'overlay.etaAway': 'takriban dakika {min}',
     'overlay.estimated': '(makadirio)',

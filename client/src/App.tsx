@@ -1474,7 +1474,7 @@ export default function App() {
           acknowledged={alarm.acknowledged}
           settings={settings}
           locale={settings.locale}
-          label={alertLabel(profile, alarm.alert.type)}
+          label={alertLabel(profile, alarm.alert.type, settings.locale)}
           safeConfirmed={safeFor === alarm.alert.id}
           onConfirmSafe={confirmSafe}
           onAcknowledge={() => dispatch({ type: 'ACKNOWLEDGE' })}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { AlertType, Locale, Severity } from '../types';
 import { ALERT_META } from '../types';
-import type { IndustryProfile } from '../lib/profiles';
+import { alertLabel, type IndustryProfile } from '../lib/profiles';
 import { t, SEVERITY_KEY } from '../lib/i18n';
 import { Icon } from './Icon';
 
@@ -107,11 +107,10 @@ export function SosPanel({ profile, disabled, onTrigger, locale, personalStatus,
         <span className="sos-hero-sub">
           {disabled
             ? t(locale, 'sos.alertActive')
-            /* chosen.label is still English-only — it comes from the
-               industry profile's own alert list (lib/profiles.ts), a much
-               larger translation job (5 profiles × several alerts each,
-               with full protocol text) deliberately left for its own pass. */
-            : chosen ? t(locale, 'sos.tapToSend', { type: chosen.label }) : t(locale, 'sos.tapToAlert')}
+            /* Plain type names are translated (Moto, Afya…); a sector's own
+               protocol term ("Code Blue") is shown as the site wrote it. See
+               alertLabel in lib/profiles.ts. Protocol steps are still English. */
+            : chosen ? t(locale, 'sos.tapToSend', { type: alertLabel(profile, chosen.type, locale) }) : t(locale, 'sos.tapToAlert')}
         </span>
       </button>
 
@@ -165,7 +164,7 @@ export function SosPanel({ profile, disabled, onTrigger, locale, personalStatus,
         </>
       )}
 
-      <div className={`sos-types ${flash ? 'flash' : ''}`} role="group" aria-label="Emergency type">
+      <div className={`sos-types ${flash ? 'flash' : ''}`} role="group" aria-label={t(locale, 'sos.typeGroup')}>
         {profile.alerts.map((a) => {
           const meta = ALERT_META[a.type];
           const active = selected === a.type;
@@ -180,13 +179,13 @@ export function SosPanel({ profile, disabled, onTrigger, locale, personalStatus,
               onClick={() => setSelected(a.type)}
             >
               <Icon name={meta.icon} className="sos-type-ic" />
-              <span>{a.label}</span>
+              <span>{alertLabel(profile, a.type, locale)}</span>
             </button>
           );
         })}
       </div>
 
-      <div className="sos-sev" role="radiogroup" aria-label="Severity">
+      <div className="sos-sev" role="radiogroup" aria-label={t(locale, 'sos.severityGroup')}>
         {SEVERITIES.map((s) => (
           <button
             key={s}
