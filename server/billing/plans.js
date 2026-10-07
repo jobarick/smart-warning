@@ -21,7 +21,9 @@ const FEATURES = {
   SUPERVISOR_DASHBOARD: 'supervisor_dashboard',
   INCIDENT_REPORTS: 'incident_reports',
   ADVANCED_ANALYTICS: 'advanced_analytics',
-  EMERGENCY_DRILLS: 'emergency_drills',      // not built yet — gate is ready for it
+  // Not built yet, so not in any plan (product owner, 2026-10-07): add it to
+  // Business and Enterprise again once drills actually exist.
+  EMERGENCY_DRILLS: 'emergency_drills',
   PRIORITY_SUPPORT: 'priority_support',
   CUSTOM_BILLING: 'custom_billing',
 };
@@ -188,9 +190,9 @@ const PLANS = [
     features: [
       F.UNLIMITED_CONTACTS, F.FAMILY_LOCATION, F.SAFETY_ASSISTANT, F.WEATHER_FORECAST,
       F.SUPERVISOR_DASHBOARD, F.INCIDENT_REPORTS,
-      F.ADVANCED_ANALYTICS, F.EMERGENCY_DRILLS, F.PRIORITY_SUPPORT,
+      F.ADVANCED_ANALYTICS, F.PRIORITY_SUPPORT,
     ],
-    includes: ['Everything in Team', 'Advanced analytics', 'Emergency drills', 'Priority support', '51–250 people'],
+    includes: ['Everything in Team', 'Advanced analytics', 'Priority support', '51–250 people'],
   },
   {
     id: 'enterprise',
@@ -206,7 +208,7 @@ const PLANS = [
     features: [
       F.UNLIMITED_CONTACTS, F.FAMILY_LOCATION, F.SAFETY_ASSISTANT, F.WEATHER_FORECAST,
       F.SUPERVISOR_DASHBOARD, F.INCIDENT_REPORTS,
-      F.ADVANCED_ANALYTICS, F.EMERGENCY_DRILLS, F.PRIORITY_SUPPORT,
+      F.ADVANCED_ANALYTICS, F.PRIORITY_SUPPORT,
       F.CUSTOM_BILLING,
     ],
     includes: ['Everything in Business', 'Custom seat count', 'Custom billing terms', 'Named account contact'],
