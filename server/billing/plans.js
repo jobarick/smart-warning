@@ -159,7 +159,7 @@ const PLANS = [
     // already taught this market to buy time in blocks.
     bundles: BUNDLE_PRICE,
     features: [F.UNLIMITED_CONTACTS, F.FAMILY_LOCATION, F.SAFETY_ASSISTANT, F.WEATHER_FORECAST],
-    includes: ['Everything in Free', 'Up to 50 emergency contacts', 'Family location sharing', 'Safety assistant guidance'],
+    includes: ['Everything in Free', 'Up to 50 emergency contacts', '3 day weather forecast', 'Weekly safety briefing'],
   },
   {
     id: 'team',
