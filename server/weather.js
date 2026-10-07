@@ -101,13 +101,28 @@ const HEAVY_RAIN_MM = 2; // mm/h, current
 const STRONG_WIND_KPH = 30;
 const EXTREME_HEAT_C = 35;
 
-function flagsFor({ current, dailyMaxPrecipProb }) {
+// The coming hours are public (see routes/weather.js), so the cautions look
+// ahead through them too: a storm due at 4pm is worth knowing about at noon.
+const HOURS_AHEAD = 12;
+
+function flagsFor({ current, dailyMaxPrecipProb, hourly = [] }) {
+  const anyHour = (pick, limit) => hourly.some((h) => pick(h) != null && pick(h) >= limit);
   return {
     heavyRainLikely: (dailyMaxPrecipProb != null && dailyMaxPrecipProb >= HEAVY_RAIN_PROBABILITY)
-      || (current.precipitationMm != null && current.precipitationMm >= HEAVY_RAIN_MM),
-    strongWind: current.windKph != null && current.windKph >= STRONG_WIND_KPH,
-    extremeHeat: current.tempC != null && current.tempC >= EXTREME_HEAT_C,
+      || (current.precipitationMm != null && current.precipitationMm >= HEAVY_RAIN_MM)
+      || anyHour((h) => h.precipitationProbability, HEAVY_RAIN_PROBABILITY),
+    strongWind: (current.windKph != null && current.windKph >= STRONG_WIND_KPH)
+      || anyHour((h) => h.windKph, STRONG_WIND_KPH),
+    extremeHeat: (current.tempC != null && current.tempC >= EXTREME_HEAT_C)
+      || anyHour((h) => h.tempC, EXTREME_HEAT_C),
   };
+}
+
+// Local wall clock time at the forecast point, "YYYY-MM-DDTHH:MM", so a
+// visitor in Dar es Salaam reads "15:00" for 3pm there whatever their device
+// clock says.
+function localTime(unixSeconds, offsetSeconds) {
+  return new Date((unixSeconds + offsetSeconds) * 1000).toISOString().slice(0, 16);
 }
 
 /** Open-Meteo — https://open-meteo.com/en/docs, no API key. */
@@ -117,7 +132,10 @@ async function fetchOpenMeteo(lat, lng, { budgetMs }) {
     longitude: String(lng),
     current: 'temperature_2m,weather_code,wind_speed_10m,precipitation',
     daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max',
+    hourly: 'temperature_2m,precipitation_probability,weather_code,wind_speed_10m',
     forecast_days: '3',
+    // Starts at the current hour, so the first entry is "now" at that place.
+    forecast_hours: String(HOURS_AHEAD),
     timezone: 'auto',
   });
   const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
@@ -139,8 +157,16 @@ async function fetchOpenMeteo(lat, lng, { budgetMs }) {
     precipitationProbability: p.daily.precipitation_probability_max?.[i] ?? null,
     condition: conditionFromWmo(p.daily.weather_code?.[i]),
   }));
+  // timezone=auto already returns local wall clock times, "YYYY-MM-DDTHH:MM".
+  const hourly = (p.hourly?.time || []).slice(0, HOURS_AHEAD).map((time, i) => ({
+    time,
+    tempC: p.hourly.temperature_2m?.[i] ?? null,
+    precipitationProbability: p.hourly.precipitation_probability?.[i] ?? null,
+    windKph: p.hourly.wind_speed_10m?.[i] ?? null,
+    condition: conditionFromWmo(p.hourly.weather_code?.[i]),
+  }));
 
-  return { current, daily, dailyMaxPrecipProb: daily[0]?.precipitationProbability ?? null };
+  return { current, daily, hourly, dailyMaxPrecipProb: daily[0]?.precipitationProbability ?? null };
 }
 
 /** OpenWeather One Call 3.0 — requires OPENWEATHER_API_KEY. */
@@ -167,8 +193,16 @@ async function fetchOpenWeather(lat, lng, { budgetMs }) {
     precipitationProbability: d.pop != null ? Math.round(d.pop * 100) : null,
     condition: conditionFromOwmId(d.weather?.[0]?.id),
   }));
+  const offset = Number(p.timezone_offset) || 0;
+  const hourly = (p.hourly || []).slice(0, HOURS_AHEAD).map((h) => ({
+    time: localTime(h.dt, offset),
+    tempC: h.temp ?? null,
+    precipitationProbability: h.pop != null ? Math.round(h.pop * 100) : null,
+    windKph: h.wind_speed != null ? h.wind_speed * 3.6 : null,
+    condition: conditionFromOwmId(h.weather?.[0]?.id),
+  }));
 
-  return { current, daily, dailyMaxPrecipProb: daily[0]?.precipitationProbability ?? null };
+  return { current, daily, hourly, dailyMaxPrecipProb: daily[0]?.precipitationProbability ?? null };
 }
 
 /**
@@ -187,12 +221,13 @@ async function getWeather({ lat, lng }) {
 
   try {
     const fetcher = PROVIDER === 'openweather' ? fetchOpenWeather : fetchOpenMeteo;
-    const { current, daily, dailyMaxPrecipProb } = await fetcher(lat, lng, { budgetMs: TIMEOUT_MS });
+    const { current, daily, hourly, dailyMaxPrecipProb } = await fetcher(lat, lng, { budgetMs: TIMEOUT_MS });
     const result = {
       provider: providerName(),
       current,
       daily,
-      flags: flagsFor({ current, dailyMaxPrecipProb }),
+      hourly,
+      flags: flagsFor({ current, dailyMaxPrecipProb, hourly }),
       updatedAt: new Date().toISOString(),
     };
     toCache(key, result);

@@ -25,6 +25,15 @@ export interface DailyWeather {
   condition: WeatherCondition;
 }
 
+export interface HourlyWeather {
+  /** Local wall clock time at the forecast point, "YYYY-MM-DDTHH:MM". */
+  time: string;
+  tempC: number | null;
+  precipitationProbability: number | null;
+  windKph: number | null;
+  condition: WeatherCondition;
+}
+
 export interface WeatherFlags {
   heavyRainLikely: boolean;
   strongWind: boolean;
@@ -38,6 +47,8 @@ export interface WeatherResult {
   updatedAt?: string;
   current?: CurrentWeather;
   flags?: WeatherFlags;
+  /** The next 12 hours, public like current conditions. Absent from an older server. */
+  hourly?: HourlyWeather[];
   /** Present only when the caller is entitled to WEATHER_FORECAST; null otherwise. */
   daily?: DailyWeather[] | null;
   forecastLocked?: boolean;
