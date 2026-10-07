@@ -3,6 +3,7 @@
 //  • supervisor — logged in with an account; carries a JWT + user/org info.
 import type { AuthUser } from './api';
 import { clearConsent } from './consent';
+import { clearPendingPayment } from './pendingPayment';
 import * as outbox from './outbox';
 import * as trackBuffer from './trackBuffer';
 import { loadSettings, saveSettings } from './settings';
@@ -63,6 +64,8 @@ export function clearUserScopedState(): void {
   localStorage.removeItem(DEVICE_TOKEN_KEY);
   outbox.clear();
   trackBuffer.clear();
+  // Someone else's payment must not reopen on the next person's screen.
+  clearPendingPayment();
   // A new person has to accept the terms themselves; acceptance is not a
   // property of the handset.
   clearConsent();

@@ -62,6 +62,7 @@ import {
   sendPersonalAlert, resolvePersonalAlert, backfillPersonalAlertLocation, type Report,
 } from './lib/api';
 import { fetchSubscription } from './lib/billing';
+import { loadPendingPayment, type PendingPayment } from './lib/pendingPayment';
 
 // How long the pending-location note may show after SOS fires with no GPS
 // fix yet, and how long a late fix is still worth backfilling. Short on
@@ -92,6 +93,7 @@ const FeedbackCenter = lazy(() => import('./components/FeedbackCenter').then((m)
 const DestinationsManager = lazy(() => import('./components/DestinationsManager').then((m) => ({ default: m.DestinationsManager })));
 const TeamInvites = lazy(() => import('./components/TeamInvites').then((m) => ({ default: m.TeamInvites })));
 const BillingPanel = lazy(() => import('./components/BillingPanel').then((m) => ({ default: m.BillingPanel })));
+const PaymentModal = lazy(() => import('./components/PaymentModal').then((m) => ({ default: m.PaymentModal })));
 
 // Deliberately plain: a spinner that appears for one frame is noise, and these
 // panels are never on a critical path where a richer skeleton would earn its
@@ -484,6 +486,16 @@ export default function App() {
       .then((r) => { if (!cancelled) setTier(r.entitlements?.tier ?? 'free'); })
       .catch(() => { if (!cancelled) setTier(null); });
     return () => { cancelled = true; };
+  }, [token]);
+
+  // A mobile money payment this device started before a reload. The USSD
+  // prompt takes the person out of the browser, which is when a phone reloads
+  // the tab; reopening the waiting screen here is what lets them still see
+  // "Payment received", or why it failed. Read once per signed in session:
+  // a payment started in this page load already has its own screen open.
+  const [resumePayment, setResumePayment] = useState<PendingPayment | null>(null);
+  useEffect(() => {
+    setResumePayment(token ? loadPendingPayment() : null);
   }, [token]);
 
   /**
@@ -1388,6 +1400,25 @@ export default function App() {
       {/* Hidden whenever a full-screen panel is open, so those keep their own
           Back button as the single way out rather than competing with it. */}
       {tabbed && <TabBar tab={tab} onChange={(t) => navigate(TAB_PATHS[t])} alertCount={log.length} active={alarmActive} locale={settings.locale} />}
+
+      {/* Rendered before the alert overlay so an emergency always sits on top
+          of a payment screen, never underneath it. */}
+      {token && resumePayment && (
+        <Suspense fallback={null}>
+          <PaymentModal
+            plan={resumePayment.plan}
+            token={token}
+            cycle={resumePayment.cycle}
+            resume={{ reference: resumePayment.reference, startedAt: resumePayment.startedAt }}
+            onClose={() => setResumePayment(null)}
+            onPaid={() => {
+              fetchSubscription(token)
+                .then((r) => setTier(r.entitlements?.tier ?? 'free'))
+                .catch(() => { /* the tier refreshes on the next sign in */ });
+            }}
+          />
+        </Suspense>
+      )}
 
       {shownView === 'worker' && alarm.alert && (
         <AlertOverlay

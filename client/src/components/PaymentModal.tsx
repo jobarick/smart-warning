@@ -8,6 +8,7 @@ import {
   OPERATORS, OFFERED, formatAsTyped, format as formatPhone,
   isValid, operatorOf, type Operator,
 } from '../lib/phone';
+import { clearPendingPayment, savePendingPayment } from '../lib/pendingPayment';
 
 // How often to ask the backend whether the customer has finished. The USSD
 // prompt itself lives about a minute; 3s is responsive without turning one
@@ -26,25 +27,38 @@ interface Props {
   defaultPhone?: string | null;
   onClose: () => void;
   onPaid: () => void;
+  /**
+   * Reopens a payment that was already started, straight into the waiting
+   * screen. Set when the page was reloaded mid payment (see pendingPayment.ts),
+   * so the person still sees "Payment received" or why it failed.
+   */
+  resume?: { reference: string; startedAt: number };
 }
 
-export function PaymentModal({ plan, token, cycle = 'monthly', defaultPhone, onClose, onPaid }: Props) {
+export function PaymentModal({ plan, token, cycle = 'monthly', defaultPhone, onClose, onPaid, resume }: Props) {
   const [phone, setPhone] = useState(() => (defaultPhone ? formatAsTyped(defaultPhone) : ''));
   // What the customer picked. The number itself is authoritative — see the
   // mismatch note below — so this starts unset and follows what they type.
   const [picked, setPicked] = useState<Operator | null>(null);
-  const [stage, setStage] = useState<Stage>('form');
+  const [stage, setStage] = useState<Stage>(resume ? 'waiting' : 'form');
   const [error, setError] = useState<string | null>(null);
   const [payment, setPayment] = useState<PaymentState | null>(null);
-  const [reference, setReference] = useState<string | null>(null);
+  const [reference, setReference] = useState<string | null>(resume?.reference ?? null);
   const [elapsed, setElapsed] = useState(0);
 
-  const startedAt = useRef(0);
+  const startedAt = useRef(resume?.startedAt ?? 0);
   // Guards the submit against repeat clicks. A `stage` check cannot: React
   // batches state updates, so three clicks in the same tick all still see
   // 'form' and all fire. A ref changes synchronously, which is the only thing
   // fast enough to stop the second tap becoming a second USSD prompt.
   const submitting = useRef(false);
+  // The latest onPaid, read through a ref so the polling effect below does not
+  // depend on it. A parent that passes a fresh arrow function each render (App
+  // re-renders every second) would otherwise restart the poll and the
+  // countdown on every render: polling ~1/s instead of every 3s, and a timer
+  // stuck at its starting value.
+  const onPaidRef = useRef(onPaid);
+  onPaidRef.current = onPaid;
   const detected = useMemo(() => operatorOf(phone), [phone]);
   const valid = isValid(phone);
 
@@ -54,8 +68,10 @@ export function PaymentModal({ plan, token, cycle = 'monthly', defaultPhone, onC
   const effective: Operator | null = detected;
   const mismatch = Boolean(picked && detected && picked !== detected);
 
-  const walletName = effective ? OPERATORS[effective].wallet : 'mobile money';
-  const displayPhone = valid ? formatPhone(phone) : phone;
+  // A resumed payment has an empty form, so fall back to what the backend
+  // recorded for it once the first status poll arrives.
+  const walletName = effective ? OPERATORS[effective].wallet : (payment?.operatorLabel || 'mobile money');
+  const displayPhone = valid ? formatPhone(phone) : (phone || payment?.phoneNumber || '');
 
   const close = useCallback(() => {
     // A payment in flight is not cancelled by closing — the customer may still
@@ -89,6 +105,7 @@ export function PaymentModal({ plan, token, cycle = 'monthly', defaultPhone, onC
         setStage('paid');
         onPaid();
       } else {
+        savePendingPayment({ reference: out.orderReference, plan, cycle, startedAt: startedAt.current });
         setStage('waiting');
       }
     } catch (e) {
@@ -102,16 +119,23 @@ export function PaymentModal({ plan, token, cycle = 'monthly', defaultPhone, onC
   useEffect(() => {
     if (stage !== 'waiting' || !reference) return;
     let cancelled = false;
+    // A resumed payment can already be past the give up point when this
+    // screen reopens. Never call it failed before the backend has answered at
+    // least once: it may well already know the payment went through.
+    let answered = false;
 
     const tick = async () => {
       try {
         const state = await fetchPaymentStatus(token, reference);
         if (cancelled) return;
+        answered = true;
         setPayment(state);
         if (state.status === 'paid') {
+          clearPendingPayment(reference);
           setStage('paid');
-          onPaid();
+          onPaidRef.current();
         } else if (state.status === 'failed' || state.status === 'reversed' || state.expired) {
+          clearPendingPayment(reference);
           setStage('failed');
         }
       } catch {
@@ -125,12 +149,12 @@ export function PaymentModal({ plan, token, cycle = 'monthly', defaultPhone, onC
     const clock = setInterval(() => {
       const ms = Date.now() - startedAt.current;
       setElapsed(ms);
-      if (ms > GIVE_UP_MS) setStage('failed');
+      if (ms > GIVE_UP_MS && answered) { clearPendingPayment(reference); setStage('failed'); }
     }, 1000);
     tick();
 
     return () => { cancelled = true; clearInterval(poll); clearInterval(clock); };
-  }, [stage, reference, token, onPaid]);
+  }, [stage, reference, token]);
 
   const secondsLeft = Math.max(0, Math.ceil((GIVE_UP_MS - elapsed) / 1000));
 
