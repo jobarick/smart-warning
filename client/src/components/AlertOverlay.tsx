@@ -3,8 +3,67 @@ import type { AcknowledgedMessage, AlertMessage, Locale, RespondingMessage, Sett
 import { ALERT_META, severityWants } from '../types';
 import { effectiveFlashRate, SAFE_FLASH_RATE } from '../lib/settings';
 import { t, SEVERITY_KEY } from '../lib/i18n';
+import { needsFallback, type DeliveryState } from '../lib/delivery';
 import { Icon } from './Icon';
 import { NearbyHelpStatus } from './NearbyHelpStatus';
+
+/**
+ * Whether the alert THIS device raised actually reached anyone, at the top of
+ * the card where a frightened person looks first. Not sent means call now:
+ * the call and SMS links work with no internet and are never disarmed.
+ */
+function DeliveryBanner({ delivery, fallback, locale }: {
+  delivery: DeliveryState;
+  fallback: { number: string; smsHref: string; canDial: boolean };
+  locale: Locale;
+}) {
+  const number = fallback.number;
+  if (needsFallback(delivery)) {
+    return (
+      <div className="delivery delivery-failed" role="alert" aria-live="assertive">
+        <b className="delivery-title">
+          {t(locale, delivery.kind === 'reached-nobody' ? 'delivery.reachedNobodyTitle' : 'delivery.notSentTitle')}
+        </b>
+        <p className="delivery-body">
+          {delivery.kind === 'reached-nobody'
+            ? t(locale, 'delivery.reachedNobody', { number })
+            : t(locale, 'delivery.notSentBody', { number })}
+        </p>
+        <div className="delivery-actions">
+          {fallback.canDial ? (
+            <a className="delivery-btn delivery-call" href={`tel:${number}`}>
+              <Icon name="phone" /> {t(locale, 'delivery.call', { number })}
+            </a>
+          ) : (
+            <span className="delivery-btn delivery-call delivery-static">{t(locale, 'delivery.callNoDial', { number })}</span>
+          )}
+          <a className="delivery-btn delivery-sms" href={fallback.smsHref}>
+            <Icon name="send" /> {t(locale, 'delivery.sms')}
+          </a>
+        </div>
+      </div>
+    );
+  }
+  if (delivery.kind === 'sending') {
+    return (
+      <div className="delivery delivery-sending" role="status" aria-live="polite">
+        <span className="delivery-spinner" aria-hidden="true" /> {t(locale, 'delivery.sending')}
+      </div>
+    );
+  }
+  if (delivery.kind !== 'sent-team' && delivery.kind !== 'sent-people') return null;
+  const alone = delivery.kind === 'sent-team' && delivery.others === 0;
+  const text = delivery.kind === 'sent-people'
+    ? t(locale, 'delivery.sentPeople', { count: String(delivery.count) })
+    : alone
+      ? t(locale, 'delivery.sentTeamNobody', { number })
+      : t(locale, 'delivery.sentTeam', { count: String(delivery.others) });
+  return (
+    <div className={`delivery ${alone ? 'delivery-warn' : 'delivery-sent'}`} role="status" aria-live="polite">
+      <Icon name={alone ? 'hazard' : 'check-circle'} /> <span>{text}</span>
+    </div>
+  );
+}
 
 interface Props {
   alert: AlertMessage;
@@ -24,9 +83,13 @@ interface Props {
   /** True when THIS device raised the alarm, so it may retract it. */
   canRetract?: boolean;
   onFalseAlarm?: () => void;
+  /** Set only for an alert THIS device raised: whether it reached anyone. */
+  delivery?: DeliveryState | null;
+  /** What to offer when it has not: a number to call and a prefilled SMS. */
+  fallback?: { number: string; smsHref: string; canDial: boolean };
 }
 
-export function AlertOverlay({ alert, acknowledged, settings, locale, label, safeConfirmed, onConfirmSafe, onAcknowledge, onAllClear, responder, ackNotice, canRetract, onFalseAlarm }: Props) {
+export function AlertOverlay({ alert, acknowledged, settings, locale, label, safeConfirmed, onConfirmSafe, onAcknowledge, onAllClear, responder, ackNotice, canRetract, onFalseAlarm, delivery, fallback }: Props) {
   // Retracting also stops every siren on site, so it takes a second tap the
   // same way all-clear does — but it is worded as taking the alarm back, not
   // as declaring an emergency over.
@@ -98,6 +161,7 @@ export function AlertOverlay({ alert, acknowledged, settings, locale, label, saf
       </div>
       <div className={`overlay-border ${acknowledged ? '' : 'overlay-border-pulse'}`} />
       <div className="overlay-card" role="alert" style={{ borderColor: meta.color }}>
+        {delivery && fallback && <DeliveryBanner delivery={delivery} fallback={fallback} locale={locale} />}
         <Icon name={meta.icon} className="overlay-icon" style={{ color: meta.color }} />
         <div className="overlay-title" style={{ color: meta.color }}>
           {t(locale, 'overlay.titleTemplate', { type: (label ?? meta.label).toUpperCase() })}
