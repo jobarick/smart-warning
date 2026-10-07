@@ -2918,6 +2918,8 @@ body {
 .weather-forecast-day span:first-child { color: var(--muted); font-weight: 600; }
 .weather-forecast-day b { font-size: 15px; }
 .weather-forecast-min { color: var(--faint); }
+.weather-hours-grid .weather-forecast-day { min-width: 0; }
+.weather-calm { margin: 10px 0 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
 .weather-disclaimer { margin: 4px 0 0; padding-top: 10px; border-top: 1px solid var(--panel-border); font-size: 11px; line-height: 1.5; color: var(--faint); }
 /* ---------- trial / subscription banner ----------
    Sits below the SOS on Home. Quiet by design: billing is the least important

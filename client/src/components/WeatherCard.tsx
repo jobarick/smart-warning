@@ -111,7 +111,10 @@ export function WeatherCard({ token, locale }: Props) {
     );
   }
 
-  const { current, daily, flags, forecastLocked } = weather;
+  const { current, daily, flags, forecastLocked, hourly } = weather;
+  // Four points across the next 12 hours (now, +3h, +6h, +9h): enough to see
+  // the afternoon coming without a long strip to scroll through.
+  const hours = (hourly ?? []).filter((_, i) => i % 3 === 0).slice(0, 4);
   const activeNotes = flags
     ? (['heavyRainLikely', 'strongWind', 'extremeHeat'] as const).filter((k) => flags[k])
     : [];
@@ -141,6 +144,29 @@ export function WeatherCard({ token, locale }: Props) {
               <span>{t(locale, noteKeys[k].body)}</span>
             </p>
           ))}
+        </div>
+      )}
+
+      {hours.length > 0 && (
+        <div className="weather-forecast">
+          <span className="weather-forecast-label">{t(locale, 'weather.nextHours')}</span>
+          <div className="weather-forecast-grid weather-hours-grid">
+            {hours.map((h, i) => (
+              <div className="weather-forecast-day" key={h.time}>
+                <span>{i === 0 ? t(locale, 'weather.now') : h.time.slice(11, 16)}</span>
+                <b>{h.tempC != null ? `${Math.round(h.tempC)}°` : 'N/A'}</b>
+                <span className="weather-forecast-min">
+                  {h.precipitationProbability != null
+                    ? t(locale, 'weather.rainChance', { pct: String(h.precipitationProbability) })
+                    : t(locale, CONDITION_KEY[h.condition])}
+                </span>
+              </div>
+            ))}
+          </div>
+          {/* Said out loud when it is true. "Nothing to worry about in the
+              next 12 hours" is the reassurance a visitor came for, and an
+              empty space would not tell them that. */}
+          {activeNotes.length === 0 && <p className="weather-calm">{t(locale, 'weather.calm')}</p>}
         </div>
       )}
 

@@ -2,12 +2,23 @@ import { useEffect, useState } from 'react';
 import { track } from '../lib/analytics';
 import { fetchPlans, formatMoney, type Plan, type PaymentMethods } from '../lib/billing';
 import { PROVIDER, SUPPORT_EMAIL, SUPPORT_PHONE, SALES_EMAIL } from '../lib/terms';
-import { t } from '../lib/i18n';
+import { t, type StringKey } from '../lib/i18n';
 import type { Locale } from '../types';
 import { EmergencyGrid } from './EmergencyGrid';
 import { FeedbackButton } from './FeedbackButton';
 import { Icon } from './Icon';
 import { Logo } from './Logo';
+import { WeatherCard } from './WeatherCard';
+
+// Plan taglines, translated here rather than taken from the server's English
+// `tagline`, so a Swahili visitor reads the whole price list in Swahili.
+const PLAN_TAG: Record<string, StringKey> = {
+  free: 'landing.plans.tag.free',
+  personal: 'landing.plans.tag.personal',
+  team: 'landing.plans.tag.team',
+  business: 'landing.plans.tag.business',
+  enterprise: 'landing.plans.tag.enterprise',
+};
 
 interface Props {
   /**
@@ -122,6 +133,15 @@ export function LandingPage({ onGetStarted, onWatchDemo, locale, onToggleLocale 
           <p className="lp-cta-note">{t(locale, 'landing.hero.noCard')}</p>
         </section>
 
+        {/* Right after the emergency numbers, before any pitch (product owner,
+            2026-10-07): the weather where the visitor is, now and over the next
+            12 hours, so the first visit already answers "is it safe out there
+            today". The same card signed in users see; with no token it gets the
+            public part (current + next hours), never the paid 3 day forecast. */}
+        <section className="lp-section lp-weather-section">
+          <WeatherCard locale={locale} />
+        </section>
+
         {/* The persuasion pitch — deliberately short and placed right after the
             free emergency numbers, not before them: a visitor should see that
             help is free and immediate before being asked to pay for anything. */}
@@ -154,6 +174,36 @@ export function LandingPage({ onGetStarted, onWatchDemo, locale, onToggleLocale 
             </article>
           </div>
         </section>
+
+        {/* Every plan and its price, as the server quotes them (product owner,
+            2026-10-07: Personal at TZS 2,500 must be visible to every visitor).
+            Shown to everyone, but an account can still only buy the plans it
+            can use; that is enforced at checkout, not here. Hidden until the
+            server answers: no price is better than a wrong one. */}
+        {billing && billing.plans.length > 0 && (
+          <section className="lp-section" id="plans">
+            <h2>{t(locale, 'landing.plans.heading')}</h2>
+            <p className="lp-section-sub">{t(locale, 'landing.plans.sub')}</p>
+            <ul className="lp-plans">
+              {billing.plans.map((p) => (
+                <li key={p.id} className={`lp-plan${p.id === 'personal' ? ' lp-plan-featured' : ''}`}>
+                  <div className="lp-plan-main">
+                    <b className="lp-plan-name">{p.name}</b>
+                    <span className="lp-plan-tag">{PLAN_TAG[p.id] ? t(locale, PLAN_TAG[p.id]) : p.tagline}</span>
+                  </div>
+                  <span className="lp-plan-price">
+                    {!p.price
+                      ? t(locale, 'landing.plans.free')
+                      : t(locale, 'landing.plans.perMonth', { price: formatMoney(p.price, p.currency) })}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <button type="button" className="lp-cta lp-plans-cta" onClick={() => go('plans_start')}>
+              {t(locale, 'landing.plans.start')}
+            </button>
+          </section>
+        )}
 
         {/* The four-card privacy breakdown that used to live here is now the
             job of the actual Privacy Policy (see lib/terms.ts) — it already

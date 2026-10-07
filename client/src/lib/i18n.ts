@@ -168,6 +168,16 @@ export type StringKey =
   | 'landing.who.teamTitle'
   | 'landing.who.teamBody'
   | 'landing.who.teamPrice'
+  | 'landing.plans.heading'
+  | 'landing.plans.sub'
+  | 'landing.plans.perMonth'
+  | 'landing.plans.free'
+  | 'landing.plans.start'
+  | 'landing.plans.tag.free'
+  | 'landing.plans.tag.personal'
+  | 'landing.plans.tag.team'
+  | 'landing.plans.tag.business'
+  | 'landing.plans.tag.enterprise'
   | 'landing.privacy.heading'
   | 'landing.privacy.summary'
   | 'landing.privacy.linkPrivacy'
@@ -409,6 +419,10 @@ export type StringKey =
   | 'weather.loading'
   | 'weather.unavailable'
   | 'weather.disclaimer'
+  | 'weather.nextHours'
+  | 'weather.now'
+  | 'weather.rainChance'
+  | 'weather.calm'
   | 'weather.condition.clear'
   | 'weather.condition.partly-cloudy'
   | 'weather.condition.cloudy'
@@ -586,6 +600,16 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'landing.who.teamTitle': 'For a site or team',
     'landing.who.teamBody': 'Your workers join with a code, no accounts to create. You get a live roster, a map, and an incident record you can hand to an inspector.',
     'landing.who.teamPrice': 'Team and site plans, billed monthly or yearly.',
+    'landing.plans.heading': 'Plans and prices',
+    'landing.plans.sub': 'Emergency alerts are free on every plan. Every paid plan starts with 30 days free, no card needed.',
+    'landing.plans.perMonth': '{price} / month',
+    'landing.plans.free': 'Free',
+    'landing.plans.start': 'Start free for 30 days',
+    'landing.plans.tag.free': 'Emergency alerts and numbers, for everyone.',
+    'landing.plans.tag.personal': 'For one person: up to 50 emergency contacts, family location sharing and the weather forecast.',
+    'landing.plans.tag.team': 'One site, up to 50 people, with a Safety Coordinator.',
+    'landing.plans.tag.business': 'Many sites, up to 250 people.',
+    'landing.plans.tag.enterprise': 'Large organizations, priced per person.',
     'landing.privacy.heading': 'Your location is yours',
     'landing.privacy.summary': 'Your location is only used while an alert is active, never sold, never used for ads. Passwords are never stored in a readable form. Delete your account and everything in it at any time.',
     'landing.privacy.linkPrivacy': 'Full Privacy Policy',
@@ -817,15 +841,19 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'bill.paymentHistory': 'Payment history',
     'bill.cancelSubscription': 'Cancel subscription',
     'weather.heading': 'Weather around you',
-    'weather.premiumTeaser': 'Premium members get a 3-day forecast and safety notes here, for wherever they are.',
+    'weather.premiumTeaser': 'Premium members also get a 3 day forecast here, for wherever they are.',
     'weather.useMyLocation': 'Use my location',
     'weather.chooseLocation': 'Choose your location',
     'weather.locationDenied': 'Location permission was not given. Choose a place instead.',
     'weather.today': 'Today',
-    'weather.forecastHeading': '3-day forecast',
+    'weather.forecastHeading': '3 day forecast',
     'weather.wind': 'Wind {kph} km/h',
     'weather.loading': 'Loading weather…',
     'weather.unavailable': 'Weather is not available right now.',
+    'weather.nextHours': 'Next 12 hours',
+    'weather.now': 'Now',
+    'weather.rainChance': '{pct}% rain',
+    'weather.calm': 'No heavy rain, strong wind or extreme heat expected in the next 12 hours.',
     'weather.disclaimer': 'A weather forecast, not an official warning. Not affiliated with the Tanzania Meteorological Authority.',
     'weather.condition.clear': 'Clear',
     'weather.condition.partly-cloudy': 'Partly cloudy',
@@ -1001,6 +1029,16 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'landing.who.teamTitle': 'Kwa eneo au timu',
     'landing.who.teamBody': 'Wafanyakazi wako hujiunga kwa msimbo, hakuna akaunti za kuunda. Unapata orodha ya moja kwa moja, ramani, na rekodi ya tukio unayoweza kumkabidhi mkaguzi.',
     'landing.who.teamPrice': 'Mipango ya timu na eneo, hulipwa kila mwezi au mwaka.',
+    'landing.plans.heading': 'Mipango na bei',
+    'landing.plans.sub': 'Tahadhari za dharura ni bure kwenye kila mpango. Kila mpango wa kulipia unaanza na siku 30 bure, bila kadi.',
+    'landing.plans.perMonth': '{price} / mwezi',
+    'landing.plans.free': 'Bure',
+    'landing.plans.start': 'Anza bure kwa siku 30',
+    'landing.plans.tag.free': 'Tahadhari za dharura na namba za msaada, kwa kila mtu.',
+    'landing.plans.tag.personal': 'Kwa mtu mmoja: hadi watu 50 wa dharura, kushiriki eneo na familia na utabiri wa hali ya hewa.',
+    'landing.plans.tag.team': 'Eneo moja, hadi watu 50, pamoja na Msimamizi wa Usalama.',
+    'landing.plans.tag.business': 'Maeneo mengi, hadi watu 250.',
+    'landing.plans.tag.enterprise': 'Mashirika makubwa, bei kwa kila mtu.',
     'landing.privacy.heading': 'Eneo lako ni lako',
     'landing.privacy.summary': 'Eneo lako hutumika tu wakati tahadhari inaendelea, hatuliuzi kamwe, na halitumiki kwa matangazo. Nywila hazihifadhiwi kwa namna inayosomeka. Futa akaunti yako na kila kilichomo wakati wowote.',
     'landing.privacy.linkPrivacy': 'Sera Kamili ya Faragha',
@@ -1232,7 +1270,7 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'bill.paymentHistory': 'Historia ya malipo',
     'bill.cancelSubscription': 'Ghairi usajili',
     'weather.heading': 'Hali ya hewa karibu nawe',
-    'weather.premiumTeaser': 'Wanachama wa Premium hupata utabiri wa siku 3 na maelezo ya usalama hapa, popote walipo.',
+    'weather.premiumTeaser': 'Wanachama wa Premium pia hupata utabiri wa siku 3 hapa, popote walipo.',
     'weather.useMyLocation': 'Tumia eneo langu',
     'weather.chooseLocation': 'Chagua eneo lako',
     'weather.locationDenied': 'Ruhusa ya eneo haikutolewa. Chagua eneo badala yake.',
@@ -1241,6 +1279,10 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'weather.wind': 'Upepo km/h {kph}',
     'weather.loading': 'Inapakia hali ya hewa…',
     'weather.unavailable': 'Hali ya hewa haipatikani kwa sasa.',
+    'weather.nextHours': 'Saa 12 zijazo',
+    'weather.now': 'Sasa',
+    'weather.rainChance': 'Mvua {pct}%',
+    'weather.calm': 'Hakuna mvua kubwa, upepo mkali wala joto kali linalotarajiwa katika saa 12 zijazo.',
     'weather.disclaimer': 'Huu ni utabiri wa hali ya hewa, si tahadhari rasmi. Hauhusiani na Mamlaka ya Hali ya Hewa Tanzania (TMA).',
     'weather.condition.clear': 'Angavu',
     'weather.condition.partly-cloudy': 'Mawingu kiasi',
