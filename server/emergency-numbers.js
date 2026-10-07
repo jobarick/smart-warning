@@ -65,7 +65,10 @@ const COUNTRIES = {
       { number: '112', icon: '🚨', category: 'police', sw: { label: 'Polisi', description: 'Dharura za kipolisi' }, en: { label: 'Police', description: 'Police emergencies' } },
       { number: '113', icon: '📢', category: null, sw: { label: 'TAKUKURU', description: 'Kuripoti rushwa' }, en: { label: 'TAKUKURU (Anticorruption)', description: 'Report corruption' } },
       { number: '114', icon: '🚒', category: 'fire', sw: { label: 'Zimamoto na Uokoaji', description: 'Moto na uokoaji' }, en: { label: 'Fire & Rescue', description: 'Fire and rescue emergencies' } },
-      { number: '115', icon: '🚑', category: 'ambulance', sw: { label: 'Gari la Wagonjwa', description: 'Huduma ya ambulansi' }, en: { label: 'Ambulance', description: 'Medical emergencies' } },
+      // Also the emergency transport for pregnant women and newborns (Mama na
+      // Mtoto), per the product owner (2026-10-07): one number serving both,
+      // so both are named. Owner-supplied, not yet independently verified.
+      { number: '115', icon: '🚑', category: 'ambulance', sw: { label: 'Gari la Wagonjwa · Mama na Mtoto', description: 'Ambulansi, na usafiri wa dharura kwa mama mjamzito na mtoto mchanga' }, en: { label: 'Ambulance · Mama na Mtoto', description: 'Ambulance, and emergency transport for pregnant women and newborns' } },
       { number: '116', icon: '👶', category: null, sw: { label: 'Msaada wa Watoto', description: 'Dharura na msaada kwa mtoto' }, en: { label: 'Child Helpline', description: 'Child emergencies and support' } },
       // Relabelled from "HIV/AIDS Services" to the broader "Afya" (Health) per
       // the product owner's correction (2026-09-17) — same caution as the rest
@@ -73,6 +76,10 @@ const COUNTRIES = {
       // an authoritative source.
       { number: '117', icon: '🩺', category: null, sw: { label: 'Afya', description: 'Huduma na dharura za afya' }, en: { label: 'Health', description: 'Health services and emergencies' } },
       { number: '119', icon: '💊', category: null, sw: { label: 'Kupambana na Dawa za Kulevya', description: 'Kuripoti masuala ya dawa za kulevya' }, en: { label: 'Drug Control', description: 'Report drug related emergencies' } },
+      // DAWASA, the Dar es Salaam water and sewerage authority. Added by the
+      // product owner (2026-10-07); Dar es Salaam only. Owner-supplied, not
+      // yet independently verified.
+      { number: '181', icon: '💧', category: 'utility', sw: { label: 'DAWASA (Maji Dar es Salaam)', description: 'Dharura za maji na majitaka, Dar es Salaam' }, en: { label: 'DAWASA (Dar es Salaam water)', description: 'Water and sewerage emergencies in Dar es Salaam' } },
       { number: '190', icon: '🏝️', category: 'disaster', sw: { label: 'Zanzibar', description: 'Huduma za maafa Zanzibar' }, en: { label: 'Zanzibar', description: 'Zanzibar disaster services' } },
       { number: '195', icon: '🚫', category: null, sw: { label: 'Kupinga Usafirishaji Haramu wa Binadamu', description: 'Toa taarifa za usafirishaji haramu wa binadamu' }, en: { label: 'Human Trafficking', description: 'Report human trafficking' } },
       { number: '199', icon: '🏥', category: null, sw: { label: 'Magonjwa ya Mlipuko', description: 'Dharura za magonjwa ya mlipuko' }, en: { label: 'Epidemic Diseases', description: 'Epidemic and outbreak emergencies' } },
