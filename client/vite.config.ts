@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -11,6 +12,16 @@ const appVersion = JSON.parse(readFileSync(new URL('./package.json', import.meta
 
 export default defineConfig({
   define: { __APP_VERSION__: JSON.stringify(appVersion) },
+  // Two pages: the app, and the light SOS page (sos.html → src/sos/sos.ts),
+  // which shares lib/ code but never React. Both are precached by the SW.
+  build: {
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        sos: fileURLToPath(new URL('./sos.html', import.meta.url)),
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({
@@ -40,6 +51,8 @@ export default defineConfig({
         theme_color: '#080808',
         background_color: '#080808',
         display: 'standalone',
+        // Long-press on the installed icon: straight to the light SOS page.
+        shortcuts: [{ name: 'SOS', short_name: 'SOS', url: '/sos.html', icons: [{ src: 'icon-192.png', sizes: '192x192', type: 'image/png' }] }],
         icons: [
           // SVG first for hosts that take it, then raster at the two sizes
           // installers actually look for. A maskable entry is listed separately

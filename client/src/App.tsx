@@ -66,7 +66,7 @@ import { fetchSubscription } from './lib/billing';
 import { loadPendingPayment, type PendingPayment } from './lib/pendingPayment';
 import { FALLBACK_EMERGENCY_NUMBER, orgDelivery, personalDelivery, smsHref, type DeliveryState } from './lib/delivery';
 import { canDial } from './lib/emergency';
-import { t, type StringKey } from './lib/i18n';
+import { t, loadLocale, isLocaleLoaded, type StringKey } from './lib/i18n';
 
 // How long the pending-location note may show after SOS fires with no GPS
 // fix yet, and how long a late fix is still worth backfilling. Short on
@@ -320,6 +320,16 @@ export default function App() {
   }, []);
 
   useEffect(() => saveSettings(settings), [settings]);
+
+  // Switching to English fetches its strings (lib/i18n.ts); re-render once
+  // they arrive. Until then the screen stays in Kiswahili, never blank.
+  const [, setLocaleReady] = useState(0);
+  useEffect(() => {
+    if (isLocaleLoaded(settings.locale)) return;
+    let cancelled = false;
+    void loadLocale(settings.locale).then(() => { if (!cancelled) setLocaleReady((n) => n + 1); });
+    return () => { cancelled = true; };
+  }, [settings.locale]);
   useEffect(() => localStorage.setItem(VIEW_KEY, view), [view]);
 
   // Runs once, against the URL the app booted with. An unrecognized path

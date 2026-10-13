@@ -1,5 +1,14 @@
-import { Analytics } from '@vercel/analytics/react';
-import { SpeedInsights } from '@vercel/speed-insights/react';
+import { lazy, Suspense } from 'react';
+
+// Both scripts are measurement, never safety: their own chunk, fetched after
+// the app is up, so they never compete with the SOS screen for a slow link.
+const Insights = lazy(async () => {
+  const [{ Analytics }, { SpeedInsights }] = await Promise.all([
+    import('@vercel/analytics/react'),
+    import('@vercel/speed-insights/react'),
+  ]);
+  return { default: () => (<><Analytics /><SpeedInsights /></>) };
+});
 
 /**
  * Vercel Web Analytics + Speed Insights, mounted only where they can work.
@@ -34,9 +43,8 @@ function onVercel(): boolean {
 export function VercelInsights() {
   if (!onVercel()) return null;
   return (
-    <>
-      <Analytics />
-      <SpeedInsights />
-    </>
+    <Suspense fallback={null}>
+      <Insights />
+    </Suspense>
   );
 }

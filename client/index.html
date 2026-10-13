@@ -35,7 +35,15 @@
     <meta name="twitter:image" content="https://smart-warning.vercel.app/og.png" />
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Shown until the app's JavaScript arrives (React replaces it on first
+         render). On a slow first visit this is what someone in trouble sees
+         first, and both links work with no JavaScript at all. Inline styles
+         only: the stylesheet may not have arrived either. -->
+    <div id="root"><div style="max-width:30rem;margin:0 auto;padding:24px 16px;font:16px/1.45 system-ui,sans-serif;display:flex;flex-direction:column;gap:12px">
+      <a href="/sos.html" style="display:block;padding:18px;border-radius:18px;background:#c62828;color:#fff;font-weight:800;font-size:1.3rem;text-align:center;text-decoration:none">SOS ya haraka · Quick SOS</a>
+      <a href="tel:112" style="display:block;padding:14px;border-radius:14px;border:2px solid #c62828;color:inherit;font-weight:700;text-align:center;text-decoration:none">Piga 112 · Call 112</a>
+      <p style="margin:0;text-align:center;opacity:.7">Inapakia Smart Warning… / Loading…</p>
+    </div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

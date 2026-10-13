@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="sw">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#080808" />
+    <script src="/theme-boot.js"></script>
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>SOS · Smart Warning</title>
+    <meta name="robots" content="noindex" />
+  </head>
+  <body>
+    <!-- Usable before any script runs: on a weak signal the call and the
+         emergency number are the whole page, and they need no JavaScript. -->
+    <main id="sos" class="sos">
+      <a class="sos-call" href="tel:112">Piga 112 · Call 112</a>
+      <p class="sos-note">Inapakia SOS… / Loading SOS…</p>
+      <a class="sos-full" href="/">Smart Warning</a>
+    </main>
+    <script type="module" src="/src/sos/sos.ts"></script>
+  </body>
+</html>
