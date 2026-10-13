@@ -1,12 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import type { Locale } from '../types';
 import { fetchDirectory } from '../lib/api';
 import { canDial, isDialable, telHref } from '../lib/emergency';
 import { EMERGENCY_SERVICE_FALLBACK, type EmergencyGridService } from '../lib/emergencyGrid';
 import { track } from '../lib/analytics';
 import { t } from '../lib/i18n';
-import { EmergencyReportForm } from './EmergencyReportForm';
 import { Icon } from './Icon';
+
+// The report form is the second choice under a category, after CALL NOW,
+// which never waits on it. It is fetched the moment a category is tapped
+// (below), so it is normally ready before "Report" is pressed, and the
+// service worker precaches it for offline use.
+const loadReportForm = () => import('./EmergencyReportForm');
+const EmergencyReportForm = lazy(() => loadReportForm().then((m) => ({ default: m.EmergencyReportForm })));
 
 interface Props {
   locale: Locale;
@@ -84,7 +90,7 @@ export function EmergencyGrid({ locale, ids = GRID_IDS, bare = false }: Props) {
                 const next = selected === id ? null : id;
                 setSelected(next);
                 setReporting(false);
-                if (next) track('click_emergency_category', { category: id });
+                if (next) { track('click_emergency_category', { category: id }); void loadReportForm().catch(() => {}); }
               }}
             >
               <span className="eg-cell-icon" aria-hidden="true"><Icon name={svc.iconName} /></span>
@@ -134,12 +140,14 @@ export function EmergencyGrid({ locale, ids = GRID_IDS, bare = false }: Props) {
           )}
 
           {reporting && (
+            <Suspense fallback={<p className="eg-detail-note">…</p>}>
             <EmergencyReportForm
               category={active.id}
               categoryLabel={active.label}
               locale={locale}
               onCancel={() => setReporting(false)}
             />
+            </Suspense>
           )}
         </div>
       )}

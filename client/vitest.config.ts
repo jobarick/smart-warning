@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
@@ -7,12 +8,14 @@ import react from '@vitejs/plugin-react';
 // one can never accidentally break the other.
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: { 'virtual:pwa-register': fileURLToPath(new URL('./src/test/pwa-register-stub.ts', import.meta.url)) },
+  },
   test: {
     environment: 'jsdom',
     globals: true,
-    // No project-wide setup file yet — @testing-library/jest-dom's matchers
-    // are imported directly in the one test file that needs them for now.
-    // Add src/test/setup.ts and reference it here if that stops scaling.
+    // Loads the lazily split English strings before any test renders.
+    setupFiles: ['./src/test/setup.ts'],
     css: false,
     // Vitest's default 'forks' pool spawns workers via child_process.fork,
     // which hangs waiting for a worker to respond under at least one
