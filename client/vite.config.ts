@@ -15,7 +15,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon.svg', 'logo.svg', 'apple-touch-icon.png', 'push-sw.js'],
+      includeAssets: ['icon.svg', 'logo.svg', 'apple-touch-icon.png', 'push-sw.js', 'theme-boot.js'],
       // Pull our push / notificationclick handlers into the generated SW.
       //
       // The allowlist matters more than it looks. Left to itself the generated

@@ -430,7 +430,151 @@ export type StringKey =
   | 'weather.place.kibaha'
   | 'weather.place.arusha'
   | 'weather.place.mwanza'
-  | 'weather.place.dodoma';
+  | 'weather.place.dodoma'
+  | 'theme.toLight'
+  | 'theme.toDark'
+  | 'weather.now'
+  | 'weather.rainChance'
+  | 'weather.rainAt'
+  | 'weather.stale'
+  | 'weather.staleShort'
+  | 'pol.ok'
+  | 'pol.down'
+  | 'offline.banner'
+  | 'landing.nav.more'
+  | 'landing.sos.sub'
+  | 'landing.sos.call112'
+  | 'landing.sos.dial112'
+  | 'landing.sos.alertCircle'
+  | 'landing.call112'
+  | 'landing.dial112'
+  | 'landing.how.heading'
+  | 'landing.how.1.title'
+  | 'landing.how.1.body'
+  | 'landing.how.2.title'
+  | 'landing.how.2.body'
+  | 'landing.how.3.title'
+  | 'landing.how.3.body'
+  | 'landing.premium.heading'
+  | 'landing.premium.body'
+  | 'landing.premium.bodyPrice'
+  | 'landing.premium.freeNote'
+  | 'landing.premium.cta'
+  | 'landing.directory.heading'
+  | 'landing.stories.heading'
+  | 'landing.stories.sub'
+  | 'landing.story.1.title'
+  | 'landing.story.1.body'
+  | 'landing.story.2.title'
+  | 'landing.story.2.body'
+  | 'landing.story.3.title'
+  | 'landing.story.3.body'
+  | 'ifb.title'
+  | 'ifb.ratingLabel'
+  | 'ifb.helped'
+  | 'ifb.yes'
+  | 'ifb.no'
+  | 'ifb.commentPlaceholder'
+  | 'ifb.failed'
+  | 'ifb.skip'
+  | 'ifb.send'
+  | 'ifb.sending'
+  | 'ifb.thanks'
+  | 'ifb.close'
+  | 'livemap.heading'
+  | 'livemap.counter'
+  | 'livemap.counterLoading'
+  | 'livemap.rings'
+  | 'livemap.filterLabel'
+  | 'livemap.filter.responders'
+  | 'livemap.filter.hospital'
+  | 'livemap.filter.police'
+  | 'livemap.filter.fire'
+  | 'livemap.filter.security'
+  | 'livemap.status.available'
+  | 'livemap.status.busy'
+  | 'livemap.status.offline'
+  | 'livemap.verified'
+  | 'livemap.you'
+  | 'livemap.privacy'
+  | 'livemap.error'
+  | 'livemap.needAccount'
+  | 'livemap.locationOff'
+  | 'livemap.waitingFix'
+  | 'onboard.skip'
+  | 'onboard.next'
+  | 'onboard.start'
+  | 'onboard.1.title'
+  | 'onboard.1.body'
+  | 'onboard.2.title'
+  | 'onboard.2.body'
+  | 'onboard.3.title'
+  | 'onboard.3.body'
+  | 'responder.heading'
+  | 'responder.verified'
+  | 'responder.verifiedTitle'
+  | 'responder.unverified'
+  | 'responder.requests'
+  | 'responder.none'
+  | 'responder.openTitle'
+  | 'responder.acceptedTitle'
+  | 'responder.away'
+  | 'responder.accept'
+  | 'responder.decline'
+  | 'responder.directions'
+  | 'responder.past'
+  | 'responder.declined'
+  | 'responder.closed'
+  | 'responder.justNow'
+  | 'responder.minutesAgo'
+  | 'responder.note'
+  | 'responder.toHome'
+  | 'responder.cat.fire'
+  | 'responder.cat.medical'
+  | 'responder.cat.security'
+  | 'responder.cat.hazard'
+  | 'responder.cat.general'
+  | 'signupTerms.legend'
+  | 'timeline.label'
+  | 'timeline.pressed'
+  | 'timeline.received'
+  | 'timeline.emailed'
+  | 'timeline.emailedNone'
+  | 'timeline.nearbyNotified'
+  | 'timeline.nearbyNone'
+  | 'timeline.accepted'
+  | 'timeline.voice'
+  | 'timeline.resolved'
+  | 'timeline.falseAlarm'
+  | 'timeline.pendingSend'
+  | 'timeline.failedSend'
+  | 'tips.label'
+  | 'tips.hint'
+  | 'unsafe.button'
+  | 'unsafe.buttonSub'
+  | 'unsafe.setupTitle'
+  | 'unsafe.setupBody'
+  | 'unsafe.checkInAfter'
+  | 'unsafe.minutes'
+  | 'unsafe.notePlaceholder'
+  | 'unsafe.cancel'
+  | 'unsafe.start'
+  | 'unsafe.activeTitle'
+  | 'unsafe.activeBody'
+  | 'unsafe.finalWarning'
+  | 'unsafe.imSafe'
+  | 'unsafe.plus10'
+  | 'unsafe.sosNow'
+  | 'unsafe.keepOpen'
+  | 'unsafe.autoMessage'
+  | 'unsafe.manualMessage'
+  | 'voice.record'
+  | 'voice.another'
+  | 'voice.stopSend'
+  | 'voice.sending'
+  | 'voice.sent'
+  | 'voice.retry'
+  | 'voice.denied';
 
 type Vars = Record<string, string>;
 
@@ -849,6 +993,150 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'weather.place.arusha': 'Arusha',
     'weather.place.mwanza': 'Mwanza',
     'weather.place.dodoma': 'Dodoma',
+    'theme.toLight': 'Switch to light mode',
+    'theme.toDark': 'Switch to dark mode',
+    'weather.now': 'Now',
+    'weather.rainChance': '{pct}% rain',
+    'weather.rainAt': 'Rain likely at {time}',
+    'weather.stale': 'Last reading, shown while offline.',
+    'weather.staleShort': 'earlier reading',
+    'pol.ok': 'System live · checked {time}',
+    'pol.down': 'Can\'t reach Smart Warning right now. The emergency numbers below still work.',
+    'offline.banner': 'You\'re offline. Emergency numbers and SOS still work; alerts send when you reconnect.',
+    'landing.nav.more': 'More',
+    'landing.sos.sub': 'Tap for help now',
+    'landing.sos.call112': 'Call 112 now',
+    'landing.sos.dial112': 'Dial 112 from a phone',
+    'landing.sos.alertCircle': 'Alert my people with my location (sign in)',
+    'landing.call112': 'Call 112, Police emergency',
+    'landing.dial112': 'Police emergency: 112',
+    'landing.how.heading': 'How it works',
+    'landing.how.1.title': 'Add your people',
+    'landing.how.1.body': 'Family, friends, or your whole team. They are who hears from you first.',
+    'landing.how.2.title': 'Press SOS',
+    'landing.how.2.body': 'One tap sends your alert and live location. No signal? It waits and sends the moment you reconnect.',
+    'landing.how.3.title': 'Help finds you',
+    'landing.how.3.body': 'Your people, and verified responders nearby who opted in, see where you are and that you need them.',
+    'landing.premium.heading': 'Try it free for one month',
+    'landing.premium.body': 'Premium adds a medical profile, a bigger Trusted Circle, the 3-day weather outlook and priority support. Emergency features are always free.',
+    'landing.premium.bodyPrice': 'Then {price} a month. Premium adds a medical profile, a bigger Trusted Circle, the 3-day weather outlook and priority support. Emergency features are always free.',
+    'landing.premium.freeNote': 'No card needed to start. SOS, 112 and the numbers on this page never cost anything.',
+    'landing.premium.cta': 'Start free month',
+    'landing.directory.heading': 'Emergency directory, Tanzania',
+    'landing.stories.heading': 'Where it helps',
+    'landing.stories.sub': 'Examples of how people use it, not testimonials.',
+    'landing.story.1.title': 'Walking home after dark',
+    'landing.story.1.body': 'Turn on "I feel unsafe". If you don\'t check in, your people get your location automatically.',
+    'landing.story.2.title': 'A fire at the workshop',
+    'landing.story.2.body': 'One worker presses SOS and every phone on site sounds, with the way to the assembly point.',
+    'landing.story.3.title': 'A medical emergency at home',
+    'landing.story.3.body': 'Your Trusted Circle and the nearest verified responder see where you are while you call 115.',
+    'ifb.title': 'Your alert is over. How did it go?',
+    'ifb.ratingLabel': 'Rate how Smart Warning helped, 1 to 5',
+    'ifb.helped': 'Did help reach you?',
+    'ifb.yes': 'Yes',
+    'ifb.no': 'No',
+    'ifb.commentPlaceholder': 'Anything we should fix? (optional)',
+    'ifb.failed': 'Couldn\'t send. Check your connection and try again.',
+    'ifb.skip': 'Skip',
+    'ifb.send': 'Send',
+    'ifb.sending': 'Sending',
+    'ifb.thanks': 'Thank you. It helps us make the next alert better.',
+    'ifb.close': 'Close',
+    'livemap.heading': 'Live map',
+    'livemap.counter': '{n} guardians here now',
+    'livemap.counterLoading': 'Checking who is near',
+    'livemap.rings': 'Available: {a} within 1 km · {b} within 3 km · {c} within 5 km',
+    'livemap.filterLabel': 'Show on map',
+    'livemap.filter.responders': 'Guardians',
+    'livemap.filter.hospital': 'Hospitals',
+    'livemap.filter.police': 'Police',
+    'livemap.filter.fire': 'Fire',
+    'livemap.filter.security': 'Security',
+    'livemap.status.available': 'Available',
+    'livemap.status.busy': 'Busy',
+    'livemap.status.offline': 'Offline',
+    'livemap.verified': 'verified',
+    'livemap.you': 'You',
+    'livemap.privacy': 'Guardians are verified volunteers, shown only roughly where they are and never by name.',
+    'livemap.error': 'Couldn\'t refresh the map. Showing the last update.',
+    'livemap.needAccount': 'Sign in with an account to see guardians and help near you.',
+    'livemap.locationOff': 'Location sharing is off in Settings, so the map can\'t show what\'s near you.',
+    'livemap.waitingFix': 'Waiting for your location',
+    'onboard.skip': 'Skip',
+    'onboard.next': 'Next',
+    'onboard.start': 'Start',
+    'onboard.1.title': 'One tap for help',
+    'onboard.1.body': 'Press SOS and your people get your alert and live location. No signal? It sends when you reconnect.',
+    'onboard.2.title': 'Feel unsafe? Say so early',
+    'onboard.2.body': 'Nahisi Hatari starts a check-in timer. If you don\'t tap "I\'m safe" in time, SOS goes out for you.',
+    'onboard.3.title': 'Emergency numbers are always free',
+    'onboard.3.body': '112 and every number in the directory work without an account, without data, and without paying.',
+    'responder.heading': 'Responder',
+    'responder.verified': 'Verified',
+    'responder.verifiedTitle': 'Checked in person by the Smart Warning team',
+    'responder.unverified': 'Not verified yet. You can still help, but you won\'t appear on other people\'s map until the team has checked your details.',
+    'responder.requests': 'Requests for help',
+    'responder.none': 'No one near you has asked for help. You\'ll get a notification if someone does.',
+    'responder.openTitle': '{cat} emergency near you',
+    'responder.acceptedTitle': 'You\'re helping: {cat}',
+    'responder.away': 'about {d} away',
+    'responder.accept': 'I can help',
+    'responder.decline': 'Not now',
+    'responder.directions': 'Directions',
+    'responder.past': 'Earlier ({n})',
+    'responder.declined': 'declined',
+    'responder.closed': 'closed',
+    'responder.justNow': 'just now',
+    'responder.minutesAgo': '{m} min ago',
+    'responder.note': 'You are a fellow citizen helping, not an emergency service. If someone is in danger, call 112 first.',
+    'responder.toHome': 'My SOS screen',
+    'responder.cat.fire': 'Fire',
+    'responder.cat.medical': 'Medical',
+    'responder.cat.security': 'Security',
+    'responder.cat.hazard': 'Hazard',
+    'responder.cat.general': 'General',
+    'signupTerms.legend': 'Terms v{version}: please confirm each point.',
+    'timeline.label': 'What has happened so far',
+    'timeline.pressed': 'You pressed SOS',
+    'timeline.received': 'Smart Warning received your alert',
+    'timeline.emailed': '{n} of your people emailed',
+    'timeline.emailedNone': 'None of your people could be emailed. Call someone or 112.',
+    'timeline.nearbyNotified': '{n} verified guardians nearby notified (within {km})',
+    'timeline.nearbyNone': 'No available guardian nearby right now',
+    'timeline.accepted': 'A guardian is coming, about {d} away',
+    'timeline.voice': 'Voice note sent to your people',
+    'timeline.resolved': 'Marked over',
+    'timeline.falseAlarm': 'Marked as a mistake',
+    'timeline.pendingSend': 'Sending to your people. Keep this screen open.',
+    'timeline.failedSend': 'Not sent: no connection. Call 112 or someone you trust now.',
+    'tips.label': 'Weekly safety tip',
+    'tips.hint': 'One short notification on Monday mornings. Turn off any time.',
+    'unsafe.button': 'Nahisi Hatari (I feel unsafe)',
+    'unsafe.buttonSub': 'Start a check-in timer. If you don\'t confirm you\'re safe, SOS goes out.',
+    'unsafe.setupTitle': 'Nahisi Hatari',
+    'unsafe.setupBody': 'Choose when you should be safe by. If you haven\'t tapped "I\'m safe" by then, Smart Warning sends SOS with your location.',
+    'unsafe.checkInAfter': 'Check in after',
+    'unsafe.minutes': '{m} min',
+    'unsafe.notePlaceholder': 'Where are you going? (optional, sent with SOS)',
+    'unsafe.cancel': 'Cancel',
+    'unsafe.start': 'Start',
+    'unsafe.activeTitle': 'Nahisi Hatari is on',
+    'unsafe.activeBody': 'SOS goes out when this reaches zero, unless you tap "I\'m safe".',
+    'unsafe.finalWarning': 'Sending SOS in a few seconds. Tap "I\'m safe" if you\'re OK.',
+    'unsafe.imSafe': 'I\'m safe',
+    'unsafe.plus10': '+10 min',
+    'unsafe.sosNow': 'Send SOS now',
+    'unsafe.keepOpen': 'Keep Smart Warning open. It can\'t send while the app is fully closed; if time runs out while it\'s closed, it sends as soon as you reopen it.',
+    'unsafe.autoMessage': 'Nahisi Hatari: did not check in as safe.',
+    'unsafe.manualMessage': 'Nahisi Hatari: sent SOS manually.',
+    'voice.record': 'Add a voice note',
+    'voice.another': 'Add another voice note',
+    'voice.stopSend': 'Stop and send ({s}s left)',
+    'voice.sending': 'Sending voice note',
+    'voice.sent': 'Voice note sent to your people.',
+    'voice.retry': 'Not sent. Tap to try again',
+    'voice.denied': 'Microphone is blocked for this site.',
   },
   sw: {
     'sos.heading': 'SOS ya Dharura',
@@ -1264,6 +1552,150 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'weather.place.arusha': 'Arusha',
     'weather.place.mwanza': 'Mwanza',
     'weather.place.dodoma': 'Dodoma',
+    'theme.toLight': 'Badili kuwa mwanga',
+    'theme.toDark': 'Badili kuwa giza',
+    'weather.now': 'Sasa',
+    'weather.rainChance': 'Mvua {pct}%',
+    'weather.rainAt': 'Mvua huenda saa {time}',
+    'weather.stale': 'Taarifa ya mwisho, inaonyeshwa ukiwa nje ya mtandao.',
+    'weather.staleShort': 'taarifa ya awali',
+    'pol.ok': 'Mfumo uko hai · imekaguliwa {time}',
+    'pol.down': 'Hatuwezi kufikia Smart Warning sasa. Namba za dharura hapa chini bado zinafanya kazi.',
+    'offline.banner': 'Uko nje ya mtandao. Namba za dharura na SOS bado zinafanya kazi; tahadhari zitatumwa ukirudi mtandaoni.',
+    'landing.nav.more': 'Zaidi',
+    'landing.sos.sub': 'Gusa upate msaada sasa',
+    'landing.sos.call112': 'Piga 112 sasa',
+    'landing.sos.dial112': 'Piga 112 kutoka kwenye simu',
+    'landing.sos.alertCircle': 'Wajulishe watu wangu na eneo langu (ingia)',
+    'landing.call112': 'Piga 112, Dharura ya Polisi',
+    'landing.dial112': 'Dharura ya Polisi: 112',
+    'landing.how.heading': 'Inavyofanya kazi',
+    'landing.how.1.title': 'Ongeza watu wako',
+    'landing.how.1.body': 'Familia, marafiki, au timu yako yote. Ndio watakaosikia kutoka kwako kwanza.',
+    'landing.how.2.title': 'Bonyeza SOS',
+    'landing.how.2.body': 'Mguso mmoja hutuma tahadhari na eneo lako la moja kwa moja. Hakuna mtandao? Inasubiri na kutuma mara tu unaporudi mtandaoni.',
+    'landing.how.3.title': 'Msaada unakupata',
+    'landing.how.3.body': 'Watu wako, na walinzi waliothibitishwa walio karibu waliokubali, wanaona ulipo na kwamba unawahitaji.',
+    'landing.premium.heading': 'Jaribu bure kwa mwezi mmoja',
+    'landing.premium.body': 'Premium huongeza wasifu wa kiafya, Mzunguko wa Uaminifu mkubwa zaidi, utabiri wa siku 3 na msaada wa kipaumbele. Huduma za dharura ni bure daima.',
+    'landing.premium.bodyPrice': 'Kisha {price} kwa mwezi. Premium huongeza wasifu wa kiafya, Mzunguko wa Uaminifu mkubwa zaidi, utabiri wa siku 3 na msaada wa kipaumbele. Huduma za dharura ni bure daima.',
+    'landing.premium.freeNote': 'Hauhitaji kadi kuanza. SOS, 112 na namba za ukurasa huu hazina gharama kamwe.',
+    'landing.premium.cta': 'Anza mwezi wa bure',
+    'landing.directory.heading': 'Orodha ya namba za dharura, Tanzania',
+    'landing.stories.heading': 'Inaposaidia',
+    'landing.stories.sub': 'Mifano ya jinsi watu wanavyoitumia, si ushuhuda.',
+    'landing.story.1.title': 'Kurudi nyumbani usiku',
+    'landing.story.1.body': 'Washa "Nahisi Hatari". Usipothibitisha uko salama, watu wako wanapata eneo lako moja kwa moja.',
+    'landing.story.2.title': 'Moto karakana',
+    'landing.story.2.body': 'Mfanyakazi mmoja anabonyeza SOS na kila simu eneo hilo inalia, ikionyesha njia ya kwenda eneo la kukusanyika.',
+    'landing.story.3.title': 'Dharura ya kiafya nyumbani',
+    'landing.story.3.body': 'Mzunguko wako wa Uaminifu na mlinzi aliyethibitishwa aliye karibu wanaona ulipo wakati unapiga 115.',
+    'ifb.title': 'Tahadhari yako imekwisha. Ilikwendaje?',
+    'ifb.ratingLabel': 'Pima jinsi Smart Warning ilivyosaidia, 1 hadi 5',
+    'ifb.helped': 'Msaada ulikufikia?',
+    'ifb.yes': 'Ndiyo',
+    'ifb.no': 'Hapana',
+    'ifb.commentPlaceholder': 'Kuna tunachopaswa kurekebisha? (si lazima)',
+    'ifb.failed': 'Haikutumwa. Angalia mtandao wako ujaribu tena.',
+    'ifb.skip': 'Ruka',
+    'ifb.send': 'Tuma',
+    'ifb.sending': 'Inatuma',
+    'ifb.thanks': 'Asante. Inatusaidia kuboresha tahadhari inayofuata.',
+    'ifb.close': 'Funga',
+    'livemap.heading': 'Ramani ya moja kwa moja',
+    'livemap.counter': 'Walinzi wapo sasa: {n}',
+    'livemap.counterLoading': 'Tunaangalia walio karibu',
+    'livemap.rings': 'Walio tayari: {a} ndani ya km 1 · {b} ndani ya km 3 · {c} ndani ya km 5',
+    'livemap.filterLabel': 'Onyesha kwenye ramani',
+    'livemap.filter.responders': 'Walinzi',
+    'livemap.filter.hospital': 'Hospitali',
+    'livemap.filter.police': 'Polisi',
+    'livemap.filter.fire': 'Zimamoto',
+    'livemap.filter.security': 'Ulinzi',
+    'livemap.status.available': 'Yupo tayari',
+    'livemap.status.busy': 'Ana kazi',
+    'livemap.status.offline': 'Hayupo mtandaoni',
+    'livemap.verified': 'amethibitishwa',
+    'livemap.you': 'Wewe',
+    'livemap.privacy': 'Walinzi ni wajitolea waliothibitishwa, wanaonyeshwa takriban walipo tu na kamwe si kwa jina.',
+    'livemap.error': 'Ramani haikusasishwa. Inaonyesha taarifa ya mwisho.',
+    'livemap.needAccount': 'Ingia kwa akaunti kuona walinzi na msaada ulio karibu nawe.',
+    'livemap.locationOff': 'Kushiriki eneo kumezimwa kwenye Mipangilio, kwa hiyo ramani haiwezi kuonyesha kilicho karibu nawe.',
+    'livemap.waitingFix': 'Inasubiri eneo lako',
+    'onboard.skip': 'Ruka',
+    'onboard.next': 'Endelea',
+    'onboard.start': 'Anza',
+    'onboard.1.title': 'Mguso mmoja kupata msaada',
+    'onboard.1.body': 'Bonyeza SOS na watu wako wanapata tahadhari na eneo lako la moja kwa moja. Hakuna mtandao? Itatumwa ukirudi mtandaoni.',
+    'onboard.2.title': 'Unahisi hatari? Sema mapema',
+    'onboard.2.body': 'Nahisi Hatari huanzisha muda wa kuthibitisha. Usipobonyeza "Niko salama" kwa wakati, SOS inatumwa kwa niaba yako.',
+    'onboard.3.title': 'Namba za dharura ni bure daima',
+    'onboard.3.body': '112 na kila namba kwenye orodha zinafanya kazi bila akaunti, bila data, na bila kulipa.',
+    'responder.heading': 'Mlinzi',
+    'responder.verified': 'Amethibitishwa',
+    'responder.verifiedTitle': 'Amekaguliwa ana kwa ana na timu ya Smart Warning',
+    'responder.unverified': 'Bado hujathibitishwa. Unaweza kusaidia, lakini hutaonekana kwenye ramani ya wengine hadi timu ikague taarifa zako.',
+    'responder.requests': 'Maombi ya msaada',
+    'responder.none': 'Hakuna aliye karibu nawe aliyeomba msaada. Utapata taarifa mtu akiomba.',
+    'responder.openTitle': 'Dharura ya {cat} karibu nawe',
+    'responder.acceptedTitle': 'Unasaidia: {cat}',
+    'responder.away': 'takriban {d}',
+    'responder.accept': 'Naweza kusaidia',
+    'responder.decline': 'Si sasa',
+    'responder.directions': 'Maelekezo ya njia',
+    'responder.past': 'Za awali ({n})',
+    'responder.declined': 'umekataa',
+    'responder.closed': 'imefungwa',
+    'responder.justNow': 'sasa hivi',
+    'responder.minutesAgo': 'dakika {m} zilizopita',
+    'responder.note': 'Wewe ni raia mwenzako anayesaidia, si huduma ya dharura. Mtu akiwa hatarini, piga 112 kwanza.',
+    'responder.toHome': 'Skrini yangu ya SOS',
+    'responder.cat.fire': 'Moto',
+    'responder.cat.medical': 'Afya',
+    'responder.cat.security': 'Usalama',
+    'responder.cat.hazard': 'Hatari',
+    'responder.cat.general': 'Jumla',
+    'signupTerms.legend': 'Vigezo toleo {version}: tafadhali thibitisha kila kipengele.',
+    'timeline.label': 'Kilichotokea hadi sasa',
+    'timeline.pressed': 'Ulibonyeza SOS',
+    'timeline.received': 'Smart Warning imepokea tahadhari yako',
+    'timeline.emailed': 'Watu wako {n} wametumiwa barua pepe',
+    'timeline.emailedNone': 'Hakuna kati ya watu wako aliyeweza kutumiwa barua pepe. Mpigie mtu au 112.',
+    'timeline.nearbyNotified': 'Walinzi {n} waliothibitishwa karibu wamejulishwa (ndani ya {km})',
+    'timeline.nearbyNone': 'Hakuna mlinzi aliye tayari karibu kwa sasa',
+    'timeline.accepted': 'Mlinzi anakuja, takriban {d}',
+    'timeline.voice': 'Ujumbe wa sauti umetumwa kwa watu wako',
+    'timeline.resolved': 'Imewekwa kuwa imekwisha',
+    'timeline.falseAlarm': 'Imewekwa kuwa kosa',
+    'timeline.pendingSend': 'Inatuma kwa watu wako. Acha skrini hii wazi.',
+    'timeline.failedSend': 'Haijatumwa: hakuna mtandao. Piga 112 au mtu unayemwamini sasa.',
+    'tips.label': 'Kidokezo cha usalama kila wiki',
+    'tips.hint': 'Taarifa moja fupi kila Jumatatu asubuhi. Zima wakati wowote.',
+    'unsafe.button': 'Nahisi Hatari',
+    'unsafe.buttonSub': 'Anzisha muda wa kuthibitisha. Usipothibitisha uko salama, SOS inatumwa.',
+    'unsafe.setupTitle': 'Nahisi Hatari',
+    'unsafe.setupBody': 'Chagua muda utakaokuwa salama. Usipobonyeza "Niko salama" kufikia muda huo, Smart Warning inatuma SOS na eneo lako.',
+    'unsafe.checkInAfter': 'Thibitisha baada ya',
+    'unsafe.minutes': 'dk {m}',
+    'unsafe.notePlaceholder': 'Unaenda wapi? (si lazima, inatumwa na SOS)',
+    'unsafe.cancel': 'Ghairi',
+    'unsafe.start': 'Anza',
+    'unsafe.activeTitle': 'Nahisi Hatari imewashwa',
+    'unsafe.activeBody': 'SOS itatumwa muda ukifika sifuri, usipobonyeza "Niko salama".',
+    'unsafe.finalWarning': 'SOS inatumwa baada ya sekunde chache. Bonyeza "Niko salama" kama uko salama.',
+    'unsafe.imSafe': 'Niko salama',
+    'unsafe.plus10': '+dk 10',
+    'unsafe.sosNow': 'Tuma SOS sasa',
+    'unsafe.keepOpen': 'Acha Smart Warning wazi. Haiwezi kutuma programu ikiwa imefungwa kabisa; muda ukiisha ikiwa imefungwa, itatuma mara tu utakapoifungua.',
+    'unsafe.autoMessage': 'Nahisi Hatari: hakuthibitisha kuwa yuko salama.',
+    'unsafe.manualMessage': 'Nahisi Hatari: ametuma SOS mwenyewe.',
+    'voice.record': 'Ongeza ujumbe wa sauti',
+    'voice.another': 'Ongeza ujumbe mwingine wa sauti',
+    'voice.stopSend': 'Simamisha na tuma (sek {s} zimebaki)',
+    'voice.sending': 'Inatuma ujumbe wa sauti',
+    'voice.sent': 'Ujumbe wa sauti umetumwa kwa watu wako.',
+    'voice.retry': 'Haijatumwa. Gusa ujaribu tena',
+    'voice.denied': 'Kipaza sauti kimezuiwa kwa tovuti hii.',
   },
 };
 

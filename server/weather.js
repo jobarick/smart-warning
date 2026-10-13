@@ -118,6 +118,8 @@ async function fetchOpenMeteo(lat, lng, { budgetMs }) {
     current: 'temperature_2m,weather_code,wind_speed_10m,precipitation',
     daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max',
     forecast_days: '3',
+    hourly: 'temperature_2m,weather_code,precipitation_probability',
+    forecast_hours: '5',
     timezone: 'auto',
   });
   const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
@@ -140,7 +142,24 @@ async function fetchOpenMeteo(lat, lng, { budgetMs }) {
     condition: conditionFromWmo(p.daily.weather_code?.[i]),
   }));
 
-  return { current, daily, dailyMaxPrecipProb: daily[0]?.precipitationProbability ?? null };
+  // Local wall-clock strings ("2026-10-13T14:00") plus the offset they are in;
+  // turned into epoch ms so the client never has to guess the timezone.
+  const offsetMs = (p.utc_offset_seconds || 0) * 1000;
+  const hourly = nextHours((p.hourly?.time || []).map((time, i) => ({
+    at: Date.parse(`${time}:00Z`) - offsetMs,
+    tempC: p.hourly.temperature_2m?.[i] ?? null,
+    precipitationProbability: p.hourly.precipitation_probability?.[i] ?? null,
+    condition: conditionFromWmo(p.hourly.weather_code?.[i]),
+  })));
+
+  return { current, daily, hourly, dailyMaxPrecipProb: daily[0]?.precipitationProbability ?? null };
+}
+
+/** Upcoming whole hours. A couple more than the three shown, so a cached
+ *  answer still has three ahead of it when the route trims past ones. */
+function nextHours(rows, count = 5) {
+  const now = Date.now();
+  return rows.filter((h) => Number.isFinite(h.at) && h.at > now).slice(0, count);
 }
 
 /** OpenWeather One Call 3.0 — requires OPENWEATHER_API_KEY. */
@@ -168,7 +187,14 @@ async function fetchOpenWeather(lat, lng, { budgetMs }) {
     condition: conditionFromOwmId(d.weather?.[0]?.id),
   }));
 
-  return { current, daily, dailyMaxPrecipProb: daily[0]?.precipitationProbability ?? null };
+  const hourly = nextHours((p.hourly || []).map((h) => ({
+    at: h.dt * 1000,
+    tempC: h.temp ?? null,
+    precipitationProbability: h.pop != null ? Math.round(h.pop * 100) : null,
+    condition: conditionFromOwmId(h.weather?.[0]?.id),
+  })));
+
+  return { current, daily, hourly, dailyMaxPrecipProb: daily[0]?.precipitationProbability ?? null };
 }
 
 /**
@@ -187,11 +213,12 @@ async function getWeather({ lat, lng }) {
 
   try {
     const fetcher = PROVIDER === 'openweather' ? fetchOpenWeather : fetchOpenMeteo;
-    const { current, daily, dailyMaxPrecipProb } = await fetcher(lat, lng, { budgetMs: TIMEOUT_MS });
+    const { current, daily, hourly, dailyMaxPrecipProb } = await fetcher(lat, lng, { budgetMs: TIMEOUT_MS });
     const result = {
       provider: providerName(),
       current,
       daily,
+      hourly,
       flags: flagsFor({ current, dailyMaxPrecipProb }),
       updatedAt: new Date().toISOString(),
     };

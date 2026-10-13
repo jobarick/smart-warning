@@ -23,6 +23,7 @@
     { "source": "/support", "destination": "/index.html" },
     { "source": "/billing", "destination": "/index.html" },
     { "source": "/setup", "destination": "/index.html" },
+    { "source": "/responder", "destination": "/index.html" },
     { "source": "/r/:code", "destination": "/index.html" }
   ],
   "headers": [

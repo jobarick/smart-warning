@@ -5,42 +5,9 @@
 // before this app will let them use it, and a blank panel with an "I agree"
 // button under it would be worthless as a record and worse as a practice.
 
-/**
- * Bump when the terms change materially.
- *
- * Consent is stored against this version, so raising it re-prompts everyone.
- * That is the point: agreement to a document is agreement to *that* document,
- * and silently carrying it forward to a rewritten one is not consent.
- */
-export const TERMS_VERSION = '1.2';
+import { PROVIDER, SUPPORT_EMAIL, SUPPORT_PHONE } from './termsMeta';
 
-export const TERMS_EFFECTIVE_DATE = '5 August 2026';
-
-export const SUPPORT_EMAIL = 'jobarick@gmail.com';
-export const SUPPORT_PHONE = '+255 713 455 454';
-
-/**
- * Public-facing business/sales contact, shown on the landing page and the
- * auth page's enterprise door. Deliberately separate from SUPPORT_EMAIL:
- * that address is where account-support tickets and the legal documents
- * above tell a user to write for a privacy/data request, and a "talk to
- * sales" inquiry should not compete with that inbox unless someone chooses
- * to point both at the same place.
- */
-export const SALES_EMAIL = 'lab@idesign.co.tz';
-
-/** Where "Talk to us" (enterprise pricing, billing) sends a visitor — the agency's own site, not a mailto. */
-export const IDESIGN_URL = 'https://idesign.co.tz';
-
-/**
- * Who provides the Service.
- *
- * Named in one place and used everywhere — the terms, the privacy policy, the
- * About screen and the support page — because a document that asks somebody to
- * agree to something should say who they are agreeing with, and three
- * different spellings of that across an app is its own kind of unreliable.
- */
-export const PROVIDER = 'Idefenda Lab';
+export { TERMS_VERSION, TERMS_EFFECTIVE_DATE, SUPPORT_EMAIL, SUPPORT_PHONE, SALES_EMAIL, IDESIGN_URL, PROVIDER } from './termsMeta';
 
 export interface TermsSection {
   heading: string;
@@ -146,6 +113,13 @@ export const TERMS_SECTIONS: TermsSection[] = [
     body: [
       'Maps, evacuation routes, recommendations, estimated arrival times, hospitals, police stations, assembly points, and other guidance are provided to assist decision making.',
       'Users must always exercise their own judgment and follow official emergency instructions where available.',
+    ],
+  },
+  {
+    heading: '8a. Weather Information',
+    body: [
+      'Weather shown in Smart Warning, including current conditions, the next few hours, any multi-day outlook and any rain, wind or heat note, comes from a third party forecast provider. It is a forecast, not an official warning, and it is not affiliated with or endorsed by the Tanzania Meteorological Authority (TMA).',
+      'Forecasts can be wrong or out of date, particularly when your device is offline and an earlier reading is shown. For official weather warnings, follow TMA and your local authorities.',
     ],
   },
   {
@@ -369,21 +343,26 @@ export const PRIVACY_SECTIONS: TermsSection[] = [
  * is the one that could matter to somebody who otherwise assumes pressing SOS
  * summons an ambulance.
  */
-export const CONSENT_POINTS: { id: string; label: string }[] = [
+/** `labelSw` is an AI-drafted translation pending fluent review, like lib/i18n.ts. The English is the binding text. */
+export const CONSENT_POINTS: { id: string; label: string; labelSw: string }[] = [
   {
     id: 'terms',
     label: 'I have read and agree to the Smart Warning Terms & Conditions and Privacy Policy.',
+    labelSw: 'Nimesoma na ninakubali Vigezo na Masharti na Sera ya Faragha ya Smart Warning.',
   },
   {
     id: 'no-guarantee',
     label: 'I understand Smart Warning assists with emergency communication but does not guarantee rescue or response.',
+    labelSw: 'Ninaelewa kuwa Smart Warning husaidia mawasiliano ya dharura lakini haihakikishi uokoaji au msaada.',
   },
   {
     id: 'location',
     label: 'I consent to sharing my live location with authorized Safety Coordinators and responders during an active emergency.',
+    labelSw: 'Ninakubali kushiriki eneo langu la moja kwa moja na Waratibu wa Usalama na walinzi walioidhinishwa wakati wa dharura inayoendelea.',
   },
   {
     id: 'misuse',
     label: 'I understand that misuse of emergency alerts may result in account suspension or other action as permitted by law.',
+    labelSw: 'Ninaelewa kuwa matumizi mabaya ya tahadhari za dharura yanaweza kusababisha akaunti kusimamishwa au hatua nyingine kwa mujibu wa sheria.',
   },
 ];

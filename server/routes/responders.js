@@ -18,6 +18,11 @@ function publicResponderStatus(row) {
     categories: row?.categories || [],
     hasLocation: row?.lat != null && row?.lng != null,
     updatedAt: row?.updated_at ? new Date(row.updated_at).getTime() : null,
+    // Set only by a person who checked them (scripts/verify-responder.js).
+    // The client shows the badge from this, and routes a verified responder
+    // to the responder view on sign-in.
+    verified: row?.verified_at != null,
+    verifiedAt: row?.verified_at ? new Date(row.verified_at).getTime() : null,
   };
 }
 
@@ -61,6 +66,25 @@ async function handle({ req, res, path }) {
       categories, isAvailable,
     });
     sendJson(res, 200, publicResponderStatus(row));
+    return true;
+  }
+
+  // The responder view's list: what I was asked to help with recently, and —
+  // only for what I accepted — where to go. See db.listMyOffers.
+  if (path === '/api/responders/offers' && req.method === 'GET') {
+    const ctx = await requireAuth(req);
+    if (!ctx) { sendJson(res, 401, { error: 'not authenticated' }); return true; }
+    if (!db.enabled()) { sendJson(res, 200, { offers: [] }); return true; }
+    const rows = await db.listMyOffers(ctx.user.id);
+    sendJson(res, 200, {
+      offers: rows.map((o) => ({
+        id: o.id, category: o.category, distanceM: o.distance_m, status: o.status,
+        notifiedAt: new Date(o.notified_at).getTime(),
+        respondedAt: o.responded_at ? new Date(o.responded_at).getTime() : null,
+        incidentOpen: o.incident_status ? o.incident_status === 'active' : null,
+        lat: o.lat ?? null, lng: o.lng ?? null,
+      })),
+    });
     return true;
   }
 

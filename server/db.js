@@ -283,6 +283,40 @@ async function init() {
     -- keeps it small regardless of how many accounts have ever opted in once
     -- and stopped.
     CREATE INDEX IF NOT EXISTS responders_available_idx ON responders (lat, lng) WHERE is_available;
+    -- Set by a person who checked who this responder is (scripts/verify-responder.js)
+    -- — never by the responder themselves. Only verified responders appear on
+    -- anyone else's live map, and the badge is shown only from this column.
+    ALTER TABLE responders ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;
+    ALTER TABLE responders ADD COLUMN IF NOT EXISTS verified_by TEXT;
+
+    -- "How did it go?" after an all-clear. One answer per person per incident;
+    -- a second submission replaces the first rather than stacking up.
+    CREATE TABLE IF NOT EXISTS incident_feedback (
+      incident_id  TEXT NOT NULL,
+      user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      rating       SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+      helped       BOOLEAN,
+      comment      TEXT,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (incident_id, user_id)
+    );
+
+    -- A short voice note recorded after SOS. Small by construction (the route
+    -- caps it), so it lives here rather than in object storage; 'token' is the
+    -- unguessable id in the link a Trusted Circle contact opens.
+    CREATE TABLE IF NOT EXISTS incident_media (
+      token        TEXT PRIMARY KEY,
+      incident_id  TEXT NOT NULL,
+      user_id      UUID REFERENCES users(id) ON DELETE CASCADE,
+      mime         TEXT NOT NULL,
+      bytes        BYTEA NOT NULL,
+      duration_s   INTEGER,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS incident_media_incident_idx ON incident_media (incident_id);
+
+    -- Weekly safety tip opt-out. On by default, off with one tap in Settings.
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS weekly_tips BOOLEAN NOT NULL DEFAULT true;
 
     -- One row per (incident, candidate responder) a ring search notified.
     -- 'incident_id' is TEXT, matching incidents.id (the client-generated alert
@@ -1329,6 +1363,158 @@ async function respondToOffer({ offerId, responderId, status }) {
     [offerId, responderId, status],
   );
   return rows[0] || null;
+}
+
+// --- Live map, responder verification, timeline, feedback, voice, tips ------
+
+/**
+ * Responders for someone else's live map: verified only, inside a box around
+ * (lat, lng), last seen within `seenWithinMs`. 'busy' means they accepted an
+ * offer in the last hour. Exact coordinates never leave this function's
+ * caller — routes/map.js snaps them to a coarse grid before responding.
+ */
+async function listMapResponders({ lat, lng, radiusM, seenWithinMs, excludeUserId }) {
+  if (!pool || !Number.isFinite(lat) || !Number.isFinite(lng)) return [];
+  const deg = radiusM / 111000;
+  const { rows } = await pool.query(
+    `SELECT r.lat, r.lng, r.categories, r.is_available, r.captured_at, r.verified_at,
+            EXISTS (SELECT 1 FROM incident_offers o
+                     WHERE o.responder_id = r.user_id AND o.status = 'accepted'
+                       AND o.responded_at > now() - interval '60 minutes') AS busy
+       FROM responders r
+      WHERE r.verified_at IS NOT NULL
+        AND r.user_id IS DISTINCT FROM $5::uuid
+        AND r.lat IS NOT NULL AND r.lng IS NOT NULL
+        AND r.captured_at > now() - ($4 || ' milliseconds')::interval
+        AND r.lat BETWEEN $1::double precision - $3::double precision AND $1::double precision + $3::double precision
+        AND r.lng BETWEEN $2::double precision - $3::double precision AND $2::double precision + $3::double precision`,
+    [lat, lng, deg, String(seenWithinMs), excludeUserId || null],
+  );
+  return rows;
+}
+
+/** Marks a responder as checked by a person — see scripts/verify-responder.js. */
+async function verifyResponder({ userId, verifiedBy, revoke = false }) {
+  if (!pool) throw new Error('persistence disabled');
+  const { rows } = await pool.query(
+    `UPDATE responders SET verified_at = CASE WHEN $3::boolean THEN NULL ELSE now() END,
+            verified_by = CASE WHEN $3::boolean THEN NULL ELSE $2::text END, updated_at = now()
+      WHERE user_id = $1 RETURNING *`,
+    [userId, verifiedBy ?? null, revoke === true],
+  );
+  return rows[0] || null;
+}
+
+/**
+ * A responder's own recent offers, newest first. The incident's position is
+ * joined in only for offers this responder accepted — a notified-but-not-yet-
+ * accepted candidate sees distance and category, never where the person is.
+ */
+async function listMyOffers(responderId, withinMs = 6 * 60 * 60 * 1000) {
+  if (!pool) return [];
+  const { rows } = await pool.query(
+    `SELECT o.id, o.incident_id, o.category, o.distance_m, o.status, o.notified_at, o.responded_at,
+            CASE WHEN o.status = 'accepted' THEN i.lat END AS lat,
+            CASE WHEN o.status = 'accepted' THEN i.lng END AS lng,
+            i.status AS incident_status
+       FROM incident_offers o
+       LEFT JOIN incidents i ON i.id = o.incident_id
+      WHERE o.responder_id = $1 AND o.notified_at > now() - ($2 || ' milliseconds')::interval
+      ORDER BY o.notified_at DESC
+      LIMIT 20`,
+    [responderId, String(withinMs)],
+  );
+  return rows;
+}
+
+/** A personal incident's timeline, for the account that raised it only. */
+async function listPersonalIncidentEvents(incidentId, userId) {
+  if (!pool) return [];
+  const { rows } = await pool.query(
+    `SELECT e.kind, e.actor_role, e.detail, e.at FROM incident_events e
+       JOIN incidents i ON i.id = e.incident_id
+      WHERE e.incident_id = $1 AND i.user_id = $2
+      ORDER BY e.at ASC`,
+    [String(incidentId), userId],
+  );
+  return rows;
+}
+
+async function getPersonalIncident(incidentId, userId) {
+  if (!pool) return null;
+  const { rows } = await pool.query(`SELECT * FROM incidents WHERE id = $1 AND user_id = $2`, [String(incidentId), userId]);
+  return rows[0] || null;
+}
+
+async function saveIncidentFeedback({ incidentId, userId, rating, helped, comment }) {
+  if (!pool) throw new Error('persistence disabled');
+  const { rows } = await pool.query(
+    `INSERT INTO incident_feedback (incident_id, user_id, rating, helped, comment)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (incident_id, user_id) DO UPDATE SET
+       rating = EXCLUDED.rating, helped = EXCLUDED.helped, comment = EXCLUDED.comment, created_at = now()
+     RETURNING *`,
+    [String(incidentId), userId, rating, helped ?? null, comment ?? null],
+  );
+  return rows[0];
+}
+
+async function saveIncidentMedia({ token, incidentId, userId, mime, bytes, durationS }) {
+  if (!pool) throw new Error('persistence disabled');
+  await pool.query(
+    `INSERT INTO incident_media (token, incident_id, user_id, mime, bytes, duration_s) VALUES ($1, $2, $3, $4, $5, $6)`,
+    [token, String(incidentId), userId, mime, bytes, durationS ?? null],
+  );
+}
+
+async function getIncidentMedia(token) {
+  if (!pool) return null;
+  const { rows } = await pool.query(`SELECT mime, bytes, created_at FROM incident_media WHERE token = $1`, [token]);
+  return rows[0] || null;
+}
+
+async function countIncidentMedia(incidentId) {
+  if (!pool) return 0;
+  const { rows } = await pool.query(`SELECT count(*)::int AS n FROM incident_media WHERE incident_id = $1`, [String(incidentId)]);
+  return rows[0]?.n ?? 0;
+}
+
+async function setWeeklyTips(userId, on) {
+  if (!pool) throw new Error('persistence disabled');
+  const { rows } = await pool.query(`UPDATE users SET weekly_tips = $2 WHERE id = $1 RETURNING weekly_tips`, [userId, on === true]);
+  return rows[0]?.weekly_tips ?? null;
+}
+
+async function getWeeklyTips(userId) {
+  if (!pool) return null;
+  const { rows } = await pool.query(`SELECT weekly_tips FROM users WHERE id = $1`, [userId]);
+  return rows[0]?.weekly_tips ?? null;
+}
+
+/**
+ * Everyone who still wants the weekly tip and has at least one device of their
+ * own to receive it on. Devices registered to an organisation rather than a
+ * person are not included: an org's phones are for that org's alerts.
+ */
+async function listWeeklyTipRecipients() {
+  if (!pool) return [];
+  const { rows } = await pool.query(
+    `SELECT u.id FROM users u
+      WHERE u.weekly_tips = true
+        AND (EXISTS (SELECT 1 FROM push_subscriptions p WHERE p.user_id = u.id)
+          OR EXISTS (SELECT 1 FROM device_tokens d WHERE d.user_id = u.id))`,
+  );
+  return rows.map((r) => r.id);
+}
+
+/** Sets `key` only if it is not already set. True when this call set it —
+ *  what keeps two server instances from both sending the same weekly tip. */
+async function kvClaim(key, value) {
+  if (!pool) return false;
+  const { rowCount } = await pool.query(
+    `INSERT INTO app_kv (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING`, [key, value],
+  );
+  return rowCount === 1;
 }
 
 // --- Incidents (all scoped to an org) --------------------------------------
@@ -2536,6 +2722,14 @@ async function recordConsent({ orgId = null, userId = null, subject = null, vers
   return rows[0] || null;
 }
 
+async function latestConsentForUser(userId) {
+  if (!pool) return null;
+  const { rows } = await pool.query(
+    `SELECT version, points, accepted_at FROM consents WHERE user_id = $1 ORDER BY accepted_at DESC LIMIT 1`, [userId],
+  );
+  return rows[0] || null;
+}
+
 async function listConsents({ orgId, limit = 100 } = {}) {
   if (!pool) return [];
   const { rows } = await pool.query(
@@ -2652,6 +2846,20 @@ module.exports = {
   createIncidentOffers,
   listOffersForIncident,
   respondToOffer,
+  listMapResponders,
+  verifyResponder,
+  listMyOffers,
+  listPersonalIncidentEvents,
+  getPersonalIncident,
+  saveIncidentFeedback,
+  saveIncidentMedia,
+  getIncidentMedia,
+  countIncidentMedia,
+  setWeeklyTips,
+  getWeeklyTips,
+  listWeeklyTipRecipients,
+  kvClaim,
+  latestConsentForUser,
   createContact,
   updateContact,
   deleteContact,

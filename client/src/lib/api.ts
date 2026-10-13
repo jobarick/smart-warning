@@ -1024,6 +1024,9 @@ export interface ResponderStatus {
   categories: ResponderCategory[];
   hasLocation: boolean;
   updatedAt: number | null;
+  /** Set only by a person who checked them — see server/scripts/verify-responder.js. */
+  verified?: boolean;
+  verifiedAt?: number | null;
 }
 
 export async function fetchResponderStatus(token: string): Promise<ResponderStatus> {
@@ -1070,4 +1073,130 @@ export async function fetchIncidentOffers(incidentId: string): Promise<IncidentO
   if (!res.ok) return [];
   const body = await res.json();
   return body.offers ?? [];
+}
+
+// --- Live map (server/routes/map.js) ---
+
+export type MapPlaceKind = 'hospital' | 'police' | 'fire' | 'security';
+export type ResponderMapStatus = 'available' | 'busy' | 'offline';
+
+/** One snapped cell — "around here", never a doorstep, never a name. */
+export interface MapResponder {
+  lat: number;
+  lng: number;
+  status: ResponderMapStatus;
+  count: number;
+  categories: ResponderCategory[];
+  distanceM: number;
+  verified: true;
+}
+
+export interface MapPlace {
+  kind: MapPlaceKind;
+  name: string;
+  lat: number;
+  lng: number;
+  distanceM: number | null;
+  phone: string | null;
+  verified: boolean;
+}
+
+export interface LiveMapData {
+  radiusM: number;
+  responders: MapResponder[];
+  counts: { available: number; busy: number; offline: number; within: Record<'1000' | '3000' | '5000', number> };
+  places: MapPlace[];
+  at: number;
+}
+
+export async function fetchLiveMap(lat: number, lng: number, kinds: MapPlaceKind[], token: string): Promise<LiveMapData> {
+  const params = new URLSearchParams({ lat: String(lat), lng: String(lng), kinds: kinds.join(',') });
+  const res = await fetch(`${API_BASE}/api/map/nearby?${params.toString()}`, { headers: authHeaders(token) });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not load the map'));
+  return res.json();
+}
+
+// --- Responder view ---
+
+export interface MyOffer {
+  id: string;
+  category: string;
+  distanceM: number | null;
+  status: 'notified' | 'accepted' | 'declined';
+  notifiedAt: number;
+  respondedAt: number | null;
+  /** null when the incident row is not visible; false once it has been resolved. */
+  incidentOpen: boolean | null;
+  /** Only ever set for an offer this responder accepted. */
+  lat: number | null;
+  lng: number | null;
+}
+
+export async function fetchMyOffers(token: string): Promise<MyOffer[]> {
+  const res = await fetch(`${API_BASE}/api/responders/offers`, { headers: authHeaders(token) });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not load your requests'));
+  const body = await res.json();
+  return body.offers ?? [];
+}
+
+// --- After SOS: timeline, voice note, feedback (server/routes/personal.js) ---
+
+export type TimelineEvent =
+  | { kind: 'raised'; at: number }
+  | { kind: 'notified'; at: number; channel: string | null; count: number | null }
+  | { kind: 'nearby-searched'; at: number; notified: number; ringM: number | null }
+  | { kind: 'responder-accepted'; at: number; distanceM: number | null }
+  | { kind: 'responder-declined'; at: number }
+  | { kind: 'voice-note'; at: number }
+  | { kind: 'resolved'; at: number; reason: string | null };
+
+export async function fetchIncidentTimeline(incidentId: string, token: string): Promise<TimelineEvent[]> {
+  const res = await fetch(`${API_BASE}/api/contacts/alert/${encodeURIComponent(incidentId)}/timeline`, { headers: authHeaders(token) });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not load the timeline'));
+  const body = await res.json();
+  return body.events ?? [];
+}
+
+export async function uploadVoiceNote(incidentId: string, blob: Blob, durationS: number, token: string): Promise<{ ok: true; url: string }> {
+  const type = (blob.type || 'audio/webm').split(';')[0];
+  const res = await fetch(
+    `${API_BASE}/api/contacts/alert/${encodeURIComponent(incidentId)}/voice?duration=${Math.round(durationS)}`,
+    { method: 'POST', headers: { 'Content-Type': type, ...authHeaders(token) }, body: blob },
+  );
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not send the voice note'));
+  return res.json();
+}
+
+export async function sendIncidentFeedback(
+  incidentId: string, input: { rating: number; helped?: boolean; comment?: string }, token: string,
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/incidents/${encodeURIComponent(incidentId)}/feedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not send your feedback'));
+}
+
+export async function fetchPreferences(token: string): Promise<{ weeklyTips: boolean; available: boolean }> {
+  const res = await fetch(`${API_BASE}/api/me/preferences`, { headers: authHeaders(token) });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not load your preferences'));
+  return res.json();
+}
+
+export async function setWeeklyTips(on: boolean, token: string): Promise<{ weeklyTips: boolean }> {
+  const res = await fetch(`${API_BASE}/api/me/preferences`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify({ weeklyTips: on }),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not save your preference'));
+  return res.json();
+}
+
+/** The latest terms version this account accepted on any device — see App.tsx's consent check. */
+export async function fetchMyConsent(token: string): Promise<{ version: string | null; points: string[] }> {
+  const res = await fetch(`${API_BASE}/api/consent/me`, { headers: authHeaders(token) });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not check your terms'));
+  return res.json();
 }

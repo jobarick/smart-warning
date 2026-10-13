@@ -46,7 +46,7 @@
   --cmd-nosig: #555555;
   --glow: #080808; /* flattens the body radial-gradient */
   --bar-bg: rgba(8, 8, 8, 0.9);
-  --mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+  --mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, "Roboto Mono", monospace;
   --sans: "DM Sans Variable", "DM Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
@@ -1658,6 +1658,9 @@ body {
 }
 
 .auth-brand-row { display: flex; align-items: center; justify-content: space-between; }
+.auth-brand-actions { display: flex; align-items: center; gap: 8px; }
+.auth-theme-toggle { display: inline-grid; place-items: center; padding: 6px 9px; }
+.auth-theme-toggle svg { width: 16px; height: 16px; }
 .auth-lang-toggle {
   background: none; border: 1px solid var(--panel-border); border-radius: 8px;
   padding: 6px 12px; color: var(--muted); font-size: 0.8rem; font-weight: 650; cursor: pointer;
@@ -2876,10 +2879,9 @@ body {
 .briefing-steps { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: 6px; }
 .briefing-steps li { font-size: 13px; line-height: 1.5; }
 
-/* Weather card (WeatherCard) — sits directly under the briefing card. A
-   third-party forecast, deliberately styled like a sibling of .briefing
-   rather than a copy of it: the .weather-disclaimer line is what keeps it
-   from being mistaken for the TMA slot above it. */
+/* Weather card (WeatherCard) — the account's now + 3 hours widget. A
+   third-party forecast; the "not an official TMA warning" boundary lives in
+   the Terms (section 8a) rather than as small print here. */
 .weather-card {
   display: flex; flex-direction: column; gap: 12px; padding: 16px;
   background: var(--panel); border: 1px solid var(--panel-border); border-radius: 14px;
@@ -2898,27 +2900,49 @@ body {
 .weather-temp { font-size: 2.1rem; font-weight: 750; line-height: 1; }
 .weather-condition { font-size: 0.95rem; color: var(--muted); font-weight: 600; }
 .weather-wind { margin-left: auto; font-size: 0.82rem; color: var(--faint); }
-.weather-notes { display: flex; flex-direction: column; gap: 8px; }
-.weather-note {
-  margin: 0; padding: 10px 12px; border-radius: 10px; font-size: 12.5px; line-height: 1.5;
-  color: var(--muted); background: color-mix(in srgb, var(--cmd-warn, #d97706) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--cmd-warn, #d97706) 24%, transparent);
+.weather-hours { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.weather-hour {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 64px;
+  padding: 8px 4px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--panel-border);
 }
-.weather-note b { display: block; color: var(--text); font-weight: 650; margin-bottom: 2px; }
-.weather-teaser { margin: 0; font-size: 13px; line-height: 1.55; color: var(--muted); }
-.weather-forecast-label {
-  display: block; margin-bottom: 8px; font-family: var(--mono); font-size: 10px;
-  letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint);
+.weather-hour-now { border-color: color-mix(in srgb, var(--accent) 40%, var(--panel-border)); }
+.weather-hour-at { font-size: 11px; font-weight: 650; color: var(--muted); }
+.weather-hour b { font-size: 17px; }
+.weather-hour-cond { font-size: 11px; color: var(--muted); text-align: center; line-height: 1.2; }
+.weather-hours-skeleton .weather-hour { animation: wx-pulse 1.4s ease-in-out infinite; }
+@keyframes wx-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+.weather-note-line { margin: 0; font-size: 12.5px; font-weight: 650; color: var(--cmd-warn, #f59e0b); }
+.weather-days { display: flex; gap: 12px; margin: 0; font-size: 12px; color: var(--muted); }
+.weather-stale { margin: 0; font-size: 11px; color: var(--faint); }
+
+/* One line at the top of home (WeatherLine). Wraps rather than truncates on
+   a narrow phone, and is never taller than two lines. */
+.weather-line {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0;
+  font-size: 13px; color: var(--muted);
 }
-.weather-forecast-grid { display: flex; gap: 8px; }
-.weather-forecast-day {
-  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
-  padding: 10px 6px; border-radius: 10px; background: var(--panel-2); font-size: 12px;
+.weather-line b { color: var(--text); }
+.weather-line-warn { color: var(--cmd-warn, #f59e0b); font-weight: 650; }
+.weather-line-place {
+  margin-left: auto; padding: 2px 4px; font: inherit; font-size: 12px; color: var(--muted);
+  background: transparent; border: 1px solid var(--panel-border); border-radius: 6px;
 }
-.weather-forecast-day span:first-child { color: var(--muted); font-weight: 600; }
-.weather-forecast-day b { font-size: 15px; }
-.weather-forecast-min { color: var(--faint); }
-.weather-disclaimer { margin: 4px 0 0; padding-top: 10px; border-top: 1px solid var(--panel-border); font-size: 11px; line-height: 1.5; color: var(--faint); }
+.weather-line-stale { color: var(--faint); }
+
+/* Proof of life (ProofOfLife). */
+.pol { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 12.5px; color: var(--muted); min-height: 18px; }
+.pol-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--faint); }
+.pol-ok .pol-dot { background: var(--cmd-safe, #22c55e); box-shadow: 0 0 0 3px color-mix(in srgb, var(--cmd-safe, #22c55e) 25%, transparent); }
+.pol-down { color: var(--cmd-warn, #f59e0b); }
+.pol-down .pol-dot { background: var(--cmd-warn, #f59e0b); }
+
+/* Offline strip (OfflineBanner) — top of every screen while offline. */
+.offline-banner {
+  position: sticky; top: 0; z-index: 40; padding: 8px 16px; text-align: center;
+  font-size: 12.5px; font-weight: 650; line-height: 1.4; color: #111;
+  background: var(--cmd-warn, #f59e0b);
+}
+@media (prefers-reduced-motion: reduce) { .weather-hours-skeleton .weather-hour { animation: none; } }
 /* ---------- trial / subscription banner ----------
    Sits below the SOS on Home. Quiet by design: billing is the least important
    thing on an emergency screen. */

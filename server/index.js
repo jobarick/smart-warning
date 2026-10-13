@@ -23,6 +23,7 @@ const fcm = require('./fcm');
 const mailer = require('./mailer');
 const payments = require('./payments');
 const escalation = require('./escalation');
+const weeklyTips = require('./weeklyTips');
 const staticFiles = require('./static');
 const relay = require('./relay');
 const routes = require('./routes');
@@ -49,6 +50,13 @@ setInterval(() => {
 setInterval(() => {
   escalation.sweep().catch((e) => console.error('[escalation] sweep failed:', e.message));
 }, 30_000).unref?.();
+
+// The weekly safety tip. Checked every five minutes; weeklyTips.tick() only
+// acts inside its Monday-morning hour and claims the week in app_kv first, so
+// restarts and extra instances never double-send.
+setInterval(() => {
+  weeklyTips.tick().catch((e) => console.error('[weekly-tip] tick failed:', e.message));
+}, 5 * 60 * 1000).unref?.();
 
 // Retention for movement history: precise GPS traces of named people have no
 // reason to live on the database forever. Not urgent like the sweeps above —

@@ -11,15 +11,18 @@ self.addEventListener('push', (event) => {
   }
   const title = data.title || 'Emergency alert';
   const urgent = data.severity === 'critical' || data.severity === 'high';
+  const quiet = data.severity === 'info';
   const options = {
     body: data.body || '',
     tag: data.tag || 'sw-alert',
-    renotify: true,
+    renotify: !quiet,
+    silent: quiet,
     requireInteraction: urgent,
-    vibrate: urgent ? [200, 100, 200, 100, 200] : [200],
+    vibrate: urgent ? [200, 100, 200, 100, 200] : quiet ? [] : [200],
     icon: '/icon.svg',
     badge: '/icon.svg',
-    data: { url: '/' },
+    // Only same-origin app paths; anything else opens the home screen.
+    data: { url: typeof data.url === 'string' && data.url.startsWith('/') ? data.url : '/' },
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });

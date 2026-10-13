@@ -231,7 +231,8 @@ export interface Settings {
   assemblyLat: number | null; // assembly / safe-zone coordinates
   assemblyLng: number | null;
   assemblyLabel: string; // name of the assembly point
-  theme: 'dark' | 'light'; // black or white background
+  /** 'system' follows the device (prefers-color-scheme) until the person picks one. */
+  theme: 'dark' | 'light' | 'system';
   locale: Locale;
 }
 

@@ -8,16 +8,18 @@ import { VercelInsights } from './components/VercelInsights';
 import { PUBLIC_REPORT_PATTERN } from './lib/routes';
 import { registerNativeBackButton } from './lib/nativeBack';
 // Bundled, not fetched. An emergency PWA has to render identically on a locked
-// -down site network or offline, so the typefaces ship with the app rather than
-// coming from a font CDN. Variable weights keep that to two files.
+// -down site network or offline, so the typeface ships with the app rather than
+// coming from a font CDN. One variable file: the monospace face that used to
+// ship alongside it was ~40KB for timers and IDs, and the system monospace
+// (see --mono in styles.css) does that job on a low-bandwidth first load.
 import '@fontsource-variable/dm-sans';
-import '@fontsource-variable/jetbrains-mono';
 import './styles.css';
 import './command-center.css';
 import './platform.css';
 import './billing.css';
 import './landing.css';
 import './demo.css';
+import './home.css';
 
 registerSW({ immediate: true });
 registerNativeBackButton();

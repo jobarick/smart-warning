@@ -16,12 +16,12 @@
 //     --source "called reception 2026-09-17"
 //
 // --category must be one of the kinds Nearby Help already searches for
-// (hospital, police, fire, shelter, pharmacy) — a new category needs a
+// (hospital, police, fire, shelter, pharmacy, security) — a new category needs a
 // matching OSM_QUERY entry in places.js first, or it will never appear
 // alongside the community results it's meant to sit above.
 const db = require('../db');
 
-const CATEGORIES = new Set(['hospital', 'police', 'fire', 'shelter', 'pharmacy']);
+const CATEGORIES = new Set(['hospital', 'police', 'fire', 'shelter', 'pharmacy', 'security']);
 
 function parseArgs(argv) {
   const out = {};

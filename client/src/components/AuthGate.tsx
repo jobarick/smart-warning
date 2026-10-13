@@ -9,17 +9,25 @@ import type { Locale } from '../types';
 import type { Session } from '../lib/session';
 import { Icon } from './Icon';
 import { Logo } from './Logo';
+import { ThemeToggle } from './ThemeToggle';
+import { SignupTerms, allConsentTicked } from './SignupTerms';
+import { CONSENT_POINTS } from '../lib/terms';
+import type { ResolvedTheme } from '../lib/theme';
 import { PasswordField } from './PasswordField';
 
 type Step = 'choose' | 'worker' | 'login' | 'signup' | 'personal' | 'sales' | 'forgot' | 'reset' | 'accept-invite';
 type SalesInterest = 'personal' | 'company' | 'enterprise' | 'partnership' | 'support' | 'general';
 
 interface Props {
-  onAuthed: (s: Session) => void;
+  /** `consentPoints` is set when the person agreed to the terms on the
+   *  sign-up form itself, so the separate consent screen can be skipped. */
+  onAuthed: (s: Session, opts?: { consentPoints?: string[] }) => void;
   /** Shown when the relay rejected a stored/entered credential. */
   notice?: string | null;
   locale: Locale;
   onToggleLocale: () => void;
+  theme: ResolvedTheme;
+  onThemeChange: (next: ResolvedTheme) => void;
 }
 
 /**
@@ -224,13 +232,16 @@ function AuthStoryColumn({ locale, onSales }: { locale: Locale; onSales: () => v
   );
 }
 
-export function AuthGate({ onAuthed, notice, locale, onToggleLocale }: Props) {
+export function AuthGate({ onAuthed, notice, locale, onToggleLocale, theme, onThemeChange }: Props) {
   const tt = (key: Parameters<typeof t>[1], vars?: Record<string, string>) => t(locale, key, vars);
   const price = usePersonalPrice();
   const [linkToken] = useState(resetTokenFromUrl);
   const [inviteToken] = useState(inviteTokenFromUrl);
   const [invitePreview, setInvitePreview] = useState<{ email: string; orgName: string } | null>(null);
   const [step, setStep] = useState<Step>(initialStepFromUrl);
+  const [terms, setTerms] = useState<Record<string, boolean>>({});
+  const termsOk = allConsentTicked(terms);
+  const agreed = () => ({ consentPoints: CONSENT_POINTS.map((p) => p.id) });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<{ mailConfigured: boolean } | null>(null);
@@ -318,7 +329,7 @@ export function AuthGate({ onAuthed, notice, locale, onToggleLocale }: Props) {
         address: address.trim() || undefined,
       });
       track('signup_complete', { path: 'organization' });
-      onAuthed({ kind: 'supervisor', token: res.token, user: res.user });
+      onAuthed({ kind: 'supervisor', token: res.token, user: res.user }, agreed());
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -337,7 +348,7 @@ export function AuthGate({ onAuthed, notice, locale, onToggleLocale }: Props) {
         phone: phone.trim() || undefined,
       });
       track('signup_complete', { path: 'personal' });
-      onAuthed({ kind: 'supervisor', token: res.token, user: res.user });
+      onAuthed({ kind: 'supervisor', token: res.token, user: res.user }, agreed());
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -422,9 +433,12 @@ export function AuthGate({ onAuthed, notice, locale, onToggleLocale }: Props) {
             <Logo size={22} className="auth-logo" decorative />
             <span>Smart Warning</span>
           </div>
-          <button type="button" className="auth-lang-toggle" onClick={onToggleLocale}>
-            {locale === 'en' ? tt('settings.languageSwahili') : tt('settings.languageEnglish')}
-          </button>
+          <div className="auth-brand-actions">
+            <ThemeToggle theme={theme} onChange={onThemeChange} locale={locale} className="auth-lang-toggle auth-theme-toggle" />
+            <button type="button" className="auth-lang-toggle" onClick={onToggleLocale}>
+              {locale === 'en' ? tt('settings.languageSwahili') : tt('settings.languageEnglish')}
+            </button>
+          </div>
         </div>
 
         <AuthStoryColumn locale={locale} onSales={() => go('sales')} />
@@ -632,7 +646,8 @@ export function AuthGate({ onAuthed, notice, locale, onToggleLocale }: Props) {
                   placeholder={tt('auth.hint.minChars')}
                   autoComplete="new-password"
                 />
-                <button className="auth-submit" type="submit" disabled={busy}>{busy ? tt('auth.submit.creating') : tt('auth.submit.createAccount')}</button>
+                <SignupTerms locale={locale} ticked={terms} onChange={setTerms} />
+                <button className="auth-submit" type="submit" disabled={busy || !termsOk}>{busy ? tt('auth.submit.creating') : tt('auth.submit.createAccount')}</button>
                 <p className="auth-alt">{tt('auth.personal.settingUpTeam')} <button type="button" onClick={() => go('signup')}>{tt('auth.link.createOrgInstead')}</button></p>
               </form>
             )}
@@ -677,7 +692,8 @@ export function AuthGate({ onAuthed, notice, locale, onToggleLocale }: Props) {
                   placeholder={tt('auth.hint.minChars')}
                   autoComplete="new-password"
                 />
-                <button className="auth-submit" type="submit" disabled={busy}>{busy ? tt('auth.submit.creating') : tt('auth.submit.createOrganization')}</button>
+                <SignupTerms locale={locale} ticked={terms} onChange={setTerms} />
+                <button className="auth-submit" type="submit" disabled={busy || !termsOk}>{busy ? tt('auth.submit.creating') : tt('auth.submit.createOrganization')}</button>
               </form>
             )}
 

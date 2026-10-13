@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { fetchResponderStatus, setResponderStatus, type ResponderCategory, type ResponderStatus } from '../lib/api';
+import type { Locale } from '../types';
 import { Icon } from './Icon';
+import { VerifiedBadge } from './VerifiedBadge';
 
 interface Props {
   token: string;
+  /** For the verified badge only; the rest of this panel is still English. */
+  locale?: Locale;
 }
 
 const DISMISSED_KEY = 'sw-nearby-help-dismissed-v1';
@@ -35,7 +39,7 @@ function toggle(list: ResponderCategory[], id: ResponderCategory): ResponderCate
  * position refresh runs on a timer only while `isAvailable` is true — turning
  * it off stops the timer immediately, not just the notifications.
  */
-export function NearbyHelpOptIn({ token }: Props) {
+export function NearbyHelpOptIn({ token, locale = 'sw' }: Props) {
   const [status, setStatus] = useState<ResponderStatus | null>(null);
   const [dismissed, setDismissed] = useState(() => {
     try { return localStorage.getItem(DISMISSED_KEY) === '1'; } catch { return false; }
@@ -138,7 +142,7 @@ export function NearbyHelpOptIn({ token }: Props) {
   if (status.isAvailable) {
     return (
       <section className="panel nearby-opt">
-        <h2><Icon name="navigation" /> Nearby Help</h2>
+        <h2><Icon name="navigation" /> Nearby Help {status.verified && <VerifiedBadge locale={locale} />}</h2>
         <p className="hint">
           You're available to help people near you. Not a Safety Coordinator, not an emergency
           service — just a fellow opted-in person nearby.
