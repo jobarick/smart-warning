@@ -574,7 +574,12 @@ export type StringKey =
   | 'voice.sending'
   | 'voice.sent'
   | 'voice.retry'
-  | 'voice.denied';
+  | 'voice.denied'
+  | 'posmap.routeTo'
+  | 'posmap.straight'
+  | 'posmap.open'
+  | 'posmap.searching'
+  | 'posmap.notFound';
 
 type Vars = Record<string, string>;
 
@@ -1137,6 +1142,11 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'voice.sent': 'Voice note sent to your people.',
     'voice.retry': 'Not sent. Tap to try again',
     'voice.denied': 'Microphone is blocked for this site.',
+    'posmap.routeTo': 'Nearest help: {name}, {d}',
+    'posmap.straight': '(straight line)',
+    'posmap.open': 'Open map',
+    'posmap.searching': 'searching…',
+    'posmap.notFound': 'not found',
   },
   sw: {
     'sos.heading': 'SOS ya Dharura',
@@ -1696,6 +1706,11 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'voice.sent': 'Ujumbe wa sauti umetumwa kwa watu wako.',
     'voice.retry': 'Haijatumwa. Gusa ujaribu tena',
     'voice.denied': 'Kipaza sauti kimezuiwa kwa tovuti hii.',
+    'posmap.routeTo': 'Msaada wa karibu: {name}, {d}',
+    'posmap.straight': '(mstari wa moja kwa moja)',
+    'posmap.open': 'Fungua ramani',
+    'posmap.searching': 'inatafuta…',
+    'posmap.notFound': 'haijapatikana',
   },
 };
 

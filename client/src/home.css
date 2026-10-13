@@ -210,3 +210,40 @@
 .profile-prefs-switch .profile-prefs-label { display: block; }
 .profile-prefs-hint { display: block; margin-top: 2px; font-size: 0.76rem; color: var(--faint); }
 .profile-prefs-switch input { flex: none; width: 22px; height: 22px; accent-color: var(--accent-fill); }
+
+/* --- the map behind the live-position card (OperatorStatus + PositionMap) ---
+ * The map fills the card; the header and tiles sit on frosted glass over it,
+ * and a clear window between them shows where you are and the way to help. */
+.op-with-map { position: relative; overflow: hidden; isolation: isolate; }
+.op-with-map .posmap-el { position: absolute; inset: 0; z-index: -2; }
+.op-with-map::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--panel) 92%, transparent) 0,
+    color-mix(in srgb, var(--panel) 55%, transparent) 90px,
+    transparent 120px, transparent 270px,
+    color-mix(in srgb, var(--panel) 70%, transparent) 330px);
+}
+.op-with-map .op-head { position: relative; }
+.op-with-map .op-tiles { margin-top: 0; }
+.op-with-map .op-tile {
+  background: color-mix(in srgb, var(--panel-2) 78%, transparent);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.posmap-bar { position: relative; margin: 150px 0 10px; display: flex; flex-direction: column; gap: 6px; }
+.posmap-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.posmap-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; font-size: 0.78rem; font-weight: 650;
+  color: var(--text); background: color-mix(in srgb, var(--panel) 85%, transparent);
+  border: 1px solid var(--panel-border); border-radius: 999px;
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.posmap-route {
+  align-self: flex-start; margin: 0; padding: 5px 10px; font-size: 0.78rem; font-weight: 600; color: var(--text);
+  background: color-mix(in srgb, var(--panel) 85%, transparent); border-radius: 8px;
+}
+.posmap-open {
+  align-self: flex-start; min-height: 40px; padding: 8px 14px; cursor: pointer; font: inherit; font-size: 0.84rem; font-weight: 700;
+  color: #fff; background: #2563eb; border: none; border-radius: 10px;
+}
+.op-with-map .leaflet-control-attribution { font-size: 9px; }

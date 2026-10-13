@@ -1,8 +1,20 @@
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { AlarmState } from '../hooks/useAlarmState';
+import type { OrgCreds } from '../lib/api';
+import type { Locale } from '../types';
 import type { NetworkStatus } from '../hooks/useNetworkStatus';
 import type { Telemetry } from '../hooks/useSelfTelemetry';
 import { bearingLabel, distanceMetres, formatDistance, safetyLevel, walkMinutes } from '../lib/geo';
 import { Icon } from './Icon';
+
+// Leaflet is the heaviest download in the app; this card itself is on the
+// emergency path and stays eager, so only the map behind it is lazy.
+const PositionMap = lazy(() => import('./PositionMap').then((m) => ({ default: m.PositionMap })));
+
+/** A phone asking to save data gets the card without the map behind it. */
+function saveData(): boolean {
+  return (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData === true;
+}
 
 interface Props {
   name: string;
@@ -13,6 +25,11 @@ interface Props {
   assembly: { lat: number | null; lng: number | null; label: string };
   alarm: AlarmState;
   now: number;
+  /** For the map behind the card: walking routes need the same credentials as the Help tab's map. */
+  creds?: OrgCreds;
+  locale?: Locale;
+  /** Opens the full map (the Help tab). Without it, no map is drawn. */
+  onOpenMap?: () => void;
 }
 
 const SAFETY_COLOR: Record<string, string> = {
@@ -27,8 +44,18 @@ function lap(ms: number): string {
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
 
-export function OperatorStatus({ name, operatorId, telemetry, network, shareLocation, assembly, alarm, now }: Props) {
+export function OperatorStatus({ name, operatorId, telemetry, network, shareLocation, assembly, alarm, now, creds = {}, locale = 'sw', onOpenMap }: Props) {
   const hasLoc = shareLocation && telemetry.lat !== null && telemetry.lng !== null;
+  const ref = useRef<HTMLElement>(null);
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    if (inView || !ref.current) return;
+    if (typeof IntersectionObserver === 'undefined') { setInView(true); return; }
+    const io = new IntersectionObserver((e) => { if (e.some((x) => x.isIntersecting)) { setInView(true); io.disconnect(); } }, { rootMargin: '150px' });
+    io.observe(ref.current);
+    return () => io.disconnect();
+  }, [inView]);
+  const withMap = hasLoc && !!onOpenMap && inView && !saveData();
   const hasAssembly = assembly.lat !== null && assembly.lng !== null;
 
   const distance =
@@ -43,7 +70,7 @@ export function OperatorStatus({ name, operatorId, telemetry, network, shareLoca
   const batteryColor = battery === null ? 'var(--muted)' : battery < 0.2 ? 'var(--cmd-crit)' : battery < 0.4 ? 'var(--cmd-warn)' : 'var(--cmd-safe)';
 
   return (
-    <section className="op">
+    <section ref={ref} className={`op${withMap ? ' op-with-map' : ''}`}>
       <div className="op-head">
         <div>
           <span className="op-hello">Hello,</span>
@@ -55,6 +82,12 @@ export function OperatorStatus({ name, operatorId, telemetry, network, shareLoca
           {alarmActive ? 'Alert active' : 'All safe'}
         </span>
       </div>
+
+      {withMap && (
+        <Suspense fallback={null}>
+          <PositionMap lat={telemetry.lat!} lng={telemetry.lng!} creds={creds} locale={locale} onOpenMap={onOpenMap!} />
+        </Suspense>
+      )}
 
       <div className="op-tiles">
         <div className="op-tile">

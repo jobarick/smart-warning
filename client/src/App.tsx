@@ -1505,6 +1505,9 @@ export default function App() {
                 assembly={{ lat: settings.assemblyLat, lng: settings.assemblyLng, label: settings.assemblyLabel }}
                 alarm={alarm}
                 now={now}
+                creds={joinCreds ?? {}}
+                locale={settings.locale}
+                onOpenMap={() => navigate('/help')}
               />
             </>
           )}
