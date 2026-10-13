@@ -1,4 +1,4 @@
-// Weather for the Safety tab — current conditions and the next 3 hours free for everyone, the
+// Weather for the Safety tab — current conditions free for everyone, the
 // 3-day forecast and its safety notes gated behind WEATHER_FORECAST like any
 // other Premium entitlement. See server/weather.js for the provider and the
 // explicit "this is not an official TMA bulletin" boundary.
@@ -64,9 +64,6 @@ async function handle({ req, res, url, path }) {
     provider: result.provider,
     updatedAt: result.updatedAt,
     current: result.current,
-    // The next three hours are free like current conditions: "will it rain
-    // on my way home" is safety information, not a premium forecast.
-    hourly: (result.hourly || []).filter((h) => h.at > Date.now()).slice(0, 3),
     flags: result.flags,
     hourly: result.hourly || [],
     daily: unlocked ? result.daily : null,

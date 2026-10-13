@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchWeather, loadWeatherPlace, NAMED_LOCATIONS, saveWeatherPlace, type WeatherResult } from '../lib/weather';
+import { fetchWeather, loadWeatherPlace, NAMED_LOCATIONS, saveWeatherPlace, upcomingHours, type WeatherResult } from '../lib/weather';
 import { t, type StringKey } from '../lib/i18n';
 import type { Locale } from '../types';
 import { CONDITION_KEY, hourLabel } from './WeatherCard';
@@ -35,13 +35,13 @@ export function WeatherLine({ locale, lat, lng, token }: Props) {
 
   if (!weather?.ok || !weather.current) return null;
   const c = weather.current;
-  const wet = weather.hourly?.find((h) => (h.precipitationProbability ?? 0) >= 40);
+  const wet = upcomingHours(weather.hourly, 3).find((h) => (h.precipitationProbability ?? 0) >= 40);
 
   return (
     <p className="weather-line" role="status">
-      <b>{c.tempC != null ? `${Math.round(c.tempC)}°C` : '—'}</b>
+      <b>{c.tempC != null ? `${Math.round(c.tempC)}°C` : 'N/A'}</b>
       <span>{t(locale, CONDITION_KEY[c.condition])}</span>
-      {wet && <span className="weather-line-warn">{t(locale, 'weather.rainAt', { time: hourLabel(wet.at, locale) })}</span>}
+      {wet && <span className="weather-line-warn">{t(locale, 'weather.rainAt', { time: hourLabel(wet) })}</span>}
       {hasFix ? null : (
         <select
           className="weather-line-place"

@@ -469,8 +469,6 @@ export type StringKey =
   | 'weather.place.dodoma'
   | 'theme.toLight'
   | 'theme.toDark'
-  | 'weather.now'
-  | 'weather.rainChance'
   | 'weather.rainAt'
   | 'weather.stale'
   | 'weather.staleShort'
@@ -1072,8 +1070,6 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'weather.place.dodoma': 'Dodoma',
     'theme.toLight': 'Switch to light mode',
     'theme.toDark': 'Switch to dark mode',
-    'weather.now': 'Now',
-    'weather.rainChance': '{pct}% rain',
     'weather.rainAt': 'Rain likely at {time}',
     'weather.stale': 'Last reading, shown while offline.',
     'weather.staleShort': 'earlier reading',
@@ -1095,8 +1091,8 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'landing.how.3.title': 'Help finds you',
     'landing.how.3.body': 'Your people, and verified responders nearby who opted in, see where you are and that you need them.',
     'landing.premium.heading': 'Try it free for one month',
-    'landing.premium.body': 'Premium adds a medical profile, a bigger Trusted Circle, the 3-day weather outlook and priority support. Emergency features are always free.',
-    'landing.premium.bodyPrice': 'Then {price} a month. Premium adds a medical profile, a bigger Trusted Circle, the 3-day weather outlook and priority support. Emergency features are always free.',
+    'landing.premium.body': 'Premium grows your Trusted Circle from 10 to 50 people and adds a 3 day weather forecast and a weekly safety briefing. Emergency features are always free.',
+    'landing.premium.bodyPrice': 'Then {price} a month. Premium grows your Trusted Circle from 10 to 50 people and adds a 3 day weather forecast and a weekly safety briefing. Emergency features are always free.',
     'landing.premium.freeNote': 'No card needed to start. SOS, 112 and the numbers on this page never cost anything.',
     'landing.premium.cta': 'Start free month',
     'landing.directory.heading': 'Emergency directory, Tanzania',
@@ -1672,8 +1668,6 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'weather.place.dodoma': 'Dodoma',
     'theme.toLight': 'Badili kuwa mwanga',
     'theme.toDark': 'Badili kuwa giza',
-    'weather.now': 'Sasa',
-    'weather.rainChance': 'Mvua {pct}%',
     'weather.rainAt': 'Mvua huenda saa {time}',
     'weather.stale': 'Taarifa ya mwisho, inaonyeshwa ukiwa nje ya mtandao.',
     'weather.staleShort': 'taarifa ya awali',
@@ -1695,8 +1689,8 @@ const STRINGS: Record<Locale, Record<StringKey, string>> = {
     'landing.how.3.title': 'Msaada unakupata',
     'landing.how.3.body': 'Watu wako, na walinzi waliothibitishwa walio karibu waliokubali, wanaona ulipo na kwamba unawahitaji.',
     'landing.premium.heading': 'Jaribu bure kwa mwezi mmoja',
-    'landing.premium.body': 'Premium huongeza wasifu wa kiafya, Mzunguko wa Uaminifu mkubwa zaidi, utabiri wa siku 3 na msaada wa kipaumbele. Huduma za dharura ni bure daima.',
-    'landing.premium.bodyPrice': 'Kisha {price} kwa mwezi. Premium huongeza wasifu wa kiafya, Mzunguko wa Uaminifu mkubwa zaidi, utabiri wa siku 3 na msaada wa kipaumbele. Huduma za dharura ni bure daima.',
+    'landing.premium.body': 'Premium hukuza Circle yako ya kuaminika kutoka watu 10 hadi 50, na huongeza utabiri wa hali ya hewa wa siku 3 na taarifa ya usalama ya kila wiki. Huduma za dharura ni bure daima.',
+    'landing.premium.bodyPrice': 'Kisha {price} kwa mwezi. Premium hukuza Circle yako ya kuaminika kutoka watu 10 hadi 50, na huongeza utabiri wa hali ya hewa wa siku 3 na taarifa ya usalama ya kila wiki. Huduma za dharura ni bure daima.',
     'landing.premium.freeNote': 'Hauhitaji kadi kuanza. SOS, 112 na namba za ukurasa huu hazina gharama kamwe.',
     'landing.premium.cta': 'Anza mwezi wa bure',
     'landing.directory.heading': 'Orodha ya namba za dharura, Tanzania',

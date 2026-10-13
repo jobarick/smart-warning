@@ -18,7 +18,7 @@ const TIPS = [
   { sw: 'Mvua kubwa: usivuke maji yanayotiririka, hata yakionekana madogo.', en: 'Heavy rain: never cross running water, even if it looks shallow.' },
   { sw: 'Unarudi usiku? Washa "Nahisi Hatari" kabla ya kuondoka.', en: 'Heading home late? Turn on "I feel unsafe" before you set off.' },
   { sw: 'Weka chaji ya simu juu ya 30% ukiwa safarini, au beba power bank.', en: 'Keep your phone above 30% when travelling, or carry a power bank.' },
-  { sw: 'Andika taarifa zako za afya (damu, mzio) kwenye wasifu wako.', en: 'Add your medical details (blood type, allergies) to your profile.' },
+  { sw: 'Mwambie mtu wa karibu aina ya damu yako na mzio ulio nao, kabla ya dharura.', en: 'Tell someone close to you your blood type and any allergies, before an emergency.' },
   { sw: 'Jaribu kengele ya Smart Warning mara moja kwa mwezi ili ujue inavyosikika.', en: 'Test your Smart Warning alarm once a month so you know how it sounds.' },
 ];
 
