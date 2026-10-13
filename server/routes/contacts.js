@@ -208,6 +208,12 @@ async function handle({ req, res, path }) {
       return true;
     }
 
+    // The personal timeline (routes/personal.js) is read from these events,
+    // so every step written here is one the person will see — and nothing is
+    // shown that was not actually recorded.
+    db.recordIncidentEvent?.({ incidentId, kind: 'raised', actorName: user.name || null, actorRole: 'worker', detail: { type, severity } })
+      .catch((e) => console.error('[db] recordIncidentEvent(raised/personal):', e.message));
+
     // Nearby Help, in parallel with the Trusted Circle emails below — this is
     // exactly the account kind Section 6/34 of the product brief is about: a
     // person alone with a thin or empty Trusted Circle is the strongest case
@@ -262,6 +268,11 @@ async function handle({ req, res, path }) {
       });
       contacted.push({ id: contact.id, name: contact.name, delivered: result.delivered === true });
     }
+
+    db.recordIncidentEvent?.({
+      incidentId, kind: 'notified', actorRole: 'system',
+      detail: { channel: 'email', count: contacted.filter((c) => c.delivered).length, skipped: skipped.length },
+    }).catch((e) => console.error('[db] recordIncidentEvent(notified/email):', e.message));
 
     sendJson(res, 201, { incidentId, contacted, skipped });
     return true;
@@ -338,6 +349,9 @@ async function handle({ req, res, path }) {
       sendJson(res, 200, { ok: true, incidentId, alreadyResolved: true });
       return true;
     }
+
+    db.recordIncidentEvent?.({ incidentId, kind: 'resolved', actorName: user.name || null, actorRole: 'worker', detail: { reason } })
+      .catch((e) => console.error('[db] recordIncidentEvent(resolved/personal):', e.message));
 
     const contacts = await db.listNotifiableContacts(user.id);
     const raiser = user.name || 'Mtumiaji wa Smart Warning';

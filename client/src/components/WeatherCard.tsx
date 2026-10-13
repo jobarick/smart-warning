@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchWeather, NAMED_LOCATIONS, type WeatherResult } from '../lib/weather';
+import { fetchWeather, NAMED_LOCATIONS, upcomingHours, type HourlyWeather, type WeatherCondition, type WeatherResult } from '../lib/weather';
 import { t, type StringKey } from '../lib/i18n';
 import type { Locale } from '../types';
 import { Icon } from './Icon';
@@ -12,7 +12,7 @@ interface Props {
   locale: Locale;
 }
 
-const CONDITION_KEY: Record<string, StringKey> = {
+export const CONDITION_KEY: Record<WeatherCondition, StringKey> = {
   'clear': 'weather.condition.clear',
   'partly-cloudy': 'weather.condition.partly-cloudy',
   'cloudy': 'weather.condition.cloudy',
@@ -24,22 +24,28 @@ const CONDITION_KEY: Record<string, StringKey> = {
   'unknown': 'weather.condition.unknown',
 };
 
+/** "14:00", the forecast point's own wall clock (the server sends it that way). */
+export function hourLabel(h: HourlyWeather): string {
+  return h.time.slice(11, 16);
+}
+
+const temp = (c: number | null | undefined) => (c != null ? `${Math.round(c)}°` : 'N/A');
+
 type LocateState = { status: 'locating' } | { status: 'choosing' } | { status: 'known'; lat: number; lng: number };
 
 /**
- * "Weather around you" — a third-party forecast (see lib/weather.ts and
- * server/weather.js), never presented as the official TMA bulletin that
- * SafetyBriefingCard already reserves a separate, still-empty slot for.
+ * The account's weather widget: now, then the next three hours. Nothing else.
  *
- * Current conditions are free for everyone; the 3-day forecast and its
- * rain/wind/heat notes unlock only when the server says so — this component
- * never hides them client-side, it just doesn't receive them (`daily` is
- * `null` and `forecastLocked` is `true` in the response).
+ * A third-party forecast (see lib/weather.ts and server/weather.js), never the
+ * official TMA bulletin. That boundary is stated once, in the Terms, rather
+ * than as small print under every reading.
+ *
+ * The 3-day outlook stays a Premium feature and appears only when the server
+ * sends it (`daily` is null otherwise) — never hidden client-side.
  */
 export function WeatherCard({ token, locale }: Props) {
   const [locate, setLocate] = useState<LocateState>({ status: 'locating' });
   const [weather, setWeather] = useState<WeatherResult | null>(null);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!navigator.geolocation) { setLocate({ status: 'choosing' }); return; }
@@ -47,7 +53,7 @@ export function WeatherCard({ token, locale }: Props) {
     navigator.geolocation.getCurrentPosition(
       (pos) => { if (!cancelled) setLocate({ status: 'known', lat: pos.coords.latitude, lng: pos.coords.longitude }); },
       () => { if (!cancelled) setLocate({ status: 'choosing' }); },
-      { timeout: 8000 },
+      { timeout: 8000, maximumAge: 10 * 60 * 1000 },
     );
     return () => { cancelled = true; };
   }, []);
@@ -55,36 +61,20 @@ export function WeatherCard({ token, locale }: Props) {
   useEffect(() => {
     if (locate.status !== 'known') return;
     let cancelled = false;
-    setLoading(true);
-    fetchWeather(locate.lat, locate.lng, token)
-      .then((r) => { if (!cancelled) setWeather(r); })
-      .finally(() => { if (!cancelled) setLoading(false); });
+    fetchWeather(locate.lat, locate.lng, token).then((r) => { if (!cancelled) setWeather(r); });
     return () => { cancelled = true; };
   }, [locate, token]);
 
-  if (locate.status === 'locating') {
-    return (
-      <section className="weather-card">
-        <h2 className="weather-heading"><Icon name="bell" /> {t(locale, 'weather.heading')}</h2>
-        <p className="weather-empty">{t(locale, 'weather.loading')}</p>
-      </section>
-    );
-  }
+  const heading = <h2 className="weather-heading"><Icon name="sun" /> {t(locale, 'weather.heading')}</h2>;
 
   if (locate.status === 'choosing') {
     return (
       <section className="weather-card">
-        <h2 className="weather-heading"><Icon name="bell" /> {t(locale, 'weather.heading')}</h2>
-        <p className="weather-empty">{t(locale, 'weather.locationDenied')}</p>
+        {heading}
         <p className="weather-choose-label">{t(locale, 'weather.chooseLocation')}</p>
         <div className="weather-place-grid">
           {NAMED_LOCATIONS.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className="weather-place-btn"
-              onClick={() => setLocate({ status: 'known', lat: p.lat, lng: p.lng })}
-            >
+            <button key={p.id} type="button" className="weather-place-btn" onClick={() => setLocate({ status: 'known', lat: p.lat, lng: p.lng })}>
               {t(locale, p.nameKey as StringKey)}
             </button>
           ))}
@@ -93,101 +83,74 @@ export function WeatherCard({ token, locale }: Props) {
     );
   }
 
-  if (loading && !weather) {
+  // Skeleton rows rather than a spinner: the shape of the answer is known, and
+  // it should not jump when the numbers land.
+  if (!weather) {
     return (
-      <section className="weather-card">
-        <h2 className="weather-heading"><Icon name="bell" /> {t(locale, 'weather.heading')}</h2>
-        <p className="weather-empty">{t(locale, 'weather.loading')}</p>
+      <section className="weather-card" aria-busy="true">
+        {heading}
+        <div className="weather-hours weather-hours-skeleton" aria-hidden="true">
+          {[0, 1, 2, 3].map((i) => <span key={i} className="weather-hour" />)}
+        </div>
       </section>
     );
   }
 
-  if (!weather?.ok || !weather.current) {
+  if (!weather.ok || !weather.current) {
     return (
       <section className="weather-card">
-        <h2 className="weather-heading"><Icon name="bell" /> {t(locale, 'weather.heading')}</h2>
+        {heading}
         <p className="weather-empty">{t(locale, 'weather.unavailable')}</p>
       </section>
     );
   }
 
-  const { current, daily, flags, forecastLocked, hourly } = weather;
-  // Four points across the next 12 hours (now, +3h, +6h, +9h): enough to see
-  // the afternoon coming without a long strip to scroll through.
-  const hours = (hourly ?? []).filter((_, i) => i % 3 === 0).slice(0, 4);
-  const activeNotes = flags
-    ? (['heavyRainLikely', 'strongWind', 'extremeHeat'] as const).filter((k) => flags[k])
-    : [];
-  const noteKeys: Record<typeof activeNotes[number], { title: StringKey; body: StringKey }> = {
-    heavyRainLikely: { title: 'weather.note.heavyRain.title', body: 'weather.note.heavyRain.body' },
-    strongWind: { title: 'weather.note.strongWind.title', body: 'weather.note.strongWind.body' },
-    extremeHeat: { title: 'weather.note.extremeHeat.title', body: 'weather.note.extremeHeat.body' },
+  const { current, daily, flags } = weather;
+  const hourly = upcomingHours(weather.hourly, 3);
+  const notes = flags ? (['heavyRainLikely', 'strongWind', 'extremeHeat'] as const).filter((k) => flags[k]) : [];
+  const noteKey: Record<(typeof notes)[number], StringKey> = {
+    heavyRainLikely: 'weather.note.heavyRain.title',
+    strongWind: 'weather.note.strongWind.title',
+    extremeHeat: 'weather.note.extremeHeat.title',
   };
 
   return (
     <section className="weather-card">
-      <h2 className="weather-heading"><Icon name="bell" /> {t(locale, 'weather.heading')}</h2>
-
-      <div className="weather-current">
-        <span className="weather-temp">{current.tempC != null ? `${Math.round(current.tempC)}°C` : 'N/A'}</span>
-        <span className="weather-condition">{t(locale, CONDITION_KEY[current.condition])}</span>
-        {current.windKph != null && (
-          <span className="weather-wind">{t(locale, 'weather.wind', { kph: String(Math.round(current.windKph)) })}</span>
-        )}
+      {heading}
+      <div className="weather-hours">
+        <span className="weather-hour weather-hour-now">
+          <span className="weather-hour-at">{t(locale, 'weather.now')}</span>
+          <b>{temp(current.tempC)}</b>
+          <span className="weather-hour-cond">{t(locale, CONDITION_KEY[current.condition])}</span>
+        </span>
+        {hourly.map((h) => (
+          <span className="weather-hour" key={h.time}>
+            <span className="weather-hour-at">{hourLabel(h)}</span>
+            <b>{temp(h.tempC)}</b>
+            <span className="weather-hour-cond">
+              {h.precipitationProbability != null && h.precipitationProbability >= 20
+                ? t(locale, 'weather.rainChance', { pct: String(h.precipitationProbability) })
+                : t(locale, CONDITION_KEY[h.condition])}
+            </span>
+          </span>
+        ))}
       </div>
 
-      {activeNotes.length > 0 && (
-        <div className="weather-notes">
-          {activeNotes.map((k) => (
-            <p className="weather-note" key={k}>
-              <b>{t(locale, noteKeys[k].title)}</b>
-              <span>{t(locale, noteKeys[k].body)}</span>
-            </p>
+      {notes.length > 0 && (
+        <p className="weather-note-line">{notes.map((k) => t(locale, noteKey[k])).join(' · ')}</p>
+      )}
+
+      {daily && daily.length > 0 && (
+        <p className="weather-days">
+          {daily.map((d, i) => (
+            <span key={d.date}>
+              {i === 0 ? t(locale, 'weather.today') : new Date(d.date).toLocaleDateString(locale, { weekday: 'short' })} {temp(d.tempMaxC)}/{temp(d.tempMinC)}
+            </span>
           ))}
-        </div>
+        </p>
       )}
 
-      {hours.length > 0 && (
-        <div className="weather-forecast">
-          <span className="weather-forecast-label">{t(locale, 'weather.nextHours')}</span>
-          <div className="weather-forecast-grid weather-hours-grid">
-            {hours.map((h, i) => (
-              <div className="weather-forecast-day" key={h.time}>
-                <span>{i === 0 ? t(locale, 'weather.now') : h.time.slice(11, 16)}</span>
-                <b>{h.tempC != null ? `${Math.round(h.tempC)}°` : 'N/A'}</b>
-                <span className="weather-forecast-min">
-                  {h.precipitationProbability != null
-                    ? t(locale, 'weather.rainChance', { pct: String(h.precipitationProbability) })
-                    : t(locale, CONDITION_KEY[h.condition])}
-                </span>
-              </div>
-            ))}
-          </div>
-          {/* Said out loud when it is true. "Nothing to worry about in the
-              next 12 hours" is the reassurance a visitor came for, and an
-              empty space would not tell them that. */}
-          {activeNotes.length === 0 && <p className="weather-calm">{t(locale, 'weather.calm')}</p>}
-        </div>
-      )}
-
-      {forecastLocked ? (
-        <p className="weather-teaser">{t(locale, 'weather.premiumTeaser')}</p>
-      ) : daily && daily.length > 0 ? (
-        <div className="weather-forecast">
-          <span className="weather-forecast-label">{t(locale, 'weather.forecastHeading')}</span>
-          <div className="weather-forecast-grid">
-            {daily.map((d, i) => (
-              <div className="weather-forecast-day" key={d.date}>
-                <span>{i === 0 ? t(locale, 'weather.today') : new Date(d.date).toLocaleDateString(locale, { weekday: 'short' })}</span>
-                <b>{d.tempMaxC != null ? `${Math.round(d.tempMaxC)}°` : 'N/A'}</b>
-                <span className="weather-forecast-min">{d.tempMinC != null ? `${Math.round(d.tempMinC)}°` : 'N/A'}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      <p className="weather-disclaimer">{t(locale, 'weather.disclaimer')}</p>
+      {weather.stale && <p className="weather-stale">{t(locale, 'weather.stale')}</p>}
     </section>
   );
 }

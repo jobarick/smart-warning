@@ -37,6 +37,8 @@ export const SPA_PATHS = [
   '/support',
   '/billing',
   '/setup',
+  // a verified Nearby Help responder's own view
+  '/responder',
 ] as const;
 
 /**

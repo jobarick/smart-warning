@@ -78,6 +78,22 @@ function readText(req) {
   });
 }
 
+// Read a raw binary body up to `max` bytes — a voice note, never a file upload
+// in general. Over the cap is refused outright rather than truncated.
+function readBytes(req, max) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > max) { reject(auth.httpError(413, 'payload too large')); req.destroy(); return; }
+      chunks.push(chunk);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
 function bearer(req) {
   const h = req.headers.authorization || '';
   return h.startsWith('Bearer ') ? h.slice(7) : '';
@@ -134,4 +150,4 @@ function rateLimiter({ windowMs, max, name }) {
   };
 }
 
-module.exports = { CORS, originHeaders, sendJson, readJson, readText, bearer, clientIp, rateLimiter };
+module.exports = { CORS, originHeaders, sendJson, readJson, readText, readBytes, bearer, clientIp, rateLimiter };

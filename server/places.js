@@ -25,6 +25,9 @@ const OSM_QUERY = {
   fire: '["amenity"="fire_station"]',
   shelter: '["amenity"="shelter"]',
   pharmacy: '["amenity"="pharmacy"]',
+  // Private security firms and guard posts. Sparse in OpenStreetMap for most
+  // of Tanzania, so verified directory entries carry most of this kind.
+  security: '["office"~"^(security|guard)$"]',
 };
 
 // What each alert type means in terms of "where do I go".
@@ -167,7 +170,7 @@ out center ${Math.max(remaining * 4, 20)};`;
 }
 
 function defaultName(kind) {
-  return { hospital: 'Hospital', police: 'Police station', fire: 'Fire station', shelter: 'Shelter', pharmacy: 'Pharmacy' }[kind] || 'Facility';
+  return { hospital: 'Hospital', police: 'Police station', fire: 'Fire station', shelter: 'Shelter', pharmacy: 'Pharmacy', security: 'Security company' }[kind] || 'Facility';
 }
 
 function addressOf(tags) {

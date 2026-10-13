@@ -25,6 +25,8 @@ const MODULES = [
   require('./billing'),
   require('./weather'),
   require('./responders'),
+  require('./map'),
+  require('./personal'),
 ];
 
 async function handle(req, res) {

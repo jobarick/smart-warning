@@ -1,6 +1,6 @@
 # Smart Warning: Privacy Policy
 
-**Version 1.2, effective 5 August 2026**
+**Version 1.3, effective 13 October 2026**
 
 <!-- Generated from client/src/lib/terms.ts by tools/generate-legal.js.
      Do not edit by hand: this must stay identical to the text shown in the

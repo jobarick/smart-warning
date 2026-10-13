@@ -15,10 +15,11 @@ interface Props {
   onReport: (type: AlertType) => void;
 }
 
-// The nine services this signed-in home page leads with — Police, Fire,
-// Ambulance (top row), Disaster/Child Helpline/Utility (middle), the less
-// frequently needed Anti-Trafficking/Epidemic/Coast Guard (bottom row).
-const GRID_IDS = ['112', '114', '115', '0800110064', '116', '0800711113', '195', '199', '110'];
+// The six services the signed-in home leads with — Police, Fire, Ambulance,
+// then Disaster, Child Helpline and Utility. The rarer numbers (Anti-
+// Trafficking, Epidemic, Coast Guard) are in the Help tab's call list and the
+// public directory, not above the fold.
+const GRID_IDS = ['112', '114', '115', '0800110064', '116', '0800711113'];
 
 // Which of this grid's categories map to one of the app's own alert types
 // (types.ts's AlertType), for the optional "Report through Smart Warning"

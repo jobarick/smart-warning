@@ -137,6 +137,17 @@ async function handle({ req, res, path }) {
     return true;
   }
 
+  // Which terms version this account has already accepted, anywhere. Lets a
+  // second phone skip the consent screen for terms the person already agreed
+  // to at sign-up — and bring it back only when the version changes.
+  if (path === '/api/consent/me' && req.method === 'GET') {
+    const ctx = await requireAuth(req);
+    if (!ctx) { sendJson(res, 401, { error: 'not authenticated' }); return true; }
+    const row = db.enabled() ? await db.latestConsentForUser(ctx.user.id) : null;
+    sendJson(res, 200, { version: row?.version ?? null, points: row?.points ?? [] });
+    return true;
+  }
+
   // Who has accepted what, for an organisation's own records.
   if (path === '/api/consent' && req.method === 'GET') {
     const ctx = await guardOrg(req, res);

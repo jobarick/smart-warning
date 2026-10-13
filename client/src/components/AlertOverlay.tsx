@@ -6,6 +6,9 @@ import { t, SEVERITY_KEY } from '../lib/i18n';
 import { needsFallback, type DeliveryState } from '../lib/delivery';
 import { Icon } from './Icon';
 import { NearbyHelpStatus } from './NearbyHelpStatus';
+import { IncidentTimeline } from './IncidentTimeline';
+import { VoiceNoteButton } from './VoiceNoteButton';
+import type { PersonalSendStatus } from './SosPanel';
 
 /**
  * Whether the alert THIS device raised actually reached anyone, at the top of
@@ -87,9 +90,13 @@ interface Props {
   delivery?: DeliveryState | null;
   /** What to offer when it has not: a number to call and a prefilled SMS. */
   fallback?: { number: string; smsHref: string; canDial: boolean };
+  /** A personal account's own alert: its token unlocks the real timeline and
+   *  the voice note. Omitted for org alerts, which have the roster instead. */
+  personalToken?: string;
+  sendStatus?: PersonalSendStatus | null;
 }
 
-export function AlertOverlay({ alert, acknowledged, settings, locale, label, safeConfirmed, onConfirmSafe, onAcknowledge, onAllClear, responder, ackNotice, canRetract, onFalseAlarm, delivery, fallback }: Props) {
+export function AlertOverlay({ alert, acknowledged, settings, locale, label, safeConfirmed, onConfirmSafe, onAcknowledge, onAllClear, responder, ackNotice, canRetract, onFalseAlarm, delivery, fallback, personalToken, sendStatus }: Props) {
   // Retracting also stops every siren on site, so it takes a second tap the
   // same way all-clear does — but it is worded as taking the alarm back, not
   // as declaring an emergency over.
@@ -173,7 +180,14 @@ export function AlertOverlay({ alert, acknowledged, settings, locale, label, saf
         <p className="overlay-meta">
           {t(locale, 'overlay.triggeredBy', { sender: alert.sender, time: new Date(alert.timestamp).toLocaleTimeString() })}
         </p>
-        <NearbyHelpStatus incidentId={alert.id} />
+        {personalToken && canRetract ? (
+          <>
+            <IncidentTimeline incidentId={alert.id} raisedAt={alert.timestamp} token={personalToken} locale={locale} sendStatus={delivery ? undefined : sendStatus} />
+            <VoiceNoteButton incidentId={alert.id} token={personalToken} locale={locale} />
+          </>
+        ) : (
+          <NearbyHelpStatus incidentId={alert.id} />
+        )}
       </div>
       <div className="overlay-actions">
         {!acknowledged ? (

@@ -8,6 +8,8 @@ import { AlertLog } from './AlertLog';
 import { Icon } from './Icon';
 import { NearbyHelpOptIn } from './NearbyHelpOptIn';
 import { TrustedCircle } from './TrustedCircle';
+import { WeatherCard } from './WeatherCard';
+import { WeeklyTipsToggle } from './WeeklyTipsToggle';
 
 interface Props {
   session: Session | null;
@@ -77,9 +79,12 @@ export function ProfilePanel({
         )}
       </section>
 
+      {/* The account's weather: now and the next three hours. */}
+      <WeatherCard token={token} locale={locale} />
+
       <AlertLog entries={log} />
 
-      {token && <NearbyHelpOptIn token={token} />}
+      {token && <NearbyHelpOptIn token={token} locale={locale} />}
 
       {org && (
         <section className="panel">
@@ -132,6 +137,8 @@ export function ProfilePanel({
           {t(locale, locale === 'en' ? 'settings.languageEnglish' : 'settings.languageSwahili')}
         </button>
       </section>
+
+      {token && <WeeklyTipsToggle token={token} locale={locale} />}
 
       <div className="profile-actions">
         {onBilling && (

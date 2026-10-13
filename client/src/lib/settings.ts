@@ -41,7 +41,7 @@ export const DEFAULT_SETTINGS: Settings = {
   assemblyLat: null,
   assemblyLng: null,
   assemblyLabel: 'Assembly point',
-  theme: 'dark',
+  theme: 'system',
   locale: detectLocale(),
 };
 

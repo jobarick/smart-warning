@@ -10,6 +10,10 @@ import { Icon } from './Icon';
 
 interface Props {
   locale: Locale;
+  /** Which services, in order. Defaults to the full nine. */
+  ids?: string[];
+  /** Drop the heading and sub-line, for a page that already introduced it. */
+  bare?: boolean;
 }
 
 // Tanzania's own short-code directory (server/emergency-numbers.js,
@@ -17,7 +21,7 @@ interface Props {
 // (2026-09-17), plus Disaster Management and Utility Emergency added
 // (2026-09-18) to reach nine. Ids are the numbers themselves — see that
 // file's directoryFor().
-const GRID_IDS = ['111', '112', '113', '114', '115', '116', '117', '0800110064', '0800711113'];
+export const GRID_IDS = ['111', '112', '113', '114', '115', '116', '117', '0800110064', '0800711113'];
 
 /**
  * The public front door's 3×3 emergency grid: nine incident types, tap one and
@@ -29,7 +33,7 @@ const GRID_IDS = ['111', '112', '113', '114', '115', '116', '117', '0800110064',
  * across borders), this grid exists specifically for the Tanzania audience the
  * product is built for.
  */
-export function EmergencyGrid({ locale }: Props) {
+export function EmergencyGrid({ locale, ids = GRID_IDS, bare = false }: Props) {
   const [byId, setById] = useState<Record<string, EmergencyGridService>>(EMERGENCY_SERVICE_FALLBACK);
   const [selected, setSelected] = useState<string | null>(null);
   // Whether the report form is open — a deliberate second choice, never
@@ -50,7 +54,7 @@ export function EmergencyGrid({ locale }: Props) {
           // — every other field (label, numbers, description) can come from
           // the network, but iconName always comes from EMERGENCY_SERVICE_FALLBACK.
           for (const svc of dir.services) {
-            if (GRID_IDS.includes(svc.id)) next[svc.id] = { ...svc, iconName: EMERGENCY_SERVICE_FALLBACK[svc.id].iconName };
+            if (svc.id in EMERGENCY_SERVICE_FALLBACK) next[svc.id] = { ...svc, iconName: EMERGENCY_SERVICE_FALLBACK[svc.id].iconName };
           }
           return next;
         });
@@ -63,11 +67,11 @@ export function EmergencyGrid({ locale }: Props) {
 
   return (
     <div className="eg">
-      <h2 className="eg-heading">{t(locale, 'emergencyGrid.heading')}</h2>
-      <p className="eg-sub">{t(locale, 'emergencyGrid.sub')}</p>
+      {!bare && <h2 className="eg-heading">{t(locale, 'emergencyGrid.heading')}</h2>}
+      {!bare && <p className="eg-sub">{t(locale, 'emergencyGrid.sub')}</p>}
 
-      <div className="eg-grid" role="group" aria-label={t(locale, 'emergencyGrid.heading')}>
-        {GRID_IDS.map((id) => {
+      <div className={`eg-grid${ids.length === 6 ? ' eg-grid-6' : ''}`} role="group" aria-label={t(locale, 'emergencyGrid.heading')}>
+        {ids.map((id) => {
           const svc = byId[id];
           const label = locale === 'sw' && svc.labelSw ? svc.labelSw : svc.label;
           return (

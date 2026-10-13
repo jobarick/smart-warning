@@ -1,6 +1,6 @@
 # Smart Warning: Terms & Conditions
 
-**Version 1.2, effective 5 August 2026**
+**Version 1.3, effective 13 October 2026**
 
 <!-- Generated from client/src/lib/terms.ts by tools/generate-legal.js.
      Do not edit by hand: this must stay identical to the text shown in the
@@ -90,6 +90,12 @@ Smart Warning is not responsible for failures caused solely by third party servi
 Maps, evacuation routes, recommendations, estimated arrival times, hospitals, police stations, assembly points, and other guidance are provided to assist decision making.
 
 Users must always exercise their own judgment and follow official emergency instructions where available.
+
+## 8a. Weather Information
+
+Weather shown in Smart Warning, including current conditions, the next few hours, any multi-day outlook and any rain, wind or heat note, comes from a third party forecast provider. It is a forecast, not an official warning, and it is not affiliated with or endorsed by the Tanzania Meteorological Authority (TMA).
+
+Forecasts can be wrong or out of date, particularly when your device is offline and an earlier reading is shown. For official weather warnings, follow TMA and your local authorities.
 
 ## 9. Privacy
 

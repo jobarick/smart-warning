@@ -9,7 +9,7 @@
 // value in localStorage proves nothing, can be cleared, and is under the user's
 // own control. The durable record is written server-side by recordConsent()
 // below, which is what an organisation could actually rely on.
-import { TERMS_VERSION } from './terms';
+import { TERMS_VERSION } from './termsMeta';
 
 const KEY = 'sw-consent-v1';
 
