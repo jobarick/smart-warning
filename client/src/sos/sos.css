@@ -11,6 +11,7 @@ html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.
 .sos-lang { min-height: 40px; padding: 6px 12px; font: inherit; font-size: 0.85rem; font-weight: 650; color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 10px; }
 .sos-lead, .sos-fine { margin: 0; color: var(--muted); }
 .sos-fine { font-size: 0.85rem; }
+.sos-warn { color: var(--warn); font-weight: 650; }
 .sos-types { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .sos-type { min-height: 44px; font: inherit; font-size: 0.85rem; font-weight: 650; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
 .sos-type.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }

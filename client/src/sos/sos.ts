@@ -51,6 +51,9 @@ const TEXT = {
     smsNoLocation: 'Mahali bado hapajulikani.',
     lang: 'English',
     retry: 'Jaribu kutuma tena',
+    replayed: 'Smart Warning ilishapokea tahadhari hii kwenye jaribio la awali. Fungua Smart Warning kamili kuona nani amejulishwa.',
+    stillTrying: 'Haijatumwa bado; bado tunajaribu. Piga {num} sasa.',
+    closeFailed: 'Hatukuweza kuwajulisha kuwa imekwisha. Jaribu tena, au fungua Smart Warning kamili.',
   },
   en: {
     title: 'Quick SOS',
@@ -77,8 +80,22 @@ const TEXT = {
     smsNoLocation: 'Location not known yet.',
     lang: 'Kiswahili',
     retry: 'Try sending again',
+    replayed: 'Smart Warning already received this alert on an earlier try. Open the full Smart Warning to see who was told.',
+    stillTrying: 'Not sent yet; still trying. Call {num} now.',
+    closeFailed: "Couldn't tell your people it is over. Try again, or open the full Smart Warning.",
   },
 };
+
+/** RFC 4122 v4. crypto.randomUUID is missing on older Android browsers; the
+ *  server needs a UUID to recognise a retry as the same alert. */
+function newId(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
 
 const fill = (s: string, v: Record<string, string>) => s.replace(/\{(\w+)\}/g, (m, k) => v[k] ?? m);
 
@@ -115,6 +132,7 @@ let raisedAt = 0;
 let pos: GeolocationPosition | null = null;
 let contacted = 0;
 let replayed = false;
+let closeFailed = false;
 
 function delivery(): DeliveryState | null {
   if (phase !== 'sending' && phase !== 'sent' && phase !== 'failed') return null;
@@ -146,13 +164,13 @@ function sms(): string {
 async function raise(retry = false) {
   if (!personal || phase === 'locating' || phase === 'sending') return;
   if (!retry || !incidentId) {
-    incidentId = crypto.randomUUID();
+    incidentId = newId();
     raisedAt = Date.now();
     navigator.vibrate?.([200, 100, 200]);
-    phase = 'locating'; render();
+    phase = 'locating'; safeRender();
     pos = await locate(6000);
   }
-  phase = 'sending'; render();
+  phase = 'sending'; safeRender();
   try {
     const r = await sendPersonalAlert({
       id: incidentId, type, severity: 'critical',
@@ -165,13 +183,20 @@ async function raise(retry = false) {
   } catch {
     phase = 'failed';
   }
-  render();
+  safeRender();
 }
 
 async function close(reason: 'resolved' | 'false-alarm') {
   if (!personal || !incidentId) return;
-  try { await resolvePersonalAlert(incidentId, reason, personal.token); } catch { /* the alert stays open; the full app can close it */ }
-  phase = 'closed'; render();
+  try {
+    await resolvePersonalAlert(incidentId, reason, personal.token);
+    closeFailed = false;
+    phase = 'closed';
+  } catch {
+    // The alert stays open on the server; say so rather than claim it closed.
+    closeFailed = true;
+  }
+  safeRender();
 }
 
 function render() {
@@ -183,7 +208,7 @@ function render() {
   const top = el('div', { class: 'sos-top' });
   top.append(el('h1', {}, T.title));
   const langBtn = el('button', { type: 'button', class: 'sos-lang' }, T.lang);
-  langBtn.onclick = () => { lang = lang === 'sw' ? 'en' : 'sw'; render(); };
+  langBtn.onclick = () => { lang = lang === 'sw' ? 'en' : 'sw'; safeRender(); };
   top.append(langBtn);
   root.append(top);
 
@@ -192,7 +217,7 @@ function render() {
     const types = el('div', { class: 'sos-types', role: 'radiogroup' });
     (Object.keys(T.types) as TypeId[]).forEach((id) => {
       const b = el('button', { type: 'button', role: 'radio', 'aria-checked': String(type === id), class: `sos-type${type === id ? ' on' : ''}` }, T.types[id]);
-      b.onclick = () => { type = id; render(); };
+      b.onclick = () => { type = id; safeRender(); };
       types.append(b);
     });
     root.append(types);
@@ -205,7 +230,9 @@ function render() {
     const status = el('p', { class: 'sos-status', role: 'status', 'aria-live': 'assertive' });
     if (phase === 'locating') status.textContent = T.locating;
     else if (d?.kind === 'sending') status.textContent = T.sending;
+    else if (phase === 'sent' && replayed) { status.textContent = T.replayed; status.classList.add('ok'); }
     else if (d?.kind === 'sent-people') { status.textContent = fill(T.sentPeople, { n: String(d.count) }); status.classList.add('ok'); }
+    else if (phase === 'sending') { status.textContent = fill(T.stillTrying, { num: FALLBACK_EMERGENCY_NUMBER }); status.classList.add('bad'); }
     else if (d?.kind === 'reached-nobody') { status.textContent = fill(T.reachedNobody, { num: FALLBACK_EMERGENCY_NUMBER }); status.classList.add('bad'); }
     else { status.textContent = fill(T.notSent, { num: FALLBACK_EMERGENCY_NUMBER }); status.classList.add('bad'); }
     root.append(status);
@@ -217,7 +244,10 @@ function render() {
       const oops = el('button', { type: 'button', class: 'sos-ghost' }, T.mistake);
       oops.onclick = () => void close('false-alarm');
       row.append(over, oops);
-      if (phase === 'sent') root.append(row);
+      if (phase === 'sent') {
+        root.append(row);
+        if (closeFailed) root.append(el('p', { class: 'sos-fine sos-warn', role: 'alert' }, T.closeFailed));
+      }
       if (phase === 'failed') {
         const again = el('button', { type: 'button', class: 'sos-ghost' }, T.retry);
         again.onclick = () => void raise(true);
@@ -242,9 +272,20 @@ function render() {
 // enough for it, and the app, to open again with no signal.
 registerSW({ immediate: true });
 
-render();
+// If drawing ever throws, put the no-JavaScript links back rather than leave
+// an empty page: 112 and SMS must survive any bug in this file.
+const fallbackHtml = document.getElementById('sos')?.innerHTML ?? '';
+function safeRender() {
+  try { render(); } catch (e) {
+    console.error('[sos] render failed', e);
+    const root = document.getElementById('sos');
+    if (root) root.innerHTML = fallbackHtml;
+  }
+}
+
+safeRender();
 // The "sending" verdict turns into "not sent" by itself after a budget
 // (lib/delivery's SEND_BUDGET_MS); re-render so that change is seen.
-setInterval(() => { if (phase === 'sending') render(); }, 1000);
-window.addEventListener('online', render);
-window.addEventListener('offline', render);
+setInterval(() => { if (phase === 'sending') safeRender(); }, 1000);
+window.addEventListener('online', safeRender);
+window.addEventListener('offline', safeRender);
