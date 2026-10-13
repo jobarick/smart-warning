@@ -6,13 +6,13 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 const emergencyNumbers = require('../emergency-numbers');
 
-test('Tanzania resolves to its own 14-row directory, not the generic categories', () => {
+test('Tanzania resolves to its own 15-row directory, not the generic categories', () => {
   const country = emergencyNumbers.countryAt(-6.79, 39.21); // Dar es Salaam
   assert.strictEqual(country.code, 'TZ');
   const { services } = emergencyNumbers.directoryFor(country);
-  assert.strictEqual(services.length, 14);
+  assert.strictEqual(services.length, 15);
   const numbers = services.map((s) => s.id);
-  for (const n of ['110', '111', '112', '113', '114', '115', '116', '117', '119', '190', '195', '199']) {
+  for (const n of ['110', '111', '112', '113', '114', '115', '116', '117', '119', '181', '190', '195', '199']) {
     assert.ok(numbers.includes(n), `missing ${n}`);
   }
 });

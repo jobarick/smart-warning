@@ -167,7 +167,7 @@ export interface Place {
 export async function fetchNearby(kind: PlaceKind, lat: number, lng: number): Promise<Place[]> {
   const params = new URLSearchParams({ kind, lat: String(lat), lng: String(lng) });
   const res = await fetch(`${API_BASE}/api/emergency/nearby?${params.toString()}`);
-  if (!res.ok) throw new Error(res.status === 429 ? 'too many lookups — wait a moment' : `nearby lookup failed (${res.status})`);
+  if (!res.ok) throw new Error(res.status === 429 ? 'too many lookups, wait a moment' : `nearby lookup failed (${res.status})`);
   const body = await res.json();
   return Array.isArray(body.places) ? body.places : [];
 }
@@ -309,7 +309,7 @@ export async function contactSales(input: SalesInquiry): Promise<{ ok: boolean }
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   });
-  if (!res.ok) throw new Error(await errorMessage(res, 'could not send that — please email us directly'));
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not send that, please email us directly'));
   return res.json();
 }
 

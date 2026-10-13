@@ -282,7 +282,7 @@ async function sendEmergencyReport(row, { audioBase64, audioMime, nearbyPlaces =
     `Logged:   ${row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString()}`,
     `Ref:      ${row.id}`,
     '',
-    row.message || '(no text — see attached voice note)',
+    row.message || '(no text, see attached voice note)',
   );
   const body = lines.join('\n');
 

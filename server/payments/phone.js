@@ -36,7 +36,7 @@ const COLLECTABLE = new Set(['mixx_by_yas', 'mpesa', 'airtel_money', 'halopesa',
 // TIGO-PESA; mapping both directions keeps that vendor detail out of our data.
 const OPERATORS = {
   mixx_by_yas:  { label: 'Mixx by Yas',   short: 'Mixx',   channel: 'TIGO-PESA' },
-  mpesa:        { label: 'Vodacom M-Pesa', short: 'M-Pesa', channel: 'M-PESA' },
+  mpesa:        { label: 'Vodacom MPesa', short: 'MPesa',  channel: 'M-PESA' },
   airtel_money: { label: 'Airtel Money',  short: 'Airtel', channel: 'AIRTEL-MONEY' },
   halopesa:     { label: 'HaloPesa',      short: 'Halo',   channel: 'HALOPESA' },
   ezypesa:      { label: 'EzyPesa',       short: 'Ezy',    channel: 'EZYPESA' },

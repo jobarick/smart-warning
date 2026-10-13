@@ -145,7 +145,7 @@ export function NearbyHelpOptIn({ token, locale = 'sw' }: Props) {
         <h2><Icon name="navigation" /> Nearby Help {status.verified && <VerifiedBadge locale={locale} />}</h2>
         <p className="hint">
           You're available to help people near you. Not a Safety Coordinator, not an emergency
-          service — just a fellow opted-in person nearby.
+          service. Just a fellow person nearby who chose to help.
         </p>
         {categoryPicker(toggleCategoryLive)}
         <button className="btn" onClick={disable} disabled={busy}>

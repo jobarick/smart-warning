@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchWeather, NAMED_LOCATIONS, type WeatherCondition, type WeatherResult } from '../lib/weather';
+import { fetchWeather, NAMED_LOCATIONS, upcomingHours, type HourlyWeather, type WeatherCondition, type WeatherResult } from '../lib/weather';
 import { t, type StringKey } from '../lib/i18n';
 import type { Locale } from '../types';
 import { Icon } from './Icon';
@@ -24,12 +24,12 @@ export const CONDITION_KEY: Record<WeatherCondition, StringKey> = {
   'unknown': 'weather.condition.unknown',
 };
 
-/** "14:00" — the hour a person will be walking home in, in their own clock. */
-export function hourLabel(at: number, locale: Locale): string {
-  return new Date(at).toLocaleTimeString(locale === 'sw' ? 'sw-TZ' : 'en-GB', { hour: '2-digit', minute: '2-digit' });
+/** "14:00", the forecast point's own wall clock (the server sends it that way). */
+export function hourLabel(h: HourlyWeather): string {
+  return h.time.slice(11, 16);
 }
 
-const temp = (c: number | null | undefined) => (c != null ? `${Math.round(c)}°` : '—');
+const temp = (c: number | null | undefined) => (c != null ? `${Math.round(c)}°` : 'N/A');
 
 type LocateState = { status: 'locating' } | { status: 'choosing' } | { status: 'known'; lat: number; lng: number };
 
@@ -105,7 +105,8 @@ export function WeatherCard({ token, locale }: Props) {
     );
   }
 
-  const { current, hourly = [], daily, flags } = weather;
+  const { current, daily, flags } = weather;
+  const hourly = upcomingHours(weather.hourly, 3);
   const notes = flags ? (['heavyRainLikely', 'strongWind', 'extremeHeat'] as const).filter((k) => flags[k]) : [];
   const noteKey: Record<(typeof notes)[number], StringKey> = {
     heavyRainLikely: 'weather.note.heavyRain.title',
@@ -122,9 +123,9 @@ export function WeatherCard({ token, locale }: Props) {
           <b>{temp(current.tempC)}</b>
           <span className="weather-hour-cond">{t(locale, CONDITION_KEY[current.condition])}</span>
         </span>
-        {hourly.slice(0, 3).map((h) => (
-          <span className="weather-hour" key={h.at}>
-            <span className="weather-hour-at">{hourLabel(h.at, locale)}</span>
+        {hourly.map((h) => (
+          <span className="weather-hour" key={h.time}>
+            <span className="weather-hour-at">{hourLabel(h)}</span>
             <b>{temp(h.tempC)}</b>
             <span className="weather-hour-cond">
               {h.precipitationProbability != null && h.precipitationProbability >= 20

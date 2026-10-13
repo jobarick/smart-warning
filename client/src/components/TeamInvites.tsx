@@ -40,7 +40,7 @@ export function TeamInvites({ token }: Props) {
       setNotice(
         res.mailConfigured
           ? 'Invite sent.'
-          : 'Invite saved, but email delivery is not configured on this deployment yet — share the link with them another way once it is.',
+          : 'Invite saved, but email delivery is not configured on this deployment yet. Share the link with them another way once it is.',
       );
       load();
     } catch (err) {
@@ -67,7 +67,7 @@ export function TeamInvites({ token }: Props) {
       </header>
       <p className="dest-intro">
         Invite another Safety Coordinator to this organization. They'll get a link by email that
-        lets them create their own sign-in — nothing changes until they use it.
+        lets them create their own sign in. Nothing changes until they use it.
       </p>
 
       {error && <p className="dest-error">{error}</p>}

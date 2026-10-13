@@ -549,9 +549,21 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  /* "safe" + scrolling: on a short screen (landscape, small phones) the card
+     used to be centred off the top, clipping the delivery state, the one
+     line that says whether anyone got this alert. */
+  justify-content: safe center;
+  overflow-y: auto;
   gap: 20px;
   padding: calc(var(--border-w) + 16px);
   pointer-events: none;
+}
+@media (max-height: 620px) {
+  .overlay { gap: 10px; }
+  .overlay-card { padding: 16px 18px; }
+  .overlay-icon { display: none; }
+  .delivery { margin: 0 0 10px; }
+  .delivery-btn { min-height: 44px; }
 }
 
 .overlay-edge-bars {
@@ -732,6 +744,42 @@ body {
   width: 100%;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.7);
 }
+
+/* Delivery state of an alert THIS device raised (safety audit 2026-10-07).
+   First thing in the card, because "did it go?" is the question a frightened
+   person is asking. The overlay card is always dark, so these colours are too. */
+.delivery {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin: -8px -12px 18px; padding: 10px 14px; border-radius: 12px;
+  font-size: 0.95rem; font-weight: 600; line-height: 1.4; text-align: left;
+}
+.delivery svg { flex: none; width: 1.15em; height: 1.15em; }
+.delivery-sending { background: rgba(255, 255, 255, 0.07); color: #e9e9ef; }
+.delivery-sent { background: rgba(48, 209, 88, 0.14); color: #4ee07a; }
+.delivery-warn { background: rgba(255, 176, 32, 0.15); color: #ffc04d; }
+.delivery-failed {
+  flex-direction: column; align-items: stretch; gap: 8px;
+  background: #ff453a; color: #fff; padding: 14px 16px;
+}
+.delivery-title { font-size: 1.25rem; font-weight: 800; letter-spacing: 0.01em; }
+.delivery-body { margin: 0; font-weight: 500; }
+.delivery-actions { display: grid; gap: 8px; margin-top: 4px; }
+.delivery-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 52px; padding: 10px 14px; border-radius: 10px;
+  font-size: 1.05rem; font-weight: 800; text-decoration: none;
+}
+.delivery-call { background: #fff; color: #b3140a; }
+.delivery-sms { background: rgba(0, 0, 0, 0.22); color: #fff; border: 2px solid rgba(255, 255, 255, 0.7); }
+.delivery-static { cursor: default; }
+.delivery-btn:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+.delivery-spinner {
+  width: 14px; height: 14px; border-radius: 50%; flex: none;
+  border: 2px solid currentColor; border-right-color: transparent;
+  animation: deliverySpin 0.9s linear infinite;
+}
+@keyframes deliverySpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .delivery-spinner { animation: none; } }
 
 .overlay-icon {
   font-size: 3.2rem;

@@ -6,6 +6,10 @@ import * as trackBuffer from '../lib/trackBuffer';
 
 export type SocketStatus = 'connecting' | 'open' | 'closed';
 
+function pendingAlertIdsOf(entries: outbox.QueuedMessage[]): string[] {
+  return entries.flatMap((e) => (e.msg.kind === 'alert' ? [e.msg.id] : []));
+}
+
 const WS_PORT = 3001;
 
 // Where to reach the relay. In LAN/dev we derive it from the current host so
@@ -56,6 +60,9 @@ export function useAlertSocket(
   // distinguishable from the few milliseconds every normal send spends here.
   const [queued, setQueued] = useState(() => outbox.size());
   const [queuedSince, setQueuedSince] = useState<number | null>(null);
+  // Which alerts are still waiting for the relay's echo, by id. The alert
+  // screen reads this to say "not sent yet" instead of looking delivered.
+  const [pendingAlertIds, setPendingAlertIds] = useState<string[]>(() => pendingAlertIdsOf(outbox.pending()));
   // Set when the relay rejects our credentials (close code 4001) — the caller
   // uses this to send the user back to the entry screen.
   const [joinRejected, setJoinRejected] = useState(false);
@@ -73,6 +80,7 @@ export function useAlertSocket(
     const entries = outbox.pending();
     setQueued(entries.length);
     setQueuedSince(entries.length === 0 ? null : Math.min(...entries.map((e) => e.queuedAt)));
+    setPendingAlertIds(pendingAlertIdsOf(entries));
   }, []);
   const syncQueueRef = useRef(syncQueue);
   syncQueueRef.current = syncQueue;
@@ -243,5 +251,5 @@ export function useAlertSocket(
     return false;
   }, []);
 
-  return { status, deviceCount, roster, joinRejected, send, sendHeartbeat, queued, queuedSince };
+  return { status, deviceCount, roster, joinRejected, send, sendHeartbeat, queued, queuedSince, pendingAlertIds };
 }

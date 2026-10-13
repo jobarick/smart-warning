@@ -50,7 +50,7 @@ function toMarkdown(title, sections, { version, effective }) {
   const lines = [
     `# ${title}`,
     '',
-    `**Version ${version} — effective ${effective}**`,
+    `**Version ${version}, effective ${effective}**`,
     '',
     '<!-- Generated from client/src/lib/terms.ts by tools/generate-legal.js.',
     '     Do not edit by hand: this must stay identical to the text shown in the',
@@ -69,7 +69,7 @@ function toMarkdown(title, sections, { version, effective }) {
 }
 
 function accountDeletionPage(terms) {
-  return `# Account & Data Deletion — Smart Warning
+  return `# Account & Data Deletion · Smart Warning
 
 **App:** Smart Warning (\`com.smartwarning.app\`)
 
@@ -78,7 +78,7 @@ it, as required by the Google Play Developer Program policies.
 
 ## Delete from inside the app
 
-**If you have a personal account** — one that is not part of an organization:
+**If you have a personal account** (one that is not part of an organization):
 
 1. Open Smart Warning and sign in.
 2. Go to **About & legal**.
@@ -97,8 +97,8 @@ Deletion is immediate and cannot be undone.
 ## Request deletion without the app
 
 If you joined an organization with a team code, your records are part of that
-organization's safety record — its incident history and roll call refer to
-them — so they cannot be removed individually without breaking it. Ask your
+organization's safety record (its incident history and roll call refer to
+them), so they cannot be removed individually without breaking it. Ask your
 Safety Coordinator, or contact us and we will action the request within
 **30 days**:
 
@@ -112,9 +112,9 @@ to if you are in one, so we can identify the right records.
 
 Deleting an organization permanently removes:
 
-- All Safety Coordinator accounts and their sign-in credentials
+- All Safety Coordinator accounts and their sign in credentials
 - Organization membership records
-- Incident history, including alerts, roll-call answers and all-clears
+- Incident history, including alerts, roll call answers and all clears
 - Location records captured during incidents
 - Incident reports, including those submitted through a public link
 - Feedback, queued email and device push registrations
@@ -122,7 +122,7 @@ Deleting an organization permanently removes:
 
 ## What is kept, and why
 
-Payment records — plan, amount, currency and a transaction reference — are
+Payment records (plan, amount, currency and a transaction reference) are
 retained for accounting and tax purposes as required by law. They are detached
 from the deleted organization and contain no location data and no personal
 identifiers beyond the transaction itself.
@@ -178,7 +178,7 @@ function page({ title, provider, version, effective, bodyHtml, showEmergencyNoti
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escape(title)} — Smart Warning</title>
+<title>${escape(title)} · Smart Warning</title>
 <meta name="robots" content="index,follow">
 <!-- Generated from client/src/lib/terms.ts by tools/generate-legal.js.
      Do not edit by hand: this must stay identical to the text shown inside the
@@ -188,9 +188,9 @@ function page({ title, provider, version, effective, bodyHtml, showEmergencyNoti
 <body>
 <main>
 <h1>${escape(title)}</h1>
-${version ? `<p class="meta">Version ${escape(version)} — effective ${escape(effective)}</p>` : ''}
+${version ? `<p class="meta">Version ${escape(version)}, effective ${escape(effective)}</p>` : ''}
 <p class="by">Smart Warning is provided by <strong>${escape(provider)}</strong>.</p>
-${showEmergencyNotice ? `<p class="notice"><strong>If you are in immediate danger, call your local emergency services directly.</strong> Smart Warning assists with emergency communication — it is not an emergency service and does not replace one.</p>` : ''}
+${showEmergencyNotice ? `<p class="notice"><strong>If you are in immediate danger, call your local emergency services directly.</strong> Smart Warning assists with emergency communication. It is not an emergency service and does not replace one.</p>` : ''}
 ${bodyHtml}
 <nav>
   <a href="/legal/">All documents</a>
@@ -252,7 +252,7 @@ function inline(text) {
 
 function indexPage(provider, meta) {
   return page({
-    title: 'Smart Warning — legal & data',
+    title: 'Smart Warning: legal & data',
     provider,
     version: meta.version,
     effective: meta.effective,
@@ -260,9 +260,9 @@ function indexPage(provider, meta) {
     bodyHtml: `
 <p>The documents that govern the Smart Warning application, and how to remove your data from it.</p>
 <ul>
-  <li><a href="/legal/privacy.html">Privacy Policy</a> — what is collected, when location is and is not recorded, who can see it.</li>
-  <li><a href="/legal/terms.html">Terms &amp; Conditions</a> — what the service does and what it does not guarantee.</li>
-  <li><a href="/legal/delete.html">Account &amp; data deletion</a> — how to delete an account, in the app or by request.</li>
+  <li><a href="/legal/privacy.html">Privacy Policy</a>: what is collected, when location is and is not recorded, who can see it.</li>
+  <li><a href="/legal/terms.html">Terms &amp; Conditions</a>: what the service does and what it does not guarantee.</li>
+  <li><a href="/legal/delete.html">Account &amp; data deletion</a>: how to delete an account, in the app or by request.</li>
 </ul>
 <p>These pages are generated from the same source as the text shown inside the application, so the hosted wording and the wording people accept cannot drift apart.</p>`,
   });
@@ -276,8 +276,8 @@ function main() {
   const meta = { version: terms.TERMS_VERSION, effective: terms.TERMS_EFFECTIVE_DATE };
 
   const files = {
-    'TERMS.md': toMarkdown('Smart Warning — Terms & Conditions', terms.TERMS_SECTIONS, meta),
-    'PRIVACY_POLICY.md': toMarkdown('Smart Warning — Privacy Policy', terms.PRIVACY_SECTIONS, meta),
+    'TERMS.md': toMarkdown('Smart Warning: Terms & Conditions', terms.TERMS_SECTIONS, meta),
+    'PRIVACY_POLICY.md': toMarkdown('Smart Warning: Privacy Policy', terms.PRIVACY_SECTIONS, meta),
     'ACCOUNT_DELETION.md': accountDeletionPage(terms),
   };
 

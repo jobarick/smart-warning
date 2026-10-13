@@ -43,9 +43,11 @@ async function handle({ req, res, url, path }) {
     return true;
   }
 
-  // Unauthenticated or free-tier: current conditions only. No account is
-  // required to see them at all — the same "safety information is not a
-  // premium feature" reasoning as the bundled emergency numbers directory.
+  // Unauthenticated or free tier: current conditions and the next 12 hours.
+  // No account is required to see them at all, the same "safety information
+  // is not a premium feature" reasoning as the bundled emergency numbers
+  // directory: whether it will storm this afternoon is a safety question.
+  // The multi day forecast stays a paid feature (product owner, 2026-10-07).
   let unlocked = false;
   if (db.enabled()) {
     const ctx = await requireAuth(req);
@@ -66,6 +68,7 @@ async function handle({ req, res, url, path }) {
     // on my way home" is safety information, not a premium forecast.
     hourly: (result.hourly || []).filter((h) => h.at > Date.now()).slice(0, 3),
     flags: result.flags,
+    hourly: result.hourly || [],
     daily: unlocked ? result.daily : null,
     forecastLocked: !unlocked,
   });

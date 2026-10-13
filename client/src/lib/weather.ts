@@ -25,12 +25,12 @@ export interface DailyWeather {
   condition: WeatherCondition;
 }
 
-/** One of the next three hours — free, like current conditions. */
 export interface HourlyWeather {
-  /** Epoch ms of the start of that hour. */
-  at: number;
+  /** Local wall clock time at the forecast point, "YYYY-MM-DDTHH:MM". */
+  time: string;
   tempC: number | null;
   precipitationProbability: number | null;
+  windKph: number | null;
   condition: WeatherCondition;
 }
 
@@ -46,13 +46,27 @@ export interface WeatherResult {
   provider?: string;
   updatedAt?: string;
   current?: CurrentWeather;
-  hourly?: HourlyWeather[];
   flags?: WeatherFlags;
+  /** The next 12 hours, public like current conditions. Absent from an older server. */
+  hourly?: HourlyWeather[];
   /** Present only when the caller is entitled to WEATHER_FORECAST; null otherwise. */
   daily?: DailyWeather[] | null;
   forecastLocked?: boolean;
   /** Set client-side when this is a remembered answer shown while offline. */
   stale?: boolean;
+}
+
+/** Epoch ms for an hourly row. The server sends wall clock time at the
+ *  forecast point; read on a phone in the same timezone, which is every
+ *  Tanzanian phone this product serves. */
+export function hourAt(h: HourlyWeather): number {
+  return Date.parse(h.time);
+}
+
+/** The whole hours still ahead — the first server row is the current hour. */
+export function upcomingHours(hourly: HourlyWeather[] | undefined, count: number): HourlyWeather[] {
+  const now = Date.now();
+  return (hourly ?? []).filter((h) => hourAt(h) > now).slice(0, count);
 }
 
 /**
@@ -91,11 +105,22 @@ function cachedOr(fallback: WeatherResult, lat: number, lng: number): WeatherRes
     const hit = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null') as { lat: number; lng: number; at: number; body: WeatherResult } | null;
     // ~10km: the same town, not the same street — good enough for "is it raining".
     if (hit && Date.now() - hit.at < CACHE_MAX_AGE_MS && Math.abs(hit.lat - lat) < 0.1 && Math.abs(hit.lng - lng) < 0.1) {
-      return { ...hit.body, stale: true, hourly: hit.body.hourly?.filter((h) => h.at > Date.now()) };
+      return { ...hit.body, stale: true };
     }
   } catch { /* corrupt cache reads as none */ }
   return fallback;
 }
+
+/** A short list of named Tanzanian places for the "choose your location" fallback, when geolocation is declined or unavailable. */
+export const NAMED_LOCATIONS: { id: string; nameKey: string; lat: number; lng: number }[] = [
+  { id: 'dar-es-salaam', nameKey: 'weather.place.dar', lat: -6.7924, lng: 39.2083 },
+  { id: 'mbagala', nameKey: 'weather.place.mbagala', lat: -6.8858, lng: 39.2453 },
+  { id: 'vikindu', nameKey: 'weather.place.vikindu', lat: -6.9667, lng: 39.1167 },
+  { id: 'kibaha', nameKey: 'weather.place.kibaha', lat: -6.7667, lng: 38.9167 },
+  { id: 'arusha', nameKey: 'weather.place.arusha', lat: -3.3869, lng: 36.6830 },
+  { id: 'mwanza', nameKey: 'weather.place.mwanza', lat: -2.5164, lng: 32.9175 },
+  { id: 'dodoma', nameKey: 'weather.place.dodoma', lat: -6.1630, lng: 35.7516 },
+];
 
 // Which named place a signed-out visitor last chose for the weather line. The
 // public page never asks for location on load (see App.tsx's note on
@@ -114,14 +139,3 @@ export function loadWeatherPlace(): (typeof NAMED_LOCATIONS)[number] {
 export function saveWeatherPlace(id: string) {
   try { localStorage.setItem(PLACE_KEY, id); } catch { /* storage blocked */ }
 }
-
-/** A short list of named Tanzanian places for the "choose your location" fallback, when geolocation is declined or unavailable. */
-export const NAMED_LOCATIONS: { id: string; nameKey: string; lat: number; lng: number }[] = [
-  { id: 'dar-es-salaam', nameKey: 'weather.place.dar', lat: -6.7924, lng: 39.2083 },
-  { id: 'mbagala', nameKey: 'weather.place.mbagala', lat: -6.8858, lng: 39.2453 },
-  { id: 'vikindu', nameKey: 'weather.place.vikindu', lat: -6.9667, lng: 39.1167 },
-  { id: 'kibaha', nameKey: 'weather.place.kibaha', lat: -6.7667, lng: 38.9167 },
-  { id: 'arusha', nameKey: 'weather.place.arusha', lat: -3.3869, lng: 36.6830 },
-  { id: 'mwanza', nameKey: 'weather.place.mwanza', lat: -2.5164, lng: 32.9175 },
-  { id: 'dodoma', nameKey: 'weather.place.dodoma', lat: -6.1630, lng: 35.7516 },
-];

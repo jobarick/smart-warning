@@ -37,6 +37,16 @@ interface Props {
   onThemeChange: (next: ResolvedTheme) => void;
 }
 
+// Plan taglines, translated here rather than taken from the server's English
+// `tagline`, so a Swahili visitor reads the whole price list in Swahili.
+const PLAN_TAG: Record<string, StringKey> = {
+  free: 'landing.plans.tag.free',
+  personal: 'landing.plans.tag.personal',
+  team: 'landing.plans.tag.team',
+  business: 'landing.plans.tag.business',
+  enterprise: 'landing.plans.tag.enterprise',
+};
+
 /** The six things people most often need, in the order they need them. The
  *  full directory is further down the page. */
 const HOME_CATEGORIES = ['112', '114', '115', '116', '111', '0800110064'];
@@ -195,6 +205,27 @@ export function LandingPage({ onGetStarted, onWatchDemo, locale, onToggleLocale,
           <p className="lp-section-sub">
             {price ? t(locale, 'landing.premium.bodyPrice', { price }) : t(locale, 'landing.premium.body')}
           </p>
+          {/* Every plan and its price, as the server quotes them (product owner,
+              2026-10-07: Personal at TZS 2,500 must be visible to every
+              visitor). Hidden until the server answers: no price is better
+              than a wrong one. */}
+          {billing && billing.plans.length > 0 && (
+            <ul className="lp-plans" id="plans">
+              {billing.plans.map((p) => (
+                <li key={p.id} className={`lp-plan${p.id === 'personal' ? ' lp-plan-featured' : ''}`}>
+                  <div className="lp-plan-main">
+                    <b className="lp-plan-name">{p.name}</b>
+                    <span className="lp-plan-tag">{PLAN_TAG[p.id] ? t(locale, PLAN_TAG[p.id]) : p.tagline}</span>
+                  </div>
+                  <span className="lp-plan-price">
+                    {!p.price
+                      ? t(locale, 'landing.plans.free')
+                      : t(locale, 'landing.plans.perMonth', { price: formatMoney(p.price, p.currency) })}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
           <p className="lp-premium-free">{t(locale, 'landing.premium.freeNote')}</p>
           <button className="lp-cta" onClick={() => go('premium_trial')}>{t(locale, 'landing.premium.cta')}</button>
         </section>
