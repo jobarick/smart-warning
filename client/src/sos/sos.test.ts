@@ -180,4 +180,19 @@ describe('light SOS page', () => {
       Object.defineProperty(crypto, 'randomUUID', { configurable: true, value: original });
     }
   });
+
+  it('a double tap sends one alert, not two', async () => {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(personal));
+    geolocation(null);
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      incidentId: 'x', contacted: [{ id: 'c1', name: 'B', delivered: true }], skipped: [],
+    }), { status: 201 }));
+    await load();
+    const big = root().querySelector<HTMLButtonElement>('.sos-big')!;
+    big.click();
+    big.click(); // the same, now-detached button, tapped again before the page redraws
+    await vi.waitFor(() => expect(root().textContent).toContain('Sent to 1'));
+    expect(fetchMock.mock.calls.filter(([u]) => String(u).includes('/api/contacts/alert')).length).toBe(1);
+  });
 });
+
