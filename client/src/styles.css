@@ -1764,7 +1764,7 @@ body {
   border: 1px solid var(--panel-border); border-radius: 18px;
   box-shadow: var(--shadow); padding: 24px 22px 26px;
 }
-.auth-brand { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.01em; }
+.auth-brand { text-decoration: none; cursor: pointer; display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.01em; }
 .auth-brand .auth-logo { width: auto; height: 22px; color: var(--accent); flex: none; }
 .auth-title { margin: 14px 0 6px; font-size: 1.5rem; font-weight: 700; color: var(--text); }
 .auth-sub { color: var(--muted); font-size: 0.9rem; line-height: 1.45; margin-bottom: 14px; }
@@ -1827,6 +1827,12 @@ body {
 .auth-submit:disabled { opacity: 0.6; cursor: default; }
 .auth-alt { margin-top: 16px; text-align: center; color: var(--muted); font-size: 0.84rem; }
 .auth-alt button { background: none; border: none; color: var(--accent); font-size: inherit; cursor: pointer; font-weight: 600; }
+.auth-alt-signup { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.auth-alt-signup button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+  padding: 10px 12px; border: 1px solid var(--panel-border); border-radius: 10px;
+}
+.auth-alt-signup button svg { width: 16px; height: 16px; }
 
 /* Defines "Safety Coordinator" once, on the only screen reached before the term
    starts being used as though it were already understood. */

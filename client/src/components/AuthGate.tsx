@@ -29,6 +29,9 @@ interface Props {
   onToggleLocale: () => void;
   theme: ResolvedTheme;
   onThemeChange: (next: ResolvedTheme) => void;
+  /** The top-left brand: back to the home page. Absent in the Android app,
+   *  which has no home page; there it returns to the account chooser. */
+  onHome?: () => void;
 }
 
 /**
@@ -233,7 +236,7 @@ function AuthStoryColumn({ locale, onSales }: { locale: Locale; onSales: () => v
   );
 }
 
-export function AuthGate({ onAuthed, notice, locale, onToggleLocale, theme, onThemeChange }: Props) {
+export function AuthGate({ onAuthed, notice, locale, onToggleLocale, theme, onThemeChange, onHome }: Props) {
   const tt = (key: Parameters<typeof t>[1], vars?: Record<string, string>) => t(locale, key, vars);
   const price = usePersonalPrice();
   const [linkToken] = useState(resetTokenFromUrl);
@@ -437,10 +440,15 @@ export function AuthGate({ onAuthed, notice, locale, onToggleLocale, theme, onTh
     <div className="auth-page">
       <div className="auth-shell">
         <div className="auth-brand-row" style={{ gridArea: 'brand' }}>
-          <div className="auth-brand">
+          <a
+            className="auth-brand"
+            href="/"
+            onClick={(e) => { e.preventDefault(); if (onHome) onHome(); else go('choose'); }}
+            aria-label={tt('auth.homeLink')}
+          >
             <Logo size={22} className="auth-logo" decorative />
             <span>Smart Warning</span>
-          </div>
+          </a>
           <div className="auth-brand-actions">
             <ThemeToggle theme={theme} onChange={onThemeChange} locale={locale} className="auth-lang-toggle auth-theme-toggle" />
             <button type="button" className="auth-lang-toggle" onClick={onToggleLocale}>
@@ -533,7 +541,12 @@ export function AuthGate({ onAuthed, notice, locale, onToggleLocale, theme, onTh
                 <PasswordField label={tt('auth.field.password')} value={password} onChange={setPassword} placeholder="••••••••" />
                 <button className="auth-submit" type="submit" disabled={busy}>{busy ? tt('auth.submit.signingIn') : tt('auth.submit.signIn')}</button>
                 <p className="auth-alt"><button type="button" onClick={() => go('forgot')}>{tt('auth.link.forgotPassword')}</button></p>
-                <p className="auth-alt">{tt('auth.newHere')} <button type="button" onClick={() => go('signup')}>{tt('auth.link.createOrg')}</button></p>
+                {/* Both doors, so a person and a company each find theirs. */}
+                <div className="auth-alt auth-alt-signup">
+                  <span>{tt('auth.newHere')}</span>
+                  <button type="button" onClick={() => go('personal')}><Icon name="user" /> {tt('auth.link.createPersonal')}</button>
+                  <button type="button" onClick={() => go('signup')}><Icon name="siren" /> {tt('auth.link.createOrg')}</button>
+                </div>
               </form>
             )}
 

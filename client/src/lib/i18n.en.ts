@@ -236,6 +236,8 @@ const EN: Record<StringKey, string> = {
     'auth.submit.signIn': 'Sign in',
     'auth.link.forgotPassword': 'Forgot password?',
     'auth.newHere': 'New here?',
+    'auth.link.createPersonal': 'Create a personal account',
+    'auth.homeLink': 'Smart Warning home',
     'auth.link.createOrg': 'Create an organization',
     'auth.forgot.title': 'Forgot your password',
     'auth.forgot.body': 'Enter the email address your account was registered with. We will send a link that lets you choose a new password.',

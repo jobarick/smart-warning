@@ -68,7 +68,7 @@ import { FALLBACK_EMERGENCY_NUMBER, orgDelivery, personalDelivery, smsHref, type
 import { canDial } from './lib/emergency';
 import { t, loadLocale, isLocaleLoaded, type StringKey } from './lib/i18n';
 import { holdUpdates, reloadPending, subscribeUpdatePending } from './lib/updateGate';
-import { peekIntendedPlan } from './lib/intendedPlan';
+import { peekIntendedPlan, takeIntendedPlan } from './lib/intendedPlan';
 
 // How long the pending-location note may show after SOS fires with no GPS
 // fix yet, and how long a late fix is still worth backfilling. Short on
@@ -1244,6 +1244,7 @@ export default function App() {
             onToggleLocale={() => patchSettings({ locale: settings.locale === 'en' ? 'sw' : 'en' })}
             theme={theme}
             onThemeChange={setTheme}
+            onHome={isNativeApp() ? undefined : () => { takeIntendedPlan(); navigate('/'); }}
           />
         </Suspense>
       );

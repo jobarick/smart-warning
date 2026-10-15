@@ -236,6 +236,8 @@ const SW: Record<StringKey, string> = {
     'auth.submit.signIn': 'Ingia',
     'auth.link.forgotPassword': 'Umesahau nywila?',
     'auth.newHere': 'Mgeni hapa?',
+    'auth.link.createPersonal': 'Fungua akaunti binafsi',
+    'auth.homeLink': 'Ukurasa wa mwanzo wa Smart Warning',
     'auth.link.createOrg': 'Fungua akaunti ya shirika',
     'auth.forgot.title': 'Umesahau nywila yako',
     'auth.forgot.body': 'Weka barua pepe iliyotumika kufungua akaunti yako. Tutakutumia kiungo cha kuweka nywila mpya.',
