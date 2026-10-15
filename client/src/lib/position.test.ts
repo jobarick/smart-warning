@@ -36,3 +36,11 @@ describe('describePosition', () => {
     expect(describePosition({ lat: 1.123456, lng: 2.123456, accuracy: 5, updatedAt: now }, now).coords).toBe('1.12346, 2.12346');
   });
 });
+
+describe('directionsUrl', () => {
+  it('opens Google Maps directions to the point, from the phone\'s own location', async () => {
+    const { directionsUrl } = await import('./position');
+    expect(directionsUrl(-6.7924, 39.2083)).toBe('https://www.google.com/maps/dir/?api=1&destination=-6.792400,39.208300&travelmode=driving');
+    expect(directionsUrl(1, 2, 'walking')).toContain('travelmode=walking');
+  });
+});

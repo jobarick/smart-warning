@@ -14,8 +14,18 @@
 const geo = require('./geo');
 const db = require('./db');
 
-const OVERPASS_URL = process.env.OVERPASS_URL || 'https://overpass-api.de/api/interpreter';
-const OVERPASS_TIMEOUT_MS = Number(process.env.OVERPASS_TIMEOUT_MS || 7000);
+// Several public Overpass servers, tried in order. Any one of them is often
+// overloaded or briefly down (2026-10-15: overpass-api.de at capacity and
+// two mirrors answering 500 while maps.mail.ru worked), so depending on one
+// left every nearby-help screen empty. OVERPASS_URLS (comma separated)
+// overrides the list; the old single OVERPASS_URL still works.
+const OVERPASS_URLS = (process.env.OVERPASS_URLS || process.env.OVERPASS_URL
+  || 'https://overpass-api.de/api/interpreter,https://maps.mail.ru/osm/tools/overpass/api/interpreter,https://overpass.kumi.systems/api/interpreter')
+  .split(',').map((u) => u.trim()).filter(Boolean);
+const OVERPASS_TIMEOUT_MS = Number(process.env.OVERPASS_TIMEOUT_MS || 9000);
+// Plain, with no URL in it: overpass-api.de answers 406 to the old
+// "(emergency alerting; +https://...)" string.
+const OVERPASS_UA = 'SmartWarning/1.0 (Idefenda Lab)';
 const SEARCH_RADIUS_M = 15000;
 
 // Which OSM features serve which of our destination kinds.
@@ -49,18 +59,105 @@ const ROUTING = {
 // and slow. Coordinates are rounded to ~1km so a walking worker keeps hitting
 // the same key instead of missing on every GPS jitter.
 const cache = new Map(); // `${kind}:${lat}:${lng}` → { at, places }
-const CACHE_TTL_MS = 30 * 60 * 1000;
+// Hospitals and police stations do not move in a day, and every lookup we
+// do not make is one less chance of meeting an overloaded server.
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+// Past its time but kept: if every server is down, yesterday's list of
+// nearby hospitals beats an empty screen.
+const STALE_MAX_MS = 14 * 24 * 60 * 60 * 1000;
 const CACHE_MAX = 500;
 
 function cacheKey(kind, lat, lng) {
   return `${kind}:${lat.toFixed(2)}:${lng.toFixed(2)}`;
 }
 
-function cacheGet(key) {
+function cacheGet(key, { allowStale = false } = {}) {
   const hit = cache.get(key);
   if (!hit) return null;
-  if (Date.now() - hit.at > CACHE_TTL_MS) { cache.delete(key); return null; }
+  const age = Date.now() - hit.at;
+  if (age > STALE_MAX_MS) { cache.delete(key); return null; }
+  if (age > CACHE_TTL_MS && !allowStale) return null;
   return hit.places;
+}
+
+// Last resort when every Overpass server fails: OpenStreetMap's Nominatim
+// search, a different service on different machines. Its usage policy allows
+// one request a second with an identifying User-Agent, so calls are queued at
+// that pace; the 24 h cache above keeps the volume tiny.
+const NOMINATIM_URL = process.env.NOMINATIM_URL || 'https://nominatim.openstreetmap.org/search';
+const NOMINATIM_GAP_MS = 1100;
+const NOMINATIM_QUERY = {
+  hospital: { q: 'hospital', match: (c, t) => c === 'amenity' && /^(hospital|clinic|doctors)$/.test(t) },
+  police: { q: 'police', match: (c, t) => c === 'amenity' && t === 'police' },
+  fire: { q: 'fire station', match: (c, t) => c === 'amenity' && t === 'fire_station' },
+  shelter: { q: 'shelter', match: (c, t) => c === 'amenity' && t === 'shelter' },
+  pharmacy: { q: 'pharmacy', match: (c, t) => c === 'amenity' && t === 'pharmacy' },
+  security: { q: 'security', match: (c, t) => c === 'office' && /^(security|guard)$/.test(t) },
+};
+let nominatimQueue = Promise.resolve();
+
+function nominatimSearch(kind, lat, lng, radius) {
+  const spec = NOMINATIM_QUERY[kind];
+  if (!spec) return Promise.resolve([]);
+  const run = async () => {
+    const dLat = radius / 111_000;
+    const dLng = radius / (111_000 * Math.max(0.2, Math.cos((lat * Math.PI) / 180)));
+    const params = new URLSearchParams({
+      q: spec.q, format: 'jsonv2', limit: '20', bounded: '1', extratags: '1',
+      viewbox: `${lng - dLng},${lat + dLat},${lng + dLng},${lat - dLat}`,
+    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), OVERPASS_TIMEOUT_MS);
+    try {
+      const res = await fetch(`${NOMINATIM_URL}?${params}`, { headers: { 'User-Agent': OVERPASS_UA }, signal: controller.signal });
+      if (!res.ok) throw new Error(`nominatim ${res.status}`);
+      const rows = await res.json();
+      if (!Array.isArray(rows)) throw new Error('nominatim bad body');
+      return rows
+        .filter((r) => spec.match(r.category, r.type))
+        .map((r) => ({
+          name: r.name || defaultName(kind),
+          lat: Number(r.lat),
+          lng: Number(r.lon),
+          kind,
+          phone: r.extratags?.phone || r.extratags?.['contact:phone'] || null,
+          address: null,
+        }))
+        .filter((r) => Number.isFinite(r.lat) && Number.isFinite(r.lng));
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  // One at a time, at least NOMINATIM_GAP_MS apart, whatever each one does.
+  const result = nominatimQueue.then(run);
+  nominatimQueue = result.catch(() => {}).then(() => new Promise((r) => setTimeout(r, NOMINATIM_GAP_MS)));
+  return result;
+}
+
+/** POST the query to each server in turn; the first good answer wins. */
+async function overpassQuery(query) {
+  let lastError = null;
+  for (const url of OVERPASS_URLS) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), OVERPASS_TIMEOUT_MS);
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': OVERPASS_UA },
+        body: 'data=' + encodeURIComponent(query),
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(`overpass ${res.status} from ${new URL(url).host}`);
+      const json = await res.json();
+      if (!json || !Array.isArray(json.elements)) throw new Error(`overpass bad body from ${new URL(url).host}`);
+      return json;
+    } catch (e) {
+      lastError = e.name === 'AbortError' ? new Error(`overpass timeout from ${new URL(url).host}`) : e;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw lastError || new Error('no overpass server configured');
 }
 
 function cacheSet(key, places) {
@@ -128,21 +225,17 @@ out center ${Math.max(remaining * 4, 20)};`;
 
   let places = [];
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), OVERPASS_TIMEOUT_MS);
-    const res = await fetch(OVERPASS_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        // Overpass asks that clients identify themselves.
-        'User-Agent': 'SmartWarning/1.0 (emergency alerting; +https://smart-warning.vercel.app)',
-      },
-      body: 'data=' + encodeURIComponent(query),
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-    if (!res.ok) throw new Error(`overpass ${res.status}`);
-    const json = await res.json();
+    let json;
+    try {
+      json = await overpassQuery(query);
+    } catch (overpassError) {
+      console.warn(`[places] ${kind}: every Overpass server failed (${overpassError.message}), trying Nominatim`);
+      places = await nominatimSearch(kind, lat, lng, radius);
+      // An empty answer is not cached: during an outage it would hide help
+      // for a whole day after the servers recover.
+      if (places.length) cacheSet(key, places);
+      return [...verified, ...rank(places, lat, lng, remaining).map((p) => ({ ...p, verified: false }))];
+    }
     places = (json.elements || [])
       .map((el) => {
         const p = el.type === 'node' ? el : el.center;
@@ -158,12 +251,14 @@ out center ${Math.max(remaining * 4, 20)};`;
         };
       })
       .filter(Boolean);
-    cacheSet(key, places);
+    if (places.length) cacheSet(key, places);
   } catch (e) {
     // Deliberately swallowed: a missing suggestion is survivable, a hung alert
     // screen is not. Whatever verified results already came back are real,
     // confirmed results — an OSM hiccup is not a reason to withhold them too.
     console.warn(`[places] ${kind} lookup failed: ${e.message}`);
+    const stale = cacheGet(key, { allowStale: true });
+    if (stale) return [...verified, ...rank(stale, lat, lng, remaining).map((p) => ({ ...p, verified: false }))];
     return verified;
   }
   return [...verified, ...rank(places, lat, lng, remaining).map((p) => ({ ...p, verified: false }))];
@@ -274,4 +369,5 @@ function withTravel(d) {
   };
 }
 
-module.exports = { nearby, safeDestination, avoidDanger, ROUTING };
+module.exports = {
+  _overpassUrls: OVERPASS_URLS, nearby, safeDestination, avoidDanger, ROUTING };

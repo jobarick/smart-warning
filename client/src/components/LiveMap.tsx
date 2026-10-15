@@ -3,6 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { fetchLiveMap, type LiveMapData, type MapPlaceKind, type ResponderMapStatus } from '../lib/api';
 import { formatDistance } from '../lib/geo';
+import { directionsUrl } from '../lib/position';
 import { t, type StringKey } from '../lib/i18n';
 import type { Locale } from '../types';
 
@@ -11,6 +12,9 @@ interface Props {
   lng: number;
   token: string;
   locale: Locale;
+  /** Premium adds the nearest-help list with directions and a full screen map. */
+  premium?: boolean;
+  onUpgrade?: () => void;
 }
 
 type Filter = MapPlaceKind | 'responders';
@@ -59,12 +63,13 @@ function escapeHtml(s: string): string {
  * The counter says how many are available right now, which is the honest
  * version of "is anyone nearby".
  */
-export function LiveMap({ lat, lng, token, locale }: Props) {
+export function LiveMap({ lat, lng, token, locale, premium = false, onUpgrade }: Props) {
   const elRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
   const [data, setData] = useState<LiveMapData | null>(null);
   const [error, setError] = useState(false);
+  const [full, setFull] = useState(false);
   const [on, setOn] = useState<Record<Filter, boolean>>({ responders: true, hospital: true, police: true, fire: true, security: true });
   const placeKinds = useMemo(() => (['hospital', 'police', 'fire', 'security'] as const).filter((k) => on[k]), [on]);
   // Rounded so walking around a room is not a new request every fix.
@@ -139,8 +144,21 @@ export function LiveMap({ lat, lng, token, locale }: Props) {
 
   const available = data?.counts.available ?? null;
 
+  // Premium: the single nearest place of each kind, closest first.
+  const nearest = useMemo(() => {
+    const best = new Map<MapPlaceKind, LiveMapData['places'][number]>();
+    for (const p of data?.places ?? []) {
+      const cur = best.get(p.kind);
+      if (!cur || (p.distanceM ?? Infinity) < (cur.distanceM ?? Infinity)) best.set(p.kind, p);
+    }
+    return [...best.values()].sort((a, b) => (a.distanceM ?? Infinity) - (b.distanceM ?? Infinity));
+  }, [data]);
+
+  // The map has to re-measure itself after switching to or from full screen.
+  useEffect(() => { setTimeout(() => mapRef.current?.invalidateSize(), 50); }, [full]);
+
   return (
-    <section className="livemap" aria-labelledby="livemap-h">
+    <section className={`livemap${full ? ' livemap-full' : ''}`} aria-labelledby="livemap-h">
       <div className="livemap-head">
         <h2 id="livemap-h">{t(locale, 'livemap.heading')}</h2>
         <p className="livemap-counter" role="status" aria-live="polite">
@@ -173,7 +191,43 @@ export function LiveMap({ lat, lng, token, locale }: Props) {
         ))}
       </div>
 
+      {premium && (
+        <button type="button" className="livemap-fullbtn" onClick={() => setFull((v) => !v)}>
+          {t(locale, full ? 'livemap.premium.close' : 'livemap.premium.fullscreen')}
+        </button>
+      )}
       <div ref={elRef} className="livemap-el" />
+
+      {premium ? (
+        nearest.length > 0 && (
+          <div className="livemap-help">
+            <h3>{t(locale, 'livemap.premium.heading')}</h3>
+            <ul>
+              {nearest.map((p) => {
+                const g = PLACE_GLYPH[p.kind];
+                const walk = p.distanceM != null && p.distanceM <= 1500;
+                return (
+                  <li key={`${p.kind}-${p.lat}-${p.lng}`}>
+                    <span className="livemap-chip-glyph" style={{ background: g.color }}>{g.letter}</span>
+                    <span className="livemap-help-name">
+                      <b>{p.name}</b>
+                      <small>{t(locale, g.key)}{p.distanceM != null ? ` · ${formatDistance(p.distanceM)}` : ''}</small>
+                    </span>
+                    <a className="livemap-help-go" href={directionsUrl(p.lat, p.lng, walk ? 'walking' : 'driving')} target="_blank" rel="noopener noreferrer">
+                      {t(locale, 'livemap.premium.directions')}
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )
+      ) : (
+        <p className="livemap-teaser">
+          {t(locale, 'livemap.premium.teaser')}{' '}
+          {onUpgrade && <button type="button" onClick={onUpgrade}>{t(locale, 'livemap.premium.upgrade')}</button>}
+        </p>
+      )}
 
       <ul className="livemap-legend">
         <li><span style={{ background: '#2563eb' }} />{t(locale, 'livemap.you')}</li>

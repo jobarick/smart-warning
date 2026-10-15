@@ -1577,6 +1577,8 @@ export default function App() {
                 token={token}
                 locale={settings.locale}
                 locationOff={!settings.shareLocation}
+                premium={!!tier && tier !== 'free'}
+                onUpgrade={token ? () => navigate('/billing') : undefined}
               />
               <OperatorStatus
                 name={settings.deviceName}

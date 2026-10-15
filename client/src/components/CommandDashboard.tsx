@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AlarmState } from '../hooks/useAlarmState';
 import type { SocketStatus } from '../hooks/useAlertSocket';
 import type { AlertType, LogEntry, Severity, SystemStatusLevel, WorkerInfo } from '../types';
 import { ALERT_META, SEVERITY_META } from '../types';
 import { alertLabel, alertProtocol, type IndustryProfile } from '../lib/profiles';
-import type { Incident, Report, Stats, TrackPoint } from '../lib/api';
+import type { Incident, Report, Stats } from '../lib/api';
 import { acknowledgeIncident } from '../lib/api';
 import { PendingReports } from './PendingReports';
 import { useIncidentTrack } from '../hooks/useIncidentTrack';
@@ -12,6 +12,9 @@ import { assess, accountedFor, unaccountedFor, musterPopulation } from '../lib/a
 import { useNavigationRoute, formatEta } from '../hooks/useNavigationRoute';
 import { formatDistance } from '../lib/geo';
 import { describePosition } from '../lib/position';
+
+// Leaflet and the tiles load only when the dashboard opens.
+const CoordinatorMap = lazy(() => import('./CoordinatorMap').then((m) => ({ default: m.CoordinatorMap })));
 
 interface Props {
   roster: WorkerInfo[];
@@ -82,94 +85,7 @@ function lastSeen(updatedAt: number, now: number): string {
   return `${Math.floor(s / 60)}m`;
 }
 
-/**
- * A pin on the map is a claim about where someone is *right now*. Without
- * this, a device that lost signal five minutes ago still shows as a solid
- * dot next to someone whose position just arrived — visually identical, and
- * a coordinator has no way to tell which one to actually trust.
- */
-type Freshness = 'live' | 'recent' | 'stale' | 'unknown';
-function freshnessOf(updatedAt: number | null | undefined, now: number): Freshness {
-  if (updatedAt == null) return 'unknown';
-  const s = (now - updatedAt) / 1000;
-  if (s < 15) return 'live';
-  if (s < 60) return 'recent';
-  return 'stale';
-}
 
-/**
- * Places located workers — and, during an incident, the trail behind them —
- * inside the SVG by normalising lat/lng bounds.
- *
- * Live pins and the recorded track are projected through the SAME bounds, which
- * is the whole reason they are computed together: fit them separately and a
- * person's trail would end somewhere other than the person.
- */
-function useMapPoints(
-  roster: WorkerInfo[],
-  track: TrackPoint[],
-  routeGeometry: [number, number][] = [],
-) {
-  return useMemo(() => {
-    const W = 760;
-    const H = 380;
-    const pad = 46;
-    const located = roster.filter((w) => w.lat !== null && w.lng !== null) as (WorkerInfo & { lat: number; lng: number })[];
-    const unlocated = roster.filter((w) => w.lat === null || w.lng === null);
-
-    // The route joins the bounds calculation for the same reason the trails do:
-    // fit them separately and the route leaves the canvas, or ends somewhere
-    // other than the person it leads to.
-    const lats = [...located.map((w) => w.lat), ...track.map((p) => p.lat), ...routeGeometry.map((p) => p[0])];
-    const lngs = [...located.map((w) => w.lng), ...track.map((p) => p.lng), ...routeGeometry.map((p) => p[1])];
-    if (lats.length === 0) return { points: [], unlocated: roster, paths: [], routePath: '' };
-
-    const minLat = Math.min(...lats);
-    const maxLat = Math.max(...lats);
-    const minLng = Math.min(...lngs);
-    const maxLng = Math.max(...lngs);
-    const spanLat = maxLat - minLat || 1;
-    const spanLng = maxLng - minLng || 1;
-
-    // north (higher lat) is up, so invert y
-    const project = (lat: number, lng: number) => ({
-      x: pad + ((lng - minLng) / spanLng) * (W - pad * 2),
-      y: pad + (1 - (lat - minLat) / spanLat) * (H - pad * 2),
-    });
-
-    const points = located.map((w) => ({ worker: w, ...project(w.lat, w.lng) }));
-
-    // One path per device, in the order the positions were recorded.
-    const byWorker = new Map<string, TrackPoint[]>();
-    for (const p of [...track].sort((a, b) => a.at - b.at)) {
-      const seen = byWorker.get(p.workerId);
-      if (seen) seen.push(p);
-      else byWorker.set(p.workerId, [p]);
-    }
-    const paths = [...byWorker.entries()]
-      .filter(([, pts]) => pts.length > 1) // a single point is a pin, not a trail
-      .map(([workerId, pts]) => ({
-        workerId,
-        d: pts
-          .map((p, i) => {
-            const { x, y } = project(p.lat, p.lng);
-            return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-          })
-          .join(' '),
-      }));
-
-    const routePath = routeGeometry.length > 1
-      ? routeGeometry
-          .map(([lat, lng], i) => {
-            const { x, y } = project(lat, lng);
-            return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-          })
-          .join(' ')
-      : '';
-
-    return { points, unlocated, paths, routePath };
-  }, [roster, track, routeGeometry]);
-}
 
 /**
  * Supervisor command centre.
@@ -252,7 +168,7 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
     { profile: 'driving', active: Boolean(alert && selfPosition && target) },
   );
 
-  const { points, unlocated, paths, routePath } = useMapPoints(roster, track, navRoute?.geometry ?? []);
+  const unlocated = roster.filter((w) => w.lat === null || w.lng === null);
 
   // Announce the response to the site as soon as there is a route to announce.
   //
@@ -555,36 +471,20 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
             <h4 className="mc-h">
               Live positions
               <span className="mc-h-note">
-                {located.length} of {roster.length} located{paths.length > 0 ? ` · ${paths.length} tracked` : ''}
+                {located.length} of {roster.length} located
               </span>
             </h4>
             <div className="mc-map-body">
-              <svg viewBox="0 0 760 380" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Map of worker locations and movement since the alert">
-                {/* Where people have been since the alert was raised, drawn
-                    under the pins so it never obscures where they are now. */}
-                {paths.map((p) => (
-                  <path key={p.workerId} className="mc-trail" d={p.d} fill="none" />
-                ))}
-                {/* The supervisor's own route to the person who raised the
-                    alarm. Drawn beneath the pins so it never hides them. */}
-                {routePath && <path className="mc-route" d={routePath} fill="none" />}
-                {points.length === 0 ? (
-                  <text x="380" y="190" textAnchor="middle" className="cmd-map-empty">No devices are sharing location yet</text>
-                ) : (
-                  points.map(({ worker, x, y }) => {
-                    const fresh = freshnessOf(worker.updatedAt, now);
-                    return (
-                      <g key={worker.id} transform={`translate(${x.toFixed(1)},${y.toFixed(1)})`} className={`mc-pin mc-pin-${fresh}`}>
-                        <title>{worker.name}: {fresh === 'unknown' ? 'no position reported' : `updated ${lastSeen(worker.updatedAt, now)} ago`}</title>
-                        {worker.status === 'sos' && <circle className="cmd-ring" r="10" fill="none" stroke="var(--cmd-crit)" strokeWidth="2" />}
-                        <circle r="7" fill={STATUS_COLOR[worker.status] ?? 'var(--cmd-nosig)'} />
-                        {fresh === 'stale' && <circle r="7" className="mc-pin-stale-ring" fill="none" />}
-                        <text y="22" textAnchor="middle" className="cmd-map-name">{worker.name}</text>
-                      </g>
-                    );
-                  })
-                )}
-              </svg>
+              <Suspense fallback={<div className="cm-el cm-loading" aria-hidden="true" />}>
+                <CoordinatorMap
+                  roster={roster}
+                  track={track}
+                  target={raiser && alert ? { name: alert.sender, lat: raiser.lat!, lng: raiser.lng! } : null}
+                  self={selfPosition ?? null}
+                  route={navRoute ? { geometry: navRoute.geometry, degraded: navRoute.degraded } : null}
+                  now={now}
+                />
+              </Suspense>
               {unlocated.length > 0 && (
                 <div className="mc-tray">
                   <span className="mc-tray-lbl">No location ({unlocated.length})</span>
