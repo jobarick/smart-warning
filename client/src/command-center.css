@@ -603,3 +603,34 @@
   font-size: 12px;
   color: var(--faint);
 }
+
+/* Coordinator street map (CoordinatorMap.tsx) */
+.cm-wrap { position: relative; display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; }
+.cm-el { flex: 1; min-height: 320px; border-radius: 10px; overflow: hidden; border: 1px solid var(--cmd-line, rgba(255,255,255,0.12)); }
+.cm-loading { background: var(--cmd-panel, #111); }
+.cm-empty {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 500; margin: 0;
+  padding: 6px 10px; border-radius: 8px; font-size: 12px; background: rgba(0,0,0,0.7); color: #fff; pointer-events: none;
+}
+.cm-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 13px; }
+.cm-go {
+  display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 10px;
+  background: var(--cmd-crit, #ef4444); color: #fff; font-weight: 700; text-decoration: none;
+}
+.cm-help a { color: inherit; text-decoration: underline; }
+.cm-note { width: 100%; font-size: 12px; color: var(--cmd-warn, #f59e0b); }
+.cm-pulse { animation: cm-pulse 1.4s ease-out infinite; transform-origin: center; transform-box: fill-box; }
+@keyframes cm-pulse { from { opacity: 1; } to { opacity: 0.15; } }
+@media (prefers-reduced-motion: reduce) { .cm-pulse { animation: none; } }
+/* The street map block takes its natural height (map + directions bar) and
+   the roll call / history row gets the rest, never less than 240px; the
+   column scrolls if both do not fit. Before, a fixed 1.25fr/1fr split
+   squeezed the map box and the directions bar slid under the lists. */
+.mc-split > .mc-col:last-child {
+  grid-template-rows: max-content minmax(240px, auto);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.mc-split > .mc-col:last-child > .mc-map { flex: 0 0 auto; }
+.mc-split > .mc-col:last-child > .mc-two { min-height: 240px; }
+.mc-map .mc-map-body, .mc-map .cm-wrap { flex: 0 0 auto; }

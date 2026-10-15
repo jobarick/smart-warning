@@ -13,9 +13,11 @@ interface Props {
   locale: Locale;
   /** Location sharing is off in Settings. */
   locationOff: boolean;
+  premium?: boolean;
+  onUpgrade?: () => void;
 }
 
-export function LiveMapSection({ lat, lng, token, locale, locationOff }: Props) {
+export function LiveMapSection({ lat, lng, token, locale, locationOff, premium, onUpgrade }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [seen, setSeen] = useState(false);
 
@@ -44,7 +46,7 @@ export function LiveMapSection({ lat, lng, token, locale, locationOff }: Props) 
   else {
     body = (
       <Suspense fallback={<div className="livemap-placeholder" aria-hidden="true" />}>
-        <LiveMap lat={lat} lng={lng} token={token} locale={locale} />
+        <LiveMap lat={lat} lng={lng} token={token} locale={locale} premium={premium} onUpgrade={onUpgrade} />
       </Suspense>
     );
   }

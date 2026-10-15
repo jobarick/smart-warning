@@ -2857,6 +2857,10 @@ body {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
+/* Inside that scrolling column the cards keep their own height; the column
+   scrolls instead. Without this, flex let them shrink, and the live map's
+   wrapper collapsed to 1px with the position card drawn on top of it. */
+.app-tabbed .worker-tabbed > * { flex-shrink: 0; }
 /* ---------- safety & preparedness library ---------- */
 .safety { display: flex; flex-direction: column; gap: 18px; padding: 4px 0 8px; }
 .safety-head h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; font-size: 1.15rem; }

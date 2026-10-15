@@ -57,3 +57,12 @@ export function describePosition(p: PositionFacts | null | undefined, now: numbe
     mapUrl: `https://www.google.com/maps?q=${p.lat},${p.lng}`,
   };
 }
+
+/**
+ * Google Maps turn-by-turn to a point, from wherever the phone is now. Opens
+ * the Google Maps app on Android when installed: real roads, live traffic and
+ * the fastest route, none of which this app can offer on its own.
+ */
+export function directionsUrl(lat: number, lng: number, mode: 'driving' | 'walking' = 'driving'): string {
+  return `https://www.google.com/maps/dir/?api=1&destination=${lat.toFixed(6)},${lng.toFixed(6)}&travelmode=${mode}`;
+}
