@@ -21,6 +21,7 @@ import { personalDelivery, needsFallback, smsHref, FALLBACK_EMERGENCY_NUMBER, ty
 import { canDial } from '../lib/emergency';
 import { loadSession } from '../lib/session';
 import { loadSettings } from '../lib/settings';
+import { checkForUpdates, holdUpdates, newVersionReady } from '../lib/updateGate';
 
 type Lang = 'sw' | 'en';
 type TypeId = 'security' | 'medical' | 'fire' | 'hazard';
@@ -270,12 +271,15 @@ function render() {
 
 // Installs the same service worker as the app, so opening this page once is
 // enough for it, and the app, to open again with no signal.
-registerSW({ immediate: true });
+registerSW({ immediate: true, onNeedReload: newVersionReady, onRegisteredSW: checkForUpdates });
 
 // If drawing ever throws, put the no-JavaScript links back rather than leave
 // an empty page: 112 and SMS must survive any bug in this file.
 const fallbackHtml = document.getElementById('sos')?.innerHTML ?? '';
 function safeRender() {
+  // No update reload while an SOS is being sent, or its result and fallback
+  // buttons are on screen.
+  holdUpdates(phase !== 'idle' && phase !== 'closed');
   try { render(); } catch (e) {
     console.error('[sos] render failed', e);
     const root = document.getElementById('sos');

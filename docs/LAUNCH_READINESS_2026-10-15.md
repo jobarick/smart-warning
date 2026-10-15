@@ -93,3 +93,15 @@ Merging to `main` deploys both Vercel and Railway automatically. After merge:
 2. `/api/health` shows `"sms":{"enabled":false,...}`.
 3. Open the site once, reload once (the service worker serves the old bundle on the first visit), check the directory note.
 4. Rollback: Vercel "Promote" the previous deployment; Railway "Redeploy" the previous successful deployment (`docs/INCIDENT_RUNBOOK.md`). No database migration is in this branch.
+
+## Addendum: production pilot audit (after `906c35d` went live)
+
+Production observations (2026-10-15): `/api/ready` 200; forged, unsigned (`alg: none`) and expired tokens get 401 on `/api/auth/me`, `/api/incidents` and `/api/contacts/alert`; WebSocket join with a forged supervisor token or an unknown team code is closed with 4001; `sw.js` and `index.html` are served `max-age=0, must-revalidate`.
+
+Defects found and fixed on `fix/pilot-audit`:
+
+1. **SOS rate limit was per IP** (10 per 10 min, shared with location, voice and "I am safe"). Under carrier-grade NAT, strangers on one mobile network could use up each other's SOS allowance, and a person's own follow-ups counted against their next SOS. Now: per account for new alerts (10 / 10 min), a separate per-account bucket for follow-ups (40 / 10 min), and per IP only as a flood guard (300 / 10 min). Tests: shared-IP and follow-up cases in `personal-alert.test.js`.
+2. **A deploy reloaded every open page, even mid-alarm.** The PWA is in autoUpdate mode and alarm state lives in memory, so a release during an emergency would clear the alarm screen on every phone. Now the reload is held while an alarm (app) or an SOS in progress or its fallback (Quick SOS) is on screen, and runs once it clears (`lib/updateGate.ts`). Installed apps also check for a new version every 30 minutes and on returning to the foreground. Tests: `updateGate.test.ts`.
+3. **The SOS free-text message was written to platform logs.** Now only its length is logged. Test in `all-clear-authority.test.js`.
+
+Still open (owner decisions, not code): incidents and voice recordings have no retention limit (location history is purged after 90 days); account emails appear in auth logs.
