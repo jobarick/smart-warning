@@ -8,6 +8,7 @@ import { PUBLIC_REPORT_PATTERN } from './lib/routes';
 import { registerNativeBackButton } from './lib/nativeBack';
 import { loadLocale } from './lib/i18n';
 import { loadSettings } from './lib/settings';
+import { checkForUpdates, newVersionReady } from './lib/updateGate';
 // Bundled, not fetched. An emergency PWA has to render identically on a locked
 // -down site network or offline, so the typeface ships with the app rather than
 // coming from a font CDN. One variable file: the monospace face that used to
@@ -22,7 +23,8 @@ import './landing.css';
 import './demo.css';
 import './home.css';
 
-registerSW({ immediate: true });
+// A new version never reloads a phone mid-alarm (see lib/updateGate.ts).
+registerSW({ immediate: true, onNeedReload: newVersionReady, onRegisteredSW: checkForUpdates });
 registerNativeBackButton();
 
 // /r/<site code> is the public reporting page. Routed here rather than inside

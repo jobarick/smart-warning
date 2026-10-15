@@ -130,10 +130,17 @@ function clientIp(req) {
 // One bucket per limiter so a burst of one kind of request cannot exhaust the
 // allowance for another — a flood of place lookups must not stop somebody
 // filing a genuine report.
+const allLimiters = [];
+/** Tests only: forget every count, so one test's traffic never limits the next. */
+function _resetRateLimitsForTest() { for (const m of allLimiters) m.clear(); }
+
 function rateLimiter({ windowMs, max, name }) {
-  const hits = new Map(); // ip → timestamps
-  return function allow(req) {
-    const ip = clientIp(req);
+  const hits = new Map(); // ip (or the caller-supplied key) → timestamps
+  allLimiters.push(hits);
+  // `key` lets a route count per account instead of per address, for limits
+  // that must not punish strangers who happen to share one public IP.
+  return function allow(req, key) {
+    const ip = key || clientIp(req);
     const now = Date.now();
     const recent = (hits.get(ip) || []).filter((t) => now - t < windowMs);
     if (recent.length >= max) {
@@ -150,4 +157,4 @@ function rateLimiter({ windowMs, max, name }) {
   };
 }
 
-module.exports = { CORS, originHeaders, sendJson, readJson, readText, readBytes, bearer, clientIp, rateLimiter };
+module.exports = { CORS, originHeaders, sendJson, readJson, readText, readBytes, bearer, clientIp, rateLimiter, _resetRateLimitsForTest };

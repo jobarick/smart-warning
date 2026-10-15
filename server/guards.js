@@ -195,11 +195,24 @@ const allowVisitorFeedback = rateLimiter({ windowMs: 60 * 60 * 1000, max: 5, nam
 // bucket for the same reason.
 const allowSalesContact = rateLimiter({ windowMs: 60 * 60 * 1000, max: 5, name: 'sales-contact' });
 
-// A personal account alerting its own Trusted Circle. Generous — a real
-// emergency can mean several genuine alerts in a short window (a fall, then
-// a worse fall) — but bounded so one account cannot turn this into a mail
-// bomb against the handful of people in its contact list.
-const allowPersonalAlert = rateLimiter({ windowMs: 10 * 60 * 1000, max: 10, name: 'personal-alert' });
+// A personal account alerting its own Trusted Circle.
+//
+// Counted PER ACCOUNT, not per IP. Tanzanian mobile networks put many
+// subscribers behind one public address (carrier-grade NAT), so a per-IP cap
+// of 10 meant strangers on the same network could use up each other's SOS
+// allowance, and one person's own follow-ups (location, voice notes, "I am
+// safe") ate into it too. A 429 on an SOS means nobody is told.
+//
+// allowPersonalAlert: per IP, only a flood guard, sized for a whole carrier
+//   address, checked before authentication so junk is turned away cheaply.
+// allowPersonalAlertFor: per account, new alerts only. Generous (a fall,
+//   then a worse fall) but bounded so one account cannot mail-bomb its own
+//   contact list.
+// allowPersonalFollowUp: per account, the location/voice/resolve calls that
+//   follow an alert, in their own bucket so they can never block an SOS.
+const allowPersonalAlert = rateLimiter({ windowMs: 10 * 60 * 1000, max: 300, name: 'personal-alert-ip' });
+const allowPersonalAlertFor = rateLimiter({ windowMs: 10 * 60 * 1000, max: 10, name: 'personal-alert' });
+const allowPersonalFollowUp = rateLimiter({ windowMs: 10 * 60 * 1000, max: 40, name: 'personal-follow-up' });
 
 // Mail-bombing ONE address, which the IP limiter above cannot stop on its own
 // — an attacker rotating IPs is still hitting a single mailbox. Keyed by the
@@ -233,6 +246,6 @@ function allowPasswordResetForAddress(email) {
 module.exports = {
   requireAuth, guardOrg, orgContext, orgIdFromRequest, deviceOwnerFromRequest, allowFeature,
   allowReport, allowPlaces, allowWebhook, allowPasswordReset, allowPasswordResetForAddress,
-  allowVisitorFeedback, allowSalesContact, allowLogin, allowSignup, allowOrgInvite, allowPersonalAlert,
+  allowVisitorFeedback, allowSalesContact, allowLogin, allowSignup, allowOrgInvite, allowPersonalAlert, allowPersonalAlertFor, allowPersonalFollowUp,
   allowEmergencyReport,
 };

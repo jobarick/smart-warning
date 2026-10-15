@@ -67,6 +67,7 @@ import { loadPendingPayment, type PendingPayment } from './lib/pendingPayment';
 import { FALLBACK_EMERGENCY_NUMBER, orgDelivery, personalDelivery, smsHref, type DeliveryState } from './lib/delivery';
 import { canDial } from './lib/emergency';
 import { t, loadLocale, isLocaleLoaded, type StringKey } from './lib/i18n';
+import { holdUpdates } from './lib/updateGate';
 
 // How long the pending-location note may show after SOS fires with no GPS
 // fix yet, and how long a late fix is still worth backfilling. Short on
@@ -197,6 +198,9 @@ export default function App() {
   const { path, navigate, replace } = useRoute();
   const [settings, setSettings] = useState(loadSettings);
   const [alarm, dispatch] = useAlarmState();
+  // A deploy must not reload this page while an alarm is on screen: the alarm
+  // lives in memory and would vanish (lib/updateGate.ts).
+  useEffect(() => { holdUpdates(!!alarm.alert); }, [alarm.alert]);
   const [log, setLog] = useState<LogEntry[]>([]);
   // Bumped on every local alert/all-clear so the supervisor history refetches.
   const [incidentTick, setIncidentTick] = useState(0);

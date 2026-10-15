@@ -12,7 +12,7 @@ const crypto = require('crypto');
 const db = require('../db');
 const mailer = require('../mailer');
 const { sendJson, readJson, readBytes } = require('../http');
-const { requireAuth, allowPersonalAlert } = require('../guards');
+const { requireAuth, allowPersonalAlert, allowPersonalFollowUp } = require('../guards');
 const { UUID_RE } = require('../wire');
 
 const API_URL = (process.env.API_URL || 'https://smart-warning-production.up.railway.app').replace(/\/+$/, '');
@@ -69,6 +69,7 @@ async function handle({ req, res, url, path }) {
     if (!allowPersonalAlert(req)) { sendJson(res, 429, { error: 'too many requests, please wait a moment' }); return true; }
     const ctx = await personalCtx(req, res);
     if (!ctx) return true;
+    if (!allowPersonalFollowUp(req, `user:${ctx.user.id}`)) { sendJson(res, 429, { error: 'too many requests, please wait a moment' }); return true; }
     if (!db.enabled()) { sendJson(res, 501, { error: 'voice notes require a database' }); return true; }
     const id = decodeURIComponent(voiceMatch[1]);
     const mime = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();

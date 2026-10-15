@@ -160,3 +160,24 @@ test('with no live incident, a worker\'s all-clear stays on their own phone', as
   assert.strictEqual(allClearsIn(worker).length, 1);
   worker.close(); watcher.close();
 });
+
+test('the SOS free-text message never reaches the server log', async () => {
+  const lines = [];
+  const orig = console.log;
+  console.log = (...a) => { lines.push(a.join(' ')); };
+  try {
+    const raiser = await connect({ kind: 'join', orgCode: JOIN_CODE });
+    raiser.send(JSON.stringify({
+      kind: 'alert', id: 'inc-private', type: 'security', severity: 'critical',
+      message: 'PRIVATE-DETAIL-12345', sender: 'Raiser', timestamp: Date.now(),
+    }));
+    await sleep(300);
+    raiser.send(allClear('Raiser'));
+    await sleep(200);
+    raiser.close();
+  } finally {
+    console.log = orig;
+  }
+  assert.ok(lines.some((l) => l.includes('ALERT security/critical')), 'the alert itself is still logged');
+  assert.ok(!lines.some((l) => l.includes('PRIVATE-DETAIL-12345')), 'what the person wrote must stay out of platform logs');
+});

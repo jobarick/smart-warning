@@ -23,7 +23,7 @@ const nearbyHelp = require('../nearbyHelp');
 const plans = require('../billing/plans');
 const entitlements = require('../billing/entitlements');
 const { sendJson, readJson } = require('../http');
-const { requireAuth, allowPersonalAlert } = require('../guards');
+const { requireAuth, allowPersonalAlert, allowPersonalAlertFor, allowPersonalFollowUp } = require('../guards');
 const { UUID_RE, ALERT_TYPES, SEVERITIES, numOrNull, titleCase } = require('../wire');
 
 // Enough for a household and then some. A cap exists so one account cannot
@@ -178,6 +178,7 @@ async function handle({ req, res, path }) {
     if (!allowPersonalAlert(req)) { sendJson(res, 429, { error: 'too many alerts, please wait a moment' }); return true; }
     const user = await personalUser(req, res);
     if (!user) return true;
+    if (!allowPersonalAlertFor(req, `user:${user.id}`)) { sendJson(res, 429, { error: 'too many alerts, please wait a moment' }); return true; }
 
     const body = await readJson(req);
     const type = ALERT_TYPES.has(body.type) ? body.type : 'hazard';
@@ -325,6 +326,7 @@ async function handle({ req, res, path }) {
     if (!allowPersonalAlert(req)) { sendJson(res, 429, { error: 'too many requests, please wait a moment' }); return true; }
     const user = await personalUser(req, res);
     if (!user) return true;
+    if (!allowPersonalFollowUp(req, `user:${user.id}`)) { sendJson(res, 429, { error: 'too many requests, please wait a moment' }); return true; }
     const incidentId = decodeURIComponent(locationMatch[1]);
     if (!UUID_RE.test(incidentId)) { sendJson(res, 404, { error: 'no such incident' }); return true; }
 
@@ -367,6 +369,7 @@ async function handle({ req, res, path }) {
     if (!allowPersonalAlert(req)) { sendJson(res, 429, { error: 'too many requests, please wait a moment' }); return true; }
     const user = await personalUser(req, res);
     if (!user) return true;
+    if (!allowPersonalFollowUp(req, `user:${user.id}`)) { sendJson(res, 429, { error: 'too many requests, please wait a moment' }); return true; }
     const incidentId = decodeURIComponent(resolveMatch[1]);
     if (!UUID_RE.test(incidentId)) { sendJson(res, 404, { error: 'no such incident' }); return true; }
 

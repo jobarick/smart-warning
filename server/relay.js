@@ -227,7 +227,10 @@ function trackPosition(ws) {
 async function raiseAlert(orgId, alert, worker = null, origin = 'unknown', actorRole = null, raiser = null) {
   // Logged here rather than at each call site so every alert is recorded once,
   // however it was raised — an escalated public report most of all.
-  console.log(`[!] ALERT ${alert.type}/${alert.severity} from ${origin} "${alert.sender}" (org ${orgId ?? 'global'})${alert.replayed ? ' [replayed]' : ''}: ${alert.message || '(no message)'}`);
+  // The free-text message is not logged: people write things like "my husband
+  // is hitting me" into it, and platform logs are kept and read far more
+  // widely than the incident record. Its length is enough to debug with.
+  console.log(`[!] ALERT ${alert.type}/${alert.severity} from ${origin} "${alert.sender}" (org ${orgId ?? 'global'})${alert.replayed ? ' [replayed]' : ''}${alert.message ? ` (message, ${String(alert.message).length} chars)` : ''}`);
 
   // Open the tracking window. Until the all-clear, every position a device
   // reports is written to the incident's movement history.

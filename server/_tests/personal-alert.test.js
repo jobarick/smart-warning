@@ -97,6 +97,9 @@ before(() => {
   stub('auth.js', {
     userFromToken: async (token) => {
       if (token === PERSONAL_TOKEN) return { user: USER, org: null, orgId: null, kind: 'individual' };
+      // Strangers on the same mobile network: separate accounts, one shared IP.
+      const m = /^neighbour-(\d+)$/.exec(token || '');
+      if (m) return { user: { ...USER, id: `neighbour-${m[1]}`, name: `Neighbour ${m[1]}` }, org: null, orgId: null, kind: 'individual' };
       if (token === ORG_TOKEN) return { user: { id: 'sup-1', name: 'Sup' }, org: { id: 'org-a' }, orgId: 'org-a', kind: 'org_member' };
       return null;
     },
@@ -137,6 +140,7 @@ beforeEach(() => {
   seenIncidentIds = new Set();
   incidentsById = new Map();
   nearbyHelpCalls.length = 0;
+  require('../http')._resetRateLimitsForTest();
 });
 
 // `ip` is optional and, when given, becomes this call's X-Forwarded-For — the
@@ -264,6 +268,25 @@ test('a burst of alerts is eventually rate limited', async () => {
     if (res.status === 429) { sawLimit = true; break; }
   }
   assert.ok(sawLimit, 'unbounded personal alerts would let one account mail-bomb its own contacts');
+});
+
+test('people sharing one mobile network IP cannot use up each other’s SOS', async () => {
+  // Carrier-grade NAT: many subscribers, one public address. The old per-IP
+  // cap of 10 let ten strangers' alerts block an eleventh person's SOS.
+  const sharedIp = '198.51.100.99';
+  for (let n = 1; n <= 12; n++) {
+    const res = await alertAs(`neighbour-${n}`, { type: 'medical', severity: 'high' }, sharedIp);
+    assert.strictEqual(res.status, 201, `neighbour ${n} must be able to raise an SOS`);
+  }
+});
+
+test('follow-ups (location, I am safe) never use up the SOS allowance', async () => {
+  contactsByUser.set(USER.id, []);
+  const first = await alertAs(PERSONAL_TOKEN, { type: 'medical', severity: 'high' });
+  const { incidentId } = await first.json();
+  for (let i = 0; i < 12; i++) await backfillLocationAs(PERSONAL_TOKEN, incidentId, { lat: -6.79, lng: 39.21 });
+  const again = await alertAs(PERSONAL_TOKEN, { type: 'fire', severity: 'high' });
+  assert.strictEqual(again.status, 201, 'a second real emergency must still go out');
 });
 
 // --- Retry idempotency: a client-generated id survives a retried request ---
