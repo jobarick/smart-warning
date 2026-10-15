@@ -2705,6 +2705,25 @@ async function deleteUser(userId) {
   // with it, as the organisation's are with the organisation.
   await pool.query(`DELETE FROM consents WHERE user_id = $1 AND org_id IS NULL`, [userId]);
 
+  // The person's own SOS history. incidents.user_id has no foreign key, so
+  // without this every alert they ever raised (position, what they wrote,
+  // their name) outlived the account, unlinked and impossible to find for a
+  // later deletion request. Only personal incidents (org_id IS NULL): an
+  // organisation's incidents are its safety record and go with it instead.
+  // incident_events cascade from incidents; incident_media and
+  // incident_feedback cascade from users.
+  const { rows: personalIncidents } = await pool.query(
+    `SELECT id FROM incidents WHERE user_id = $1 AND org_id IS NULL`,
+    [userId],
+  );
+  const incidentIds = personalIncidents.map((r) => r.id);
+  if (incidentIds.length) {
+    await pool.query(`DELETE FROM location_pings WHERE incident_id = ANY($1::text[]) AND org_id IS NULL`, [incidentIds]);
+    await pool.query(`DELETE FROM incident_offers WHERE incident_id = ANY($1::text[])`, [incidentIds]);
+    await pool.query(`DELETE FROM incidents WHERE id = ANY($1::text[]) AND user_id = $2 AND org_id IS NULL`, [incidentIds, userId]);
+  }
+  counts[0].incidents = incidentIds.length;
+
   const { rowCount } = await pool.query(`DELETE FROM users WHERE id = $1`, [userId]);
   if (rowCount === 0) return null;
   return counts[0];

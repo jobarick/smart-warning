@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type {
   AcknowledgedMessage,
   AlertMessage,
@@ -67,7 +67,7 @@ import { loadPendingPayment, type PendingPayment } from './lib/pendingPayment';
 import { FALLBACK_EMERGENCY_NUMBER, orgDelivery, personalDelivery, smsHref, type DeliveryState } from './lib/delivery';
 import { canDial } from './lib/emergency';
 import { t, loadLocale, isLocaleLoaded, type StringKey } from './lib/i18n';
-import { holdUpdates } from './lib/updateGate';
+import { holdUpdates, reloadPending, subscribeUpdatePending } from './lib/updateGate';
 
 // How long the pending-location note may show after SOS fires with no GPS
 // fix yet, and how long a late fix is still worth backfilling. Short on
@@ -201,6 +201,7 @@ export default function App() {
   // A deploy must not reload this page while an alarm is on screen: the alarm
   // lives in memory and would vanish (lib/updateGate.ts).
   useEffect(() => { holdUpdates(!!alarm.alert); }, [alarm.alert]);
+  const updateWaiting = useSyncExternalStore(subscribeUpdatePending, reloadPending);
   const [log, setLog] = useState<LogEntry[]>([]);
   // Bumped on every local alert/all-clear so the supervisor history refetches.
   const [incidentTick, setIncidentTick] = useState(0);
@@ -1704,6 +1705,7 @@ export default function App() {
           // else's emergency.
           canRetract={alarm.alert.sender === settings.deviceName}
           onFalseAlarm={() => allClear('false-alarm')}
+          updateWaiting={updateWaiting}
           canEndForAll={session?.kind !== 'worker' || alarm.alert.sender === settings.deviceName}
           delivery={delivery}
           fallback={deliveryFallback}
@@ -1712,6 +1714,9 @@ export default function App() {
         />
       )}
 
+      {updateWaiting && alarm.alert && shownView !== 'worker' && (
+        <p className="update-wait" role="status">{t(settings.locale, 'update.waiting')}</p>
+      )}
       <SystemFooter connected={isPersonal ? online : status === 'open'} personal={isPersonal} lastSync={lastSync} now={now} queued={queued} queuedSince={queuedSince} />
     </div>
   );

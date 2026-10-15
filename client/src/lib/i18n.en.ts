@@ -57,6 +57,7 @@ const EN: Record<StringKey, string> = {
     'overlay.estimated': '(estimated)',
     'overlay.allClearConfirm': 'Tap again to confirm all clear',
     'overlay.allClearBtn': 'All clear (all devices)',
+    'update.waiting': 'A new version of the app is ready. It will load after this alert ends.',
     'overlay.silenceBtn': 'Silence this phone',
     'overlay.silenceNote': 'Only the person who raised this or a Safety Coordinator can end it for everyone.',
     'severity.low': 'Low',

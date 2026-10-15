@@ -73,6 +73,7 @@ export type StringKey =
   | 'overlay.allClearConfirm'
   | 'overlay.allClearBtn'
   | 'overlay.silenceBtn'
+  | 'update.waiting'
   | 'timeline.texted'
   | 'timeline.textedNone'
   | 'overlay.silenceNote'
