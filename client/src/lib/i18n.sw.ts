@@ -57,6 +57,7 @@ const SW: Record<StringKey, string> = {
     'overlay.estimated': '(makadirio)',
     'overlay.allClearConfirm': 'Gusa tena kuthibitisha hali salama',
     'overlay.allClearBtn': 'Hali salama (vifaa vyote)',
+    'update.waiting': 'Toleo jipya la programu liko tayari. Litapakia baada ya tahadhari hii kuisha.',
     'overlay.silenceBtn': 'Zima kengele kwenye simu hii',
     'overlay.silenceNote': 'Aliyetuma tahadhari hii au Mratibu wa Usalama pekee ndiye anaweza kuimaliza kwa wote.',
     'severity.low': 'Chini',

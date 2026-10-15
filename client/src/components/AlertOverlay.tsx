@@ -90,6 +90,8 @@ interface Props {
    *  or a supervisor end an alarm for everyone, so their button silences this
    *  phone and says so. */
   canEndForAll?: boolean;
+  /** A new app version is ready and is being held until this alarm ends. */
+  updateWaiting?: boolean;
   /** Set only for an alert THIS device raised: whether it reached anyone. */
   delivery?: DeliveryState | null;
   /** What to offer when it has not: a number to call and a prefilled SMS. */
@@ -100,7 +102,7 @@ interface Props {
   sendStatus?: PersonalSendStatus | null;
 }
 
-export function AlertOverlay({ alert, acknowledged, settings, locale, label, safeConfirmed, onConfirmSafe, onAcknowledge, onAllClear, responder, ackNotice, canRetract, onFalseAlarm, canEndForAll = true, delivery, fallback, personalToken, sendStatus }: Props) {
+export function AlertOverlay({ alert, acknowledged, settings, locale, label, safeConfirmed, onConfirmSafe, onAcknowledge, onAllClear, responder, ackNotice, canRetract, onFalseAlarm, canEndForAll = true, updateWaiting = false, delivery, fallback, personalToken, sendStatus }: Props) {
   // Retracting also stops every siren on site, so it takes a second tap the
   // same way all-clear does — but it is worded as taking the alarm back, not
   // as declaring an emergency over.
@@ -262,6 +264,7 @@ export function AlertOverlay({ alert, acknowledged, settings, locale, label, saf
           </div>
         )}
         {!canEndForAll && <p className="overlay-meta">{t(locale, 'overlay.silenceNote')}</p>}
+        {updateWaiting && <p className="overlay-meta" role="status">{t(locale, 'update.waiting')}</p>}
         <button
           className={`btn btn-clear ${confirmClear ? 'btn-clear-confirm' : ''}`}
           disabled={!armed}

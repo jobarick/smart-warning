@@ -2891,6 +2891,10 @@ body {
   margin: 4px 0 0; padding-top: 14px; border-top: 1px solid var(--panel-border);
   font-size: 12px; line-height: 1.55; color: var(--muted);
 }
+.update-wait {
+  margin: 8px 16px; padding: 8px 12px; border-radius: 10px; font-size: 13px;
+  border: 1px solid var(--panel-border); color: var(--text); text-align: center;
+}
 .safety-review-note {
   margin: 0 0 14px; padding: 10px 12px; border-radius: 10px;
   border: 1px solid var(--panel-border); font-size: 13px; line-height: 1.5; color: var(--text);

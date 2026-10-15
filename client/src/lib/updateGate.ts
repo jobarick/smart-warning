@@ -16,11 +16,24 @@
 let held = false;
 let pending = false;
 let doReload: () => void = () => window.location.reload();
+const listeners = new Set<() => void>();
+function setPending(v: boolean) {
+  if (pending === v) return;
+  pending = v;
+  listeners.forEach((l) => l());
+}
+
+/** For a screen that says "a new version will load when this ends". */
+export function subscribeUpdatePending(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
+}
 
 /** For tests. */
 export function _resetUpdateGate(reload?: () => void) {
   held = false;
   pending = false;
+  listeners.clear();
   doReload = reload ?? (() => window.location.reload());
 }
 
@@ -28,14 +41,14 @@ export function _resetUpdateGate(reload?: () => void) {
 export function holdUpdates(on: boolean) {
   held = on;
   if (!on && pending) {
-    pending = false;
+    setPending(false);
     doReload();
   }
 }
 
 /** Passed to registerSW as onNeedReload: reload now, or once nothing is held. */
 export function newVersionReady() {
-  if (held) pending = true;
+  if (held) setPending(true);
   else doReload();
 }
 
@@ -50,7 +63,11 @@ export function checkForUpdates(_swUrl: string, registration: ServiceWorkerRegis
   if (!registration) return;
   const check = () => {
     if (navigator.onLine === false) return;
-    registration.update().catch(() => { /* offline or flaky: next check */ });
+    // A failed check (offline, flaky network, server error) is ignored: the
+    // running version keeps working and the next check tries again.
+    try {
+      registration.update().catch(() => { /* next check */ });
+    } catch { /* next check */ }
   };
   setInterval(check, UPDATE_CHECK_MS);
   document.addEventListener('visibilitychange', () => {

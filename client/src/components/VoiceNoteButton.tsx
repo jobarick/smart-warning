@@ -3,6 +3,7 @@ import { uploadVoiceNote } from '../lib/api';
 import { t } from '../lib/i18n';
 import type { Locale } from '../types';
 import { Icon } from './Icon';
+import { isNativeApp } from '../lib/platform';
 
 interface Props {
   incidentId: string;
@@ -39,7 +40,10 @@ export function VoiceNoteButton({ incidentId, token, locale }: Props) {
     streamRef.current?.getTracks().forEach((tr) => tr.stop());
   }, []);
 
-  const supported = typeof window !== 'undefined' && typeof window.MediaRecorder !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
+  // Not in the Android app: it deliberately declares no microphone permission
+  // (docs/PLAY_LAUNCH.md), so recording there could only ever fail with a
+  // "microphone blocked" message the person has no way to fix mid-emergency.
+  const supported = !isNativeApp() && typeof window !== 'undefined' && typeof window.MediaRecorder !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
   if (!supported) return null;
 
   const send = async (blob: Blob, seconds: number) => {
