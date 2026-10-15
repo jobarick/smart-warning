@@ -18,6 +18,7 @@ const crypto = require('crypto');
 const db = require('../db');
 const auth = require('../auth');
 const mailer = require('../mailer');
+const sms = require('../sms');
 const nearbyHelp = require('../nearbyHelp');
 const plans = require('../billing/plans');
 const entitlements = require('../billing/entitlements');
@@ -153,10 +154,11 @@ async function handle({ req, res, path }) {
   // personal account has always sounded the alarm on that one device and gone
   // no further. This records the incident (org_id null, user_id set — kept out
   // of the org escalation sweep, see listEscalationDue) and emails every
-  // notify=true contact who has an email address. Nothing else exists yet to
-  // reach a phone-only contact: no SMS gateway is wired up, so one is neither
-  // attempted nor claimed. The response says exactly who was actually told,
-  // so the client can show that truth rather than a bare "sent".
+  // notify=true contact who has an email address, and texts every one with a
+  // phone number when SMS is switched on (sms.js; off by default). The
+  // response says per channel what actually happened, so the client can show
+  // that truth rather than a bare "sent". An SMS counts only as "accepted by
+  // the provider", never as delivered to the handset.
   //
   // Idempotent on the incident id: the client now generates it up front and
   // retries this request (bounded, with a timeout — see client/src/lib/api.ts)
@@ -230,11 +232,29 @@ async function handle({ req, res, path }) {
 
     const contacted = [];
     const skipped = [];
+    const smsOn = sms.enabled();
+    // Short enough for two SMS segments, plain characters only.
+    const smsText = [
+      `DHARURA: ${raiser} anahitaji msaada (${titleCase(type)}).`,
+      `EMERGENCY: ${raiser} needs help.`,
+      mapsLink ? `Mahali/Location: ${mapsLink}` : 'Mahali haijulikani / Location unknown.',
+      'Smart Warning si huduma ya dharura / not an emergency service. Piga/Call 112.',
+    ].join(' ');
     for (const contact of contacts) {
-      if (!contact.email) {
-        // No SMS/voice channel exists yet — recorded honestly as unreachable
+      const canSms = smsOn && !!contact.phone;
+      if (!contact.email && !canSms) {
+        // Unreachable on every channel that is switched on: recorded honestly
         // rather than silently dropped or falsely claimed as notified.
         skipped.push({ id: contact.id, name: contact.name, reason: 'no-email' });
+        continue;
+      }
+      let smsStatus = null;
+      if (canSms) {
+        const r = await sms.send({ to: contact.phone, message: smsText, refId: `${incidentId}:${contact.id}:sms`, incidentId });
+        smsStatus = r.status;
+      }
+      if (!contact.email) {
+        contacted.push({ id: contact.id, name: contact.name, delivered: smsStatus === 'accepted', sms: smsStatus, email: null });
         continue;
       }
       const subject = `DHARURA: ${raiser} anahitaji msaada / needs help`;
@@ -266,13 +286,29 @@ async function handle({ req, res, path }) {
         refId: `${incidentId}:${contact.id}`,
         orgId: null,
       });
-      contacted.push({ id: contact.id, name: contact.name, delivered: result.delivered === true });
+      contacted.push({
+        id: contact.id, name: contact.name,
+        delivered: result.delivered === true || smsStatus === 'accepted',
+        email: result.delivered === true ? 'sent' : 'queued',
+        sms: smsStatus,
+      });
     }
 
     db.recordIncidentEvent?.({
       incidentId, kind: 'notified', actorRole: 'system',
-      detail: { channel: 'email', count: contacted.filter((c) => c.delivered).length, skipped: skipped.length },
+      detail: { channel: 'email', count: contacted.filter((c) => c.email === 'sent').length, skipped: skipped.length },
     }).catch((e) => console.error('[db] recordIncidentEvent(notified/email):', e.message));
+    if (smsOn) {
+      db.recordIncidentEvent?.({
+        incidentId, kind: 'notified', actorRole: 'system',
+        detail: {
+          channel: 'sms',
+          count: contacted.filter((c) => c.sms === 'accepted').length,
+          accepted: contacted.filter((c) => c.sms === 'accepted').length,
+          failed: contacted.filter((c) => c.sms && c.sms !== 'accepted').length,
+        },
+      }).catch((e) => console.error('[db] recordIncidentEvent(notified/sms):', e.message));
+    }
 
     sendJson(res, 201, { incidentId, contacted, skipped });
     return true;

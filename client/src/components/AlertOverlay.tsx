@@ -86,6 +86,10 @@ interface Props {
   /** True when THIS device raised the alarm, so it may retract it. */
   canRetract?: boolean;
   onFalseAlarm?: () => void;
+  /** False for a worker who did not raise it: the server only lets the raiser
+   *  or a supervisor end an alarm for everyone, so their button silences this
+   *  phone and says so. */
+  canEndForAll?: boolean;
   /** Set only for an alert THIS device raised: whether it reached anyone. */
   delivery?: DeliveryState | null;
   /** What to offer when it has not: a number to call and a prefilled SMS. */
@@ -96,7 +100,7 @@ interface Props {
   sendStatus?: PersonalSendStatus | null;
 }
 
-export function AlertOverlay({ alert, acknowledged, settings, locale, label, safeConfirmed, onConfirmSafe, onAcknowledge, onAllClear, responder, ackNotice, canRetract, onFalseAlarm, delivery, fallback, personalToken, sendStatus }: Props) {
+export function AlertOverlay({ alert, acknowledged, settings, locale, label, safeConfirmed, onConfirmSafe, onAcknowledge, onAllClear, responder, ackNotice, canRetract, onFalseAlarm, canEndForAll = true, delivery, fallback, personalToken, sendStatus }: Props) {
   // Retracting also stops every siren on site, so it takes a second tap the
   // same way all-clear does — but it is worded as taking the alarm back, not
   // as declaring an emergency over.
@@ -124,7 +128,7 @@ export function AlertOverlay({ alert, acknowledged, settings, locale, label, saf
   }, [confirmClear]);
 
   const handleClearClick = () => {
-    if (confirmClear) {
+    if (!canEndForAll || confirmClear) {
       onAllClear();
     } else {
       setConfirmClear(true);
@@ -257,12 +261,17 @@ export function AlertOverlay({ alert, acknowledged, settings, locale, label, saf
             </span>
           </div>
         )}
+        {!canEndForAll && <p className="overlay-meta">{t(locale, 'overlay.silenceNote')}</p>}
         <button
           className={`btn btn-clear ${confirmClear ? 'btn-clear-confirm' : ''}`}
           disabled={!armed}
           onClick={handleClearClick}
         >
-          {confirmClear ? (
+          {!canEndForAll ? (
+            <>
+              <Icon name="stop" /> {t(locale, 'overlay.silenceBtn')}
+            </>
+          ) : confirmClear ? (
             <>
               <Icon name="hazard" /> {t(locale, 'overlay.allClearConfirm')}
             </>

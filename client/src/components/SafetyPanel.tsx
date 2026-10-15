@@ -32,6 +32,7 @@ export function SafetyPanel({ premium }: Props) {
         <h2>Safety &amp; preparedness</h2>
         <p>{SAFETY_GUIDES.length} guides. All of this works without a connection.</p>
       </header>
+      <ReviewNotice />
 
       {SAFETY_GROUPS.map((group) => (
         <div key={group.id} className="safety-group">
@@ -63,6 +64,21 @@ export function SafetyPanel({ premium }: Props) {
   );
 }
 
+/**
+ * Shown on the list and on every guide, before the steps: this content has
+ * not been reviewed by a clinician or emergency officer yet (see the header
+ * of lib/safety.ts), and nobody should read it in place of making the call.
+ * Remove only once a qualified review has actually signed it off.
+ */
+function ReviewNotice() {
+  return (
+    <p className="safety-review-note" role="note">
+      Not yet reviewed by a medical or emergency professional. If someone is badly hurt or in
+      danger, call 112 or 115 first, then use this guide.
+    </p>
+  );
+}
+
 function GuideDetail({ guide, onBack }: { guide: SafetyGuide; onBack: () => void }) {
   return (
     <section className="safety">
@@ -74,6 +90,7 @@ function GuideDetail({ guide, onBack }: { guide: SafetyGuide; onBack: () => void
         <h2><Icon name={guide.icon} /> {guide.title}</h2>
         <p>{guide.summary}</p>
       </header>
+      <ReviewNotice />
 
       <Phase title="During" tone="now" steps={guide.during} />
       <Phase title="Before" tone="prep" steps={guide.before} />

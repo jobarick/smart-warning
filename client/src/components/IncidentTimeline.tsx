@@ -53,6 +53,11 @@ export function IncidentTimeline({ incidentId, raisedAt, token, locale, sendStat
       rows.push(e.count
         ? { at: e.at, text: t(locale, 'timeline.emailed', { n: String(e.count) }), tone: 'ok' }
         : { at: e.at, text: t(locale, 'timeline.emailedNone'), tone: 'warn' });
+    } else if (e.kind === 'notified' && e.channel === 'sms') {
+      // Accepted by the SMS provider, not confirmed on the handset: said so.
+      rows.push(e.count
+        ? { at: e.at, text: t(locale, 'timeline.texted', { n: String(e.count) }), tone: 'ok' }
+        : { at: e.at, text: t(locale, 'timeline.textedNone'), tone: 'warn' });
     } else if (e.kind === 'nearby-searched') {
       rows.push(e.notified
         ? { at: e.at, text: t(locale, 'timeline.nearbyNotified', { n: String(e.notified), km: e.ringM ? formatDistance(e.ringM) : '' }), tone: 'ok' }

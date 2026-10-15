@@ -205,7 +205,7 @@ test('a contact with an email is actually mailed', async () => {
   assert.strictEqual(mailSent.length, 1);
   assert.strictEqual(mailSent[0].to, 'baba@example.test');
   assert.match(mailSent[0].body, /-6\.79,39\.21/, 'a map link is included when location is known');
-  assert.deepStrictEqual(body.contacted, [{ id: 'c1', name: 'Baba', delivered: true }]);
+  assert.deepStrictEqual(body.contacted, [{ id: 'c1', name: 'Baba', delivered: true, email: 'sent', sms: null }]);
   assert.deepStrictEqual(body.skipped, []);
 });
 
@@ -228,7 +228,7 @@ test('a delivery failure is reported honestly, not as a false success', async ()
   const res = await alertAs(PERSONAL_TOKEN, { type: 'medical', severity: 'high' });
   const body = await res.json();
   assert.strictEqual(mailSent.length, 1, 'a real attempt was still made');
-  assert.deepStrictEqual(body.contacted, [{ id: 'c3', name: 'Mama', delivered: false }]);
+  assert.deepStrictEqual(body.contacted, [{ id: 'c3', name: 'Mama', delivered: false, email: 'queued', sms: null }]);
 });
 
 test('the incident is recorded against the user, not any organization', async () => {

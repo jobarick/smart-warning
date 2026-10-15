@@ -20,6 +20,7 @@ const http = require('http');
 const db = require('./db');
 const push = require('./push');
 const fcm = require('./fcm');
+const sms = require('./sms');
 const mailer = require('./mailer');
 const payments = require('./payments');
 const escalation = require('./escalation');
@@ -110,6 +111,7 @@ async function start() {
   } catch (err) {
     console.error('[fcm] init failed, continuing without native push:', err.message);
   }
+  sms.init(); // never throws; only reports whether SMS is on and why not
   try {
     await mailer.init();
   } catch (err) {

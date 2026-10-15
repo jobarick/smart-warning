@@ -149,6 +149,8 @@
 }
 
 .mc-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+.mc-pos-warn { color: var(--cmd-warn); font-family: inherit; }
+.mc-facts dd a { color: inherit; text-decoration: underline; }
 .mc-facts dt {
   font-family: var(--mono);
   font-size: 0.58rem;

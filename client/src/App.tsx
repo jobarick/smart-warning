@@ -1700,6 +1700,7 @@ export default function App() {
           // else's emergency.
           canRetract={alarm.alert.sender === settings.deviceName}
           onFalseAlarm={() => allClear('false-alarm')}
+          canEndForAll={session?.kind !== 'worker' || alarm.alert.sender === settings.deviceName}
           delivery={delivery}
           fallback={deliveryFallback}
           personalToken={isPersonal ? token || undefined : undefined}

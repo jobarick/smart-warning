@@ -178,8 +178,14 @@ test('SAFETY: all-clear also works while past due', async () => {
   const watcher = await connect();
   await Promise.all([join(raiser), join(watcher)]);
 
+  // Raised and ended from the same phone: only the raiser or a supervisor may
+  // end an alarm for everyone (see all-clear-authority.test.js).
+  const raised = nextMessage(watcher, (m) => m.kind === 'alert');
+  raiser.send(JSON.stringify({ kind: 'alert', id: 'incident-past-due-2', type: 'fire', severity: 'critical', message: '', sender: 'Device-TEST', timestamp: Date.now() }));
+  await raised;
+
   const delivered = nextMessage(watcher, (m) => m.kind === 'all-clear');
-  raiser.send(JSON.stringify({ kind: 'all-clear', id: 'incident-past-due-1', sender: 'Device-TEST', timestamp: Date.now() }));
+  raiser.send(JSON.stringify({ kind: 'all-clear', id: 'incident-past-due-2', sender: 'Device-TEST', timestamp: Date.now() }));
   await delivered;
 
   assert.strictEqual(recorded.allClears.length, 1);
