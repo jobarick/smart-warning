@@ -253,6 +253,8 @@ export type StringKey =
   | 'auth.submit.signIn'
   | 'auth.link.forgotPassword'
   | 'auth.newHere'
+  | 'auth.link.createPersonal'
+  | 'auth.homeLink'
   | 'auth.link.createOrg'
   | 'auth.forgot.title'
   | 'auth.forgot.body'
