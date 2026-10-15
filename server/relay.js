@@ -181,6 +181,19 @@ function sendStatus(ws) {
 // to a live emergency, and nothing more.
 const activeIncident = new Map(); // orgId (or null) → incident id
 
+// Who raised the live incident, so the relay can tell the person having the
+// emergency apart from a bystander. Only those two (and a supervisor) may end
+// it for everyone: an all-clear from anyone else silences their own phone and
+// nothing more. Without this, any phone holding the team code could stop every
+// siren on site during a real emergency. Escalated reports have no raiser.
+const activeRaiser = new Map(); // orgId (or null) → { connId, workerId }
+
+function raisedLiveIncident(ws) {
+  const r = activeRaiser.get(ws.orgId ?? null);
+  if (!r) return false;
+  return r.connId === ws.connId || (r.workerId != null && r.workerId === ws.worker?.id);
+}
+
 // Heartbeats arrive every ~5s per device. Match that, and no faster, so a
 // chatty client cannot turn itself into a write amplifier.
 const PING_MIN_INTERVAL_MS = 5000;
@@ -211,7 +224,7 @@ function trackPosition(ws) {
 // Everything that makes an alert real: stored, pushed to closed apps, and sent
 // to every device in the org. Shared so an escalated report is indistinguishable
 // from one raised on a device.
-async function raiseAlert(orgId, alert, worker = null, origin = 'unknown', actorRole = null) {
+async function raiseAlert(orgId, alert, worker = null, origin = 'unknown', actorRole = null, raiser = null) {
   // Logged here rather than at each call site so every alert is recorded once,
   // however it was raised — an escalated public report most of all.
   console.log(`[!] ALERT ${alert.type}/${alert.severity} from ${origin} "${alert.sender}" (org ${orgId ?? 'global'})${alert.replayed ? ' [replayed]' : ''}: ${alert.message || '(no message)'}`);
@@ -219,6 +232,8 @@ async function raiseAlert(orgId, alert, worker = null, origin = 'unknown', actor
   // Open the tracking window. Until the all-clear, every position a device
   // reports is written to the incident's movement history.
   activeIncident.set(orgId ?? null, alert.id);
+  if (raiser) activeRaiser.set(orgId ?? null, raiser);
+  else activeRaiser.delete(orgId ?? null);
   // A new emergency invalidates any response to the last one. Carrying it over
   // would tell someone help was already on its way to them.
   clearResponding(orgId);
@@ -519,13 +534,25 @@ function attach(server) {
             return;
           }
           ws.lastAlertAt = Date.now();
-          await raiseAlert(ws.orgId, msg, ws.worker, `#${ws.connId}`, ws.supervisor ? 'supervisor' : 'worker');
+          await raiseAlert(ws.orgId, msg, ws.worker, `#${ws.connId}`, ws.supervisor ? 'supervisor' : 'worker',
+            { connId: ws.connId, workerId: ws.worker?.id ?? null });
           return; // raiseAlert already broadcast it
         } else {
           // Normalised here rather than trusted: anything unrecognised is a
           // plain resolution, so a malformed message cannot rewrite a real
           // incident as an accident in the site's safety record.
           msg.reason = msg.reason === 'false-alarm' ? 'false-alarm' : 'resolved';
+          const isRaiser = raisedLiveIncident(ws);
+          if (ORGS && !ws.supervisor && !isRaiser) {
+            // A bystander's all-clear. Echo it to their own phone only, so
+            // their alarm stops, and leave everyone else's running.
+            console.log(`[.] all-clear from #${ws.connId} "${msg.sender}" is not the raiser or a supervisor — silenced on that device only (org ${ws.orgId ?? 'global'})`);
+            if (ws.readyState === 1) ws.send(JSON.stringify({ ...msg, localOnly: true }));
+            return;
+          }
+          // Only the person who raised it can say it was never real.
+          if (msg.reason === 'false-alarm' && !isRaiser) msg.reason = 'resolved';
+          activeRaiser.delete(ws.orgId ?? null);
           const retracted = msg.reason === 'false-alarm';
           console.log(`[.] ${retracted ? 'FALSE ALARM retracted' : 'all-clear'} from #${ws.connId} "${msg.sender}" (org ${ws.orgId ?? 'global'})`);
           // Read before deleting: this is the incident the all-clear closes.

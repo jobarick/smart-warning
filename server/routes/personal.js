@@ -22,6 +22,8 @@ const API_URL = (process.env.API_URL || 'https://smart-warning-production.up.rai
 const VOICE_MAX_BYTES = 400 * 1024;
 const VOICE_MAX_PER_INCIDENT = 3;
 const VOICE_TYPES = new Set(['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/aac']);
+// How long an emailed/texted voice note link keeps working (VOICE_LINK_TTL_DAYS).
+const VOICE_LINK_TTL_MS = (Number(process.env.VOICE_LINK_TTL_DAYS) > 0 ? Number(process.env.VOICE_LINK_TTL_DAYS) : 30) * 86_400_000;
 
 /**
  * The shape the client renders. Only what the person who raised the alert is
@@ -125,10 +127,21 @@ async function handle({ req, res, url, path }) {
   if (mediaMatch && req.method === 'GET') {
     const row = db.enabled() ? await db.getIncidentMedia(mediaMatch[1]) : null;
     if (!row) { sendJson(res, 404, { error: 'not found' }); return true; }
+    // The link is a bearer capability sent by email/SMS, so it must not stay
+    // valid forever: a forwarded or leaked message would otherwise open a
+    // private recording years later. The recording itself is kept (deleting
+    // stored data is a separate retention decision); only link access ends.
+    const createdAt = row.created_at ? new Date(row.created_at).getTime() : null;
+    if (createdAt != null && Date.now() - createdAt > VOICE_LINK_TTL_MS) {
+      sendJson(res, 410, { error: 'this voice note link has expired' });
+      return true;
+    }
     res.writeHead(200, {
       'Content-Type': row.mime,
       'Content-Length': row.bytes.length,
-      'Cache-Control': 'private, max-age=3600',
+      'Cache-Control': 'private, no-store',
+      'Referrer-Policy': 'no-referrer',
+      'Content-Security-Policy': "default-src 'none'; media-src 'self'; sandbox",
       'X-Content-Type-Options': 'nosniff',
       'Content-Disposition': 'inline',
     });

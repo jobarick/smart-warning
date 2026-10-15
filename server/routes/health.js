@@ -7,6 +7,7 @@ const db = require('../db');
 const push = require('../push');
 const fcm = require('../fcm');
 const mailer = require('../mailer');
+const sms = require('../sms');
 const routing = require('../routing');
 const payments = require('../payments');
 const staticFiles = require('../static');
@@ -54,6 +55,8 @@ function health({ authenticated = false } = {}) {
       // and until now the only way to find that was to send a message and wait
       // to see whether it ever arrived.
       mailQueue: mailer.queueSnapshot?.() ?? null,
+      // Provider name and on/off only, never a credential or a number.
+      sms: sms.status(),
       // Reported so "is the ETA a real road route or a straight line?" is
       // answerable without reading logs.
       routing: routing.status(),
@@ -79,6 +82,18 @@ async function handle({ req, res, path }) {
   // is bundled in; it is also Render's healthCheckPath.
   if (path === '/api/health' && req.method === 'GET') {
     sendJson(res, 200, health(opts));
+    return true;
+  }
+
+  // Readiness, for an external uptime monitor. /api/health always answers 200
+  // while the process is up (it is the platform's liveness check, and a
+  // database blip must not get the relay restarted, since alerts still flow
+  // without it). This one answers 503 when the database is configured but its
+  // last check failed, so a simple "is it 200?" monitor pages someone.
+  if (path === '/api/ready' && req.method === 'GET') {
+    const { ok } = db.livenessStatus?.() ?? {};
+    const ready = !db.enabled() || ok === true;
+    sendJson(res, ready ? 200 : 503, { ready, database: db.enabled() ? ok ?? null : 'not configured' });
     return true;
   }
 

@@ -583,8 +583,8 @@ export async function deleteContact(id: string, token: string): Promise<void> {
  * into, so this REST call — not the WebSocket — is the only thing that can
  * reach anyone besides the device that raised it. It emails every
  * notify=true contact who has an email address; a phone-only contact comes
- * back under `skipped`, never silently or falsely as delivered — there is no
- * SMS gateway in this codebase to reach them with yet.
+ * back under `skipped` unless SMS is switched on on the server (sms.js,
+ * off by default), never silently or falsely as delivered.
  *
  * Unlike the org/relay path (see hooks/useAlertSocket.ts's outbox), this call
  * has no durable offline queue — that is real, separate infrastructure work.
@@ -595,7 +595,9 @@ export async function deleteContact(id: string, token: string): Promise<void> {
  */
 export interface PersonalAlertResult {
   incidentId: string;
-  contacted: { id: string; name: string; delivered: boolean }[];
+  /** `delivered` = email sent, or SMS accepted by the provider. Neither
+   *  confirms the person read it. */
+  contacted: { id: string; name: string; delivered: boolean; email?: 'sent' | 'queued' | null; sms?: string | null }[];
   skipped: { id: string; name: string; reason: 'no-email' }[];
   /** True when this exact incident id had already been recorded — a retry
    *  that actually landed the first time, replaying safely rather than

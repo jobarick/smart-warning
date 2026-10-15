@@ -11,6 +11,7 @@ import { useIncidentTrack } from '../hooks/useIncidentTrack';
 import { assess, accountedFor, unaccountedFor, musterPopulation } from '../lib/advisor';
 import { useNavigationRoute, formatEta } from '../hooks/useNavigationRoute';
 import { formatDistance } from '../lib/geo';
+import { describePosition } from '../lib/position';
 
 interface Props {
   roster: WorkerInfo[];
@@ -368,7 +369,23 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
                   <div><dt>Zone</dt><dd>{sender?.zone || 'N/A'}</dd></div>
                   <div>
                     <dt>Position</dt>
-                    <dd className="mc-mono">{sender && sender.lat !== null && sender.lng !== null ? `${sender.lat.toFixed(4)}, ${sender.lng.toFixed(4)}` : 'not shared'}</dd>
+                    {(() => {
+                      // Coordinates alone read as exact and current; say how
+                      // precise and how old they are, and warn when they are not.
+                      const pos = describePosition(sender, now);
+                      if (!pos.coords) return <dd>not shared</dd>;
+                      return (
+                        <dd className="mc-mono">
+                          {pos.mapUrl ? <a href={pos.mapUrl} target="_blank" rel="noopener noreferrer">{pos.coords}</a> : pos.coords}
+                          {' '}· {pos.accuracy}{pos.age ? ` · ${pos.age}` : ''}
+                          {(pos.stale || pos.rough) && (
+                            <span className="mc-pos-warn" role="note">
+                              {' '}{pos.stale ? '(old position, may have moved)' : '(rough fix, confirm by phone)'}
+                            </span>
+                          )}
+                        </dd>
+                      );
+                    })()}
                   </div>
                   <div><dt>Battery</dt><dd>{sender ? batteryLabel(sender.battery) : 'N/A'}</dd></div>
                 </dl>

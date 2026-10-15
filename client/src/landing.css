@@ -471,6 +471,7 @@
 .lp-premium-free { margin: 0 0 16px; font-size: 0.84rem; color: var(--faint); }
 
 /* Directory */
+.lp-dir-note { margin: -4px auto 12px; max-width: 34rem; text-align: center; font-size: 0.84rem; color: var(--faint); }
 .lp-directory { list-style: none; margin: 0 auto; padding: 0; max-width: 34rem; }
 .lp-directory li {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;

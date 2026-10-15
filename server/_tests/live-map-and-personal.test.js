@@ -64,7 +64,7 @@ before(() => {
     saveIncidentMedia: async (row) => { media.set(row.token, row); },
     getIncidentMedia: async (token) => {
       const m = media.get(token);
-      return m ? { mime: m.mime, bytes: m.bytes, created_at: new Date().toISOString() } : null;
+      return m ? { mime: m.mime, bytes: m.bytes, created_at: m.createdAt || new Date().toISOString() } : null;
     },
     listNotifiableContacts: async () => [],
     saveIncidentFeedback: async (row) => { feedback.push(row); return row; },
@@ -211,6 +211,20 @@ test('a voice note is stored, served back by its link, and capped per incident',
   }
   const fourth = await authed(`/api/contacts/alert/${INC_A}/voice`, 'token-a', { method: 'POST', headers: { 'content-type': 'audio/webm' }, body: audio });
   assert.strictEqual(fourth.status, 409);
+});
+
+test('a voice note link stops working after its lifetime, and is never cached', async () => {
+  const audio = Buffer.alloc(1024, 3);
+  media.set('o'.repeat(32), { incidentId: 'old', mime: 'audio/webm', bytes: audio, createdAt: new Date(Date.now() - 31 * 86_400_000).toISOString() });
+  const old = await fetch(`${BASE}/api/media/${'o'.repeat(32)}`);
+  assert.strictEqual(old.status, 410, 'a forwarded link must not open a private recording forever');
+
+  media.set('n'.repeat(32), { incidentId: 'new', mime: 'audio/webm', bytes: audio, createdAt: new Date().toISOString() });
+  const fresh = await fetch(`${BASE}/api/media/${'n'.repeat(32)}`);
+  assert.strictEqual(fresh.status, 200);
+  assert.match(fresh.headers.get('cache-control'), /no-store/);
+  assert.strictEqual(fresh.headers.get('referrer-policy'), 'no-referrer');
+  media.delete('o'.repeat(32)); media.delete('n'.repeat(32));
 });
 
 test('an unknown media link is a 404', async () => {

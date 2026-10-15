@@ -17,6 +17,7 @@ function stub(relPath, exports) {
 }
 
 let app;
+let dbOk = true;
 
 before(async () => {
   process.env.PORT = String(PORT);
@@ -25,7 +26,7 @@ before(async () => {
   stub('db.js', {
     enabled: () => true,
     init: async () => true,
-    livenessStatus: () => ({ ok: true, at: Date.now() }),
+    livenessStatus: () => ({ ok: dbOk, at: Date.now() }),
     listPendingTransactions: async () => [],
     listExpiredSubscriptions: async () => [],
   });
@@ -77,4 +78,17 @@ test('a garbage Authorization header degrades to anonymous, not an error', async
   const body = await res.json();
   assert.strictEqual('clients' in body, false);
   assert.strictEqual('uptime' in body, false);
+});
+
+test('/api/ready is 200 while the database answers and 503 when it does not', async () => {
+  dbOk = true;
+  let res = await fetch(`${BASE}/api/ready`);
+  assert.strictEqual(res.status, 200);
+  assert.deepStrictEqual(await res.json(), { ready: true, database: true });
+  dbOk = false;
+  res = await fetch(`${BASE}/api/ready`);
+  assert.strictEqual(res.status, 503, 'an uptime monitor only sees the status code');
+  // Liveness stays 200, so the platform does not restart the relay over it.
+  assert.strictEqual((await fetch(`${BASE}/api/health`)).status, 200);
+  dbOk = true;
 });

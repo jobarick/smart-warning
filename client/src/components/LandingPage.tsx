@@ -232,6 +232,7 @@ export function LandingPage({ onGetStarted, onWatchDemo, locale, onToggleLocale,
 
         <section className="lp-section" id="directory">
           <h2>{t(locale, 'landing.directory.heading')}</h2>
+          <p className="lp-dir-note">{t(locale, 'landing.directory.unverified')}</p>
           <ul className="lp-directory">
             {DIRECTORY_IDS.map((id) => {
               const svc = EMERGENCY_SERVICE_FALLBACK[id];

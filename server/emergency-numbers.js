@@ -371,7 +371,14 @@ function directoryFor(country) {
       labelSw: s.sw.label,
       descriptionSw: s.sw.description,
     }));
-    return { country: { code: country.code, name: country.name, dial: country.dial }, services };
+    return {
+      country: { code: country.code, name: country.name, dial: country.dial },
+      // Said in the data itself so no screen can present these as official:
+      // owner-supplied 2026-09-16, not yet confirmed by TCRA, Police, Fire,
+      // or the Ministry of Health. Update per number once confirmed.
+      verification: { status: 'unverified', source: 'owner-supplied', verifiedAt: null },
+      services,
+    };
   }
 
   const services = [];
