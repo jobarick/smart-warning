@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { track } from '../lib/analytics';
 import { fetchPlans, formatMoney, type Plan, type PaymentMethods } from '../lib/billing';
+import { saveIntendedPlan } from '../lib/intendedPlan';
 import { canDial, telHref } from '../lib/emergency';
 import { EMERGENCY_SERVICE_FALLBACK } from '../lib/emergencyGrid';
 import { PROVIDER, SUPPORT_EMAIL, SUPPORT_PHONE, SALES_EMAIL } from '../lib/termsMeta';
@@ -95,6 +96,14 @@ export function LandingPage({ onGetStarted, onWatchDemo, locale, onToggleLocale,
   const go = (cta: string, step?: 'login' | 'worker' | 'sales') => {
     track('click_cta', { cta });
     onGetStarted(step);
+  };
+
+  /** A tapped plan: Enterprise goes to sales; a paid plan is remembered so
+   *  sign-up ends on its payment screen; Free just starts sign-up. */
+  const choosePlan = (p: Plan) => {
+    if (p.contactOnly) { go(`plan_${p.id}`, 'sales'); return; }
+    if (p.chargeable && p.price) saveIntendedPlan(p.id, p.audience);
+    go(`plan_${p.id}`);
   };
 
   return (
@@ -212,16 +221,23 @@ export function LandingPage({ onGetStarted, onWatchDemo, locale, onToggleLocale,
           {billing && billing.plans.length > 0 && (
             <ul className="lp-plans" id="plans">
               {billing.plans.map((p) => (
-                <li key={p.id} className={`lp-plan${p.id === 'personal' ? ' lp-plan-featured' : ''}`}>
-                  <div className="lp-plan-main">
-                    <b className="lp-plan-name">{p.name}</b>
-                    <span className="lp-plan-tag">{PLAN_TAG[p.id] ? t(locale, PLAN_TAG[p.id]) : p.tagline}</span>
-                  </div>
-                  <span className="lp-plan-price">
-                    {!p.price
-                      ? t(locale, 'landing.plans.free')
-                      : t(locale, 'landing.plans.perMonth', { price: formatMoney(p.price, p.currency) })}
-                  </span>
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    className={`lp-plan${p.id === 'personal' ? ' lp-plan-featured' : ''}`}
+                    onClick={() => choosePlan(p)}
+                  >
+                    <span className="lp-plan-main">
+                      <b className="lp-plan-name">{p.name}</b>
+                      <span className="lp-plan-tag">{PLAN_TAG[p.id] ? t(locale, PLAN_TAG[p.id]) : p.tagline}</span>
+                    </span>
+                    <span className="lp-plan-price">
+                      {!p.price
+                        ? t(locale, 'landing.plans.free')
+                        : t(locale, 'landing.plans.perMonth', { price: formatMoney(p.price, p.currency) })}
+                      <Icon name="arrow-left" className="lp-plan-go" />
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>

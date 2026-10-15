@@ -68,6 +68,7 @@ import { FALLBACK_EMERGENCY_NUMBER, orgDelivery, personalDelivery, smsHref, type
 import { canDial } from './lib/emergency';
 import { t, loadLocale, isLocaleLoaded, type StringKey } from './lib/i18n';
 import { holdUpdates, reloadPending, subscribeUpdatePending } from './lib/updateGate';
+import { peekIntendedPlan } from './lib/intendedPlan';
 
 // How long the pending-location note may show after SOS fires with no GPS
 // fix yet, and how long a late fix is still worth backfilling. Short on
@@ -482,6 +483,12 @@ export default function App() {
       if (s.kind === 'supervisor') {
         void recordConsent({ version: TERMS_VERSION, points: opts.consentPoints }, { token: s.token }).catch(() => {});
       }
+    }
+    // A paid plan tapped on the home page before signing in: finish on its
+    // payment screen (BillingPanel opens it).
+    if (s.kind === 'supervisor' && peekIntendedPlan()) {
+      navigate('/billing');
+      return;
     }
     // Routed by role:
     //   org admin   → the command centre

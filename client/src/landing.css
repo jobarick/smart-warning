@@ -96,9 +96,13 @@
    in about a screen instead of five tall cards (minimal, short scroll). */
 .lp-plans { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .lp-plan {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%;
   padding: 14px 18px; border: 1px solid var(--panel-border); border-radius: 12px; background: var(--panel);
+  color: inherit; font: inherit; text-align: left; cursor: pointer;
 }
+.lp-plan:hover, .lp-plan:focus-visible { border-color: var(--text); }
+.lp-plan-price { display: inline-flex; align-items: center; gap: 6px; }
+.lp-plan-go { transform: rotate(180deg); width: 14px; height: 14px; opacity: 0.6; }
 .lp-plan-featured { border-color: var(--accent, var(--text)); }
 .lp-plan-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .lp-plan-name { font-size: 1rem; font-weight: 650; }

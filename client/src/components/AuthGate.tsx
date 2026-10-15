@@ -14,6 +14,7 @@ import { SignupTerms, allConsentTicked } from './SignupTerms';
 import { CONSENT_POINTS } from '../lib/terms';
 import type { ResolvedTheme } from '../lib/theme';
 import { PasswordField } from './PasswordField';
+import { peekIntendedPlan } from '../lib/intendedPlan';
 
 type Step = 'choose' | 'worker' | 'login' | 'signup' | 'personal' | 'sales' | 'forgot' | 'reset' | 'accept-invite';
 type SalesInterest = 'personal' | 'company' | 'enterprise' | 'partnership' | 'support' | 'general';
@@ -238,7 +239,14 @@ export function AuthGate({ onAuthed, notice, locale, onToggleLocale, theme, onTh
   const [linkToken] = useState(resetTokenFromUrl);
   const [inviteToken] = useState(inviteTokenFromUrl);
   const [invitePreview, setInvitePreview] = useState<{ email: string; orgName: string } | null>(null);
-  const [step, setStep] = useState<Step>(initialStepFromUrl);
+  const [step, setStep] = useState<Step>(() => {
+    const fromUrl = initialStepFromUrl();
+    // A plan tapped on the home page (a tap on this device, never a link):
+    // open the matching sign-up form rather than the chooser.
+    if (fromUrl !== 'choose') return fromUrl;
+    const plan = peekIntendedPlan();
+    return plan ? (plan.audience === 'individual' ? 'personal' : 'signup') : 'choose';
+  });
   const [terms, setTerms] = useState<Record<string, boolean>>({});
   const termsOk = allConsentTicked(terms);
   const agreed = () => ({ consentPoints: CONSENT_POINTS.map((p) => p.id) });

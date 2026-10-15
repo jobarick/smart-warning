@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { takeIntendedPlan } from '../lib/intendedPlan';
 import { t } from '../lib/i18n';
 import { IDESIGN_URL } from '../lib/terms';
 import type { Locale } from '../types';
@@ -84,6 +85,21 @@ export function BillingPanel({ token, onBack, locale }: Props) {
   }, [token, load]);
 
   const current = entitlements?.tier ?? 'free';
+
+  // Arrived from a price tapped on the home page: open that plan's payment
+  // screen once, if this account can buy it here.
+  const intentHandled = useRef(false);
+  useEffect(() => {
+    if (intentHandled.current || !entitlements || !methods || plans.length === 0) return;
+    intentHandled.current = true;
+    const intent = takeIntendedPlan();
+    if (!intent) return;
+    const plan = offered.find((p) => p.id === intent.planId);
+    const alreadyOn = plan?.id === current && entitlements.status !== 'trialing';
+    if (plan && plan.chargeable && !plan.contactOnly && !alreadyOn && currency === 'TZS' && methods.mobileMoney.enabled) {
+      setCheckout(plan);
+    }
+  }, [entitlements, methods, plans, offered, current, currency]);
 
   return (
     <section className="bill">
