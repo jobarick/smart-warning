@@ -134,30 +134,64 @@ function nominatimSearch(kind, lat, lng, radius) {
   return result;
 }
 
-/** POST the query to each server in turn; the first good answer wins. */
+// How long Overpass gets on its own before Nominatim is asked in parallel.
+// Most good answers arrive well inside this; when every Overpass server is
+// struggling, waiting out their full timeouts one after another made the
+// first lookup take up to 19 s.
+const NOMINATIM_HEDGE_MS = Number(process.env.NOMINATIM_HEDGE_MS || 2500);
+
+/**
+ * Ask every Overpass server at once; the first good answer wins and the
+ * others are cancelled. Bounded by OVERPASS_TIMEOUT_MS in total, rather than
+ * per server one after another.
+ */
 async function overpassQuery(query) {
-  let lastError = null;
-  for (const url of OVERPASS_URLS) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), OVERPASS_TIMEOUT_MS);
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': OVERPASS_UA },
-        body: 'data=' + encodeURIComponent(query),
-        signal: controller.signal,
-      });
-      if (!res.ok) throw new Error(`overpass ${res.status} from ${new URL(url).host}`);
-      const json = await res.json();
-      if (!json || !Array.isArray(json.elements)) throw new Error(`overpass bad body from ${new URL(url).host}`);
-      return json;
-    } catch (e) {
-      lastError = e.name === 'AbortError' ? new Error(`overpass timeout from ${new URL(url).host}`) : e;
-    } finally {
-      clearTimeout(timer);
-    }
+  if (!OVERPASS_URLS.length) throw new Error('no overpass server configured');
+  const controllers = OVERPASS_URLS.map(() => new AbortController());
+  const timer = setTimeout(() => controllers.forEach((c) => c.abort()), OVERPASS_TIMEOUT_MS);
+  try {
+    return await Promise.any(OVERPASS_URLS.map(async (url, i) => {
+      const host = new URL(url).host;
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': OVERPASS_UA },
+          body: 'data=' + encodeURIComponent(query),
+          signal: controllers[i].signal,
+        });
+        if (!res.ok) throw new Error(`overpass ${res.status} from ${host}`);
+        const json = await res.json();
+        if (!json || !Array.isArray(json.elements)) throw new Error(`overpass bad body from ${host}`);
+        controllers.forEach((c, j) => { if (j !== i) c.abort(); });
+        return json;
+      } catch (e) {
+        throw e.name === 'AbortError' ? new Error(`overpass timeout from ${host}`) : e;
+      }
+    }));
+  } catch (e) {
+    const errs = e instanceof AggregateError ? e.errors.map((x) => x.message).join('; ') : e.message;
+    throw new Error(errs || 'every overpass server failed');
+  } finally {
+    clearTimeout(timer);
   }
-  throw lastError || new Error('no overpass server configured');
+}
+
+function parseOverpass(json, kind) {
+  return (json.elements || [])
+    .map((el) => {
+      const p = el.type === 'node' ? el : el.center;
+      if (!p || !Number.isFinite(p.lat) || !Number.isFinite(p.lon)) return null;
+      const tags = el.tags || {};
+      return {
+        name: tags.name || tags['name:en'] || defaultName(kind),
+        lat: p.lat,
+        lng: p.lon,
+        kind,
+        phone: tags.phone || tags['contact:phone'] || null,
+        address: addressOf(tags),
+      };
+    })
+    .filter(Boolean);
 }
 
 function cacheSet(key, places) {
@@ -225,32 +259,25 @@ out center ${Math.max(remaining * 4, 20)};`;
 
   let places = [];
   try {
-    let json;
-    try {
-      json = await overpassQuery(query);
-    } catch (overpassError) {
-      console.warn(`[places] ${kind}: every Overpass server failed (${overpassError.message}), trying Nominatim`);
-      places = await nominatimSearch(kind, lat, lng, radius);
-      // An empty answer is not cached: during an outage it would hide help
-      // for a whole day after the servers recover.
-      if (places.length) cacheSet(key, places);
-      return [...verified, ...rank(places, lat, lng, remaining).map((p) => ({ ...p, verified: false }))];
+    const fromOverpass = overpassQuery(query).then((json) => parseOverpass(json, kind));
+    fromOverpass.catch(() => {}); // handled below; never an unhandled rejection
+    const hedge = new Promise((resolve) => setTimeout(resolve, NOMINATIM_HEDGE_MS, 'hedge'));
+    const first = await Promise.race([fromOverpass.then((p) => ({ p }), (e) => ({ e })), hedge]);
+    if (first !== 'hedge' && first.p) {
+      places = first.p;
+    } else {
+      if (first !== 'hedge') console.warn(`[places] ${kind}: Overpass failed (${first.e.message}), asking Nominatim`);
+      // Nominatim only wins with real results; an empty Nominatim answer must
+      // not beat a slower Overpass answer that has them.
+      const fromNominatim = nominatimSearch(kind, lat, lng, radius)
+        .then((p) => (p.length ? p : Promise.reject(new Error('nominatim found nothing'))));
+      places = await Promise.any([fromOverpass, fromNominatim]).catch((e) => {
+        const why = e instanceof AggregateError ? e.errors.map((x) => x.message).join('; ') : e.message;
+        throw new Error(why);
+      });
     }
-    places = (json.elements || [])
-      .map((el) => {
-        const p = el.type === 'node' ? el : el.center;
-        if (!p || !Number.isFinite(p.lat) || !Number.isFinite(p.lon)) return null;
-        const tags = el.tags || {};
-        return {
-          name: tags.name || tags['name:en'] || defaultName(kind),
-          lat: p.lat,
-          lng: p.lon,
-          kind,
-          phone: tags.phone || tags['contact:phone'] || null,
-          address: addressOf(tags),
-        };
-      })
-      .filter(Boolean);
+    // An empty answer is not cached: during an outage it would hide help for
+    // a whole day after the servers recover.
     if (places.length) cacheSet(key, places);
   } catch (e) {
     // Deliberately swallowed: a missing suggestion is survivable, a hung alert

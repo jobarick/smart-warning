@@ -216,15 +216,13 @@
  * and a clear window between them shows where you are and the way to help. */
 .op-with-map { position: relative; overflow: hidden; isolation: isolate; }
 .op-with-map .posmap-el { position: absolute; inset: 0; z-index: -2; }
-.op-with-map::before {
-  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  background: linear-gradient(180deg,
-    color-mix(in srgb, var(--panel) 92%, transparent) 0,
-    color-mix(in srgb, var(--panel) 55%, transparent) 90px,
-    transparent 120px, transparent 270px,
-    color-mix(in srgb, var(--panel) 70%, transparent) 330px);
+/* No fade over the map (owner, 2026-10-16: it read as a vignette in both
+   themes). The text keeps its own solid backing instead. */
+.op-with-map .op-head {
+  position: relative; padding: 8px 10px; border-radius: 10px;
+  background: color-mix(in srgb, var(--panel) 90%, transparent);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
 }
-.op-with-map .op-head { position: relative; }
 .op-with-map .op-tiles { margin-top: 0; }
 .op-with-map .op-tile {
   background: color-mix(in srgb, var(--panel-2) 78%, transparent);
