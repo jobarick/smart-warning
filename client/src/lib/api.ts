@@ -183,8 +183,25 @@ export interface Facility {
   operator?: 'private' | 'government' | 'faith' | 'ngo' | null;
   /** Always false for open data: nobody has confirmed it. */
   verified: boolean;
+  /** open-data, or needs-review (the reason is in note). */
+  status?: 'open-data' | 'needs-review';
+  note?: string | null;
   /** Only in "nearby" answers. */
   distanceM?: number;
+}
+
+/** A private service you call (no map pin), from the provider's own website. */
+export interface FacilityProvider {
+  id: string;
+  name: string;
+  kind: FacilityKind;
+  service: string;
+  hours: string;
+  coverage: string;
+  phones: { number: string; display: string; label: string }[];
+  status: 'provider-published';
+  source: { url: string; org: string; checked: string };
+  limits: string;
 }
 
 export interface FacilityAnswer {
@@ -192,6 +209,7 @@ export interface FacilityAnswer {
   notice: string;
   attribution: string;
   results: Facility[];
+  providers?: FacilityProvider[];
 }
 
 export interface FacilityArea {

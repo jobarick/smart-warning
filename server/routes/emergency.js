@@ -155,6 +155,8 @@ async function handle({ req, res, url, path }) {
       attribution: '© OpenStreetMap contributors (ODbL); areas: Tanzania NBS / UN OCHA (CC BY-IGO)',
       sources: Object.fromEntries(Object.entries(sources).map(([k, v]) => [k, { title: v.title, snapshot: v.snapshot || v.published, license: v.license }])),
       results,
+      // Private services you call (no pin), from the provider's own website.
+      providers: directory.providers(kinds),
     });
     return true;
   }

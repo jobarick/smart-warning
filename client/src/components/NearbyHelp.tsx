@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import type { Locale } from '../types';
-import { fetchFacilities, fetchFacilityAreas, type Facility, type FacilityArea, type FacilityKind } from '../lib/api';
+import { fetchFacilities, fetchFacilityAreas, type Facility, type FacilityArea, type FacilityKind, type FacilityProvider } from '../lib/api';
 import { canDial, telHref } from '../lib/emergency';
 import { directionsUrl } from '../lib/position';
 import { FACILITY_KINDS, HOTLINE_FOR, KIND_LETTER, PRIVATE_KINDS, formatDistance, placeLine } from '../lib/facilities';
@@ -23,7 +23,7 @@ const KIND_KEY: Record<FacilityKind, StringKey> = {
   utility: 'facilities.kind.utility',
   anticorruption: 'facilities.kind.anticorruption',
   security: 'facilities.kind.security',
-  ambulance: 'facilities.kind.ambulance',
+  ambulance: 'facilities.kind.ambulancePrivate',
 };
 const OPERATOR_KEY: Record<string, StringKey> = {
   private: 'facilities.operator.private',
@@ -57,6 +57,7 @@ export function NearbyHelp({ lat, lng, locale }: Props) {
   const [kind, setKind] = useState<FacilityKind>('hospital');
   const [view, setView] = useState<'list' | 'map'>('list');
   const [results, setResults] = useState<Facility[]>([]);
+  const [providers, setProviders] = useState<FacilityProvider[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -76,13 +77,17 @@ export function NearbyHelp({ lat, lng, locale }: Props) {
 
   useEffect(() => {
     if (!open) return;
-    if (!hasLocation && !region) { setResults([]); return; }
+    // Private providers do not depend on a location; ask even without one.
+    if (!hasLocation && !region) {
+      setResults([]);
+      if (!PRIVATE_KINDS.has(kind)) { setProviders([]); return; }
+    }
     let cancelled = false;
     setLoading(true);
     setError(false);
-    const query = hasLocation ? { lat: rLat!, lng: rLng! } : { region, district: district || null };
+    const query = hasLocation ? { lat: rLat!, lng: rLng! } : region ? { region, district: district || null } : { region: '__none__' };
     fetchFacilities(query, [kind], hasLocation ? 10 : 30)
-      .then((a) => { if (!cancelled) { setResults(a.results); setNotice(a.notice); } })
+      .then((a) => { if (!cancelled) { setResults(a.results); setProviders(a.providers || []); setNotice(a.notice); } })
       .catch(() => { if (!cancelled) setError(true); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
@@ -157,7 +162,32 @@ export function NearbyHelp({ lat, lng, locale }: Props) {
 
           {loading && <p className="pocket-foot">{t(locale, 'nearby.loading')}</p>}
           {!loading && error && <p className="pocket-foot" role="alert">{t(locale, 'nearby.error')}</p>}
-          {!loading && !error && (hasLocation || region) && results.length === 0 && (
+          {providers.length > 0 && (
+            <div className="fac-providers">
+              <h3>{t(locale, 'facilities.providersHeading')}</h3>
+              <ul>
+                {providers.map((pv) => (
+                  <li key={pv.id} className="fac-provider">
+                    <b>{pv.name}</b>
+                    <small>{pv.service}</small>
+                    <small>{pv.coverage} · {pv.hours}</small>
+                    <span className="fac-tags">
+                      <span className="fac-tag fac-op fac-op-private">{t(locale, 'facilities.operator.private')}</span>
+                      <span className="fac-tag">{t(locale, 'facilities.providerPublished', { date: pv.source.checked })}</span>
+                    </span>
+                    <span className="fac-provider-calls">
+                      {pv.phones.map((ph) => (dialable
+                        ? <a key={ph.number} className="fac-go" href={telHref(ph.number)}><Icon name="phone" /> {ph.display}</a>
+                        : <span key={ph.number} className="fac-tag">{ph.display}</span>))}
+                      <a className="fac-src" href={pv.source.url} target="_blank" rel="noopener noreferrer">{t(locale, 'facilities.source')}</a>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {!loading && !error && (hasLocation || region) && results.length === 0 && providers.length === 0 && (
             <p className="pocket-foot">{t(locale, hasLocation ? 'facilities.emptyNear' : 'facilities.emptyArea')}</p>
           )}
 
@@ -182,8 +212,11 @@ export function NearbyHelp({ lat, lng, locale }: Props) {
                       {f.operator && OPERATOR_KEY[f.operator] && (
                         <span className={`fac-tag fac-op fac-op-${f.operator}`}>{t(locale, OPERATOR_KEY[f.operator])}</span>
                       )}
-                      <span className="fac-tag">{t(locale, f.verified ? 'nearby.verified' : 'facilities.openData')}</span>
+                      {f.status === 'needs-review'
+                        ? <span className="fac-tag fac-review" title={f.note || undefined}>{t(locale, 'facilities.needsReview')}</span>
+                        : <span className="fac-tag">{t(locale, f.verified ? 'nearby.verified' : 'facilities.openData')}</span>}
                     </span>
+                    {f.status === 'needs-review' && f.note && <small className="fac-review-note">{f.note}</small>}
                   </span>
                   <a className="fac-go" href={directionsUrl(f.lat, f.lng, f.distanceM != null && f.distanceM <= 1500 ? 'walking' : 'driving')} target="_blank" rel="noopener noreferrer">
                     <Icon name="navigation" /> {t(locale, 'facilities.directions')}

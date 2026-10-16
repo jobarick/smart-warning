@@ -58,6 +58,30 @@ describe('NearbyHelp', () => {
     expect(screen.getByRole('link', { name: /Call 112/ })).toBeTruthy();
   });
 
+  it('a record needing review says so, with the reason, instead of looking confirmed', async () => {
+    api.fetchFacilities.mockResolvedValue(answer([{ ...amana, status: 'needs-review', note: 'Mapped with an unresolved type.' }]));
+    render(<NearbyHelp lat={-6.816} lng={39.28} locale="en" />);
+    await screen.findByText('Amana Hospital');
+    expect(screen.getByText('Needs review')).toBeTruthy();
+    expect(screen.getByText('Mapped with an unresolved type.')).toBeTruthy();
+    expect(screen.queryByText('Open data, unconfirmed')).toBeNull();
+  });
+
+  it('private ambulance providers: their own numbers, source and private label, with 115 still first, even without location', async () => {
+    api.fetchFacilities.mockResolvedValue({ ...answer([]), providers: [{
+      id: 'provider/x', name: 'E-Plus Tanzania', kind: 'ambulance', service: 'Ground ambulance', hours: '24 hours', coverage: 'Dar es Salaam',
+      phones: [{ number: '080001199', display: '0800 01199', label: 'Emergency' }], status: 'provider-published',
+      source: { url: 'https://eplus.co.tz/', org: 'E-Plus', checked: '2026-10-16' }, limits: 'Not confirmed.',
+    }] });
+    render(<NearbyHelp lat={null} lng={null} locale="en" />);
+    fireEvent.click(screen.getByRole('button', { name: /Private ambulance/ }));
+    await screen.findByText('E-Plus Tanzania');
+    expect(screen.getByRole('link', { name: /0800 01199/ }).getAttribute('href')).toBe('tel:080001199');
+    expect(screen.getByRole('link', { name: 'Source' }).getAttribute('href')).toBe('https://eplus.co.tz/');
+    expect(screen.getByText(/From the provider's website, checked 2026-10-16/)).toBeTruthy();
+    expect(screen.getByRole('link', { name: /Call 115/ })).toBeTruthy();
+  });
+
   it('says so plainly when nothing is mapped nearby', async () => {
     api.fetchFacilities.mockResolvedValue(answer([]));
     render(<NearbyHelp lat={-9.6} lng={38.9} locale="en" />);

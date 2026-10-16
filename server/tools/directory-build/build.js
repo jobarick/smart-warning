@@ -45,13 +45,41 @@ function classify(p) {
   }
   const healthcare = String(p.healthcare || '');
   const name = `${p.name || ''} ${p.name_en || ''}`;
+  // An unresolved type: the mapper left amenity=fixme with their guess in
+  // fixme:type ("hospital", "hospi", "pharmarcy"...). Whole areas (most of
+  // North Pemba) are mapped this way. Kept only when the guess clearly names
+  // an emergency-relevant kind, and always marked for review.
+  if (amenity === 'fixme' && p['fixme:type']) {
+    const guess = String(p['fixme:type']).toLowerCase();
+    const review = `Mapped in OpenStreetMap with an unresolved type; the mapper's note says "${String(p['fixme:type']).slice(0, 40)}".`;
+    if (/polic|polisi/.test(guess)) return { kind: 'police', subtype: 'station', review };
+    if (/pharm|chemist|otc/.test(guess)) return { kind: 'pharmacy', subtype: 'pharmacy', review };
+    if (/hosp|spitali|clinic|dispens|despens|health|medical|polyclinic/.test(guess)) {
+      if (/dispensar|zahanati/i.test(nameAll) || /dispens|despens/.test(guess)) return { kind: 'hospital', subtype: 'dispensary', review };
+      if (/kituo cha afya|health cent|primary (health )?care unit|phcu/i.test(nameAll) || /health cent/.test(guess)) return { kind: 'hospital', subtype: 'health_centre', review };
+      if (/clinic/i.test(nameAll) || /clinic|polyclinic/.test(guess)) return { kind: 'hospital', subtype: 'clinic', review };
+      return { kind: 'hospital', subtype: 'hospital', review };
+    }
+    return null;
+  }
   if (amenity === 'police') {
+    // Fire services and security companies mis-tagged as police: the name
+    // says what they are. Recorded as corrections.
+    if (/zimamoto|fire (and|&) rescue|fire brigade/i.test(nameAll)) {
+      return { kind: 'fire', subtype: 'station', correction: 'Tagged amenity=police in OpenStreetMap; the name shows a fire and rescue service.' };
+    }
+    if (/security (company|services|group|ltd|limited)/i.test(nameAll)) {
+      return { kind: 'security', subtype: 'company', correction: 'Tagged amenity=police in OpenStreetMap; the name shows a private security company.' };
+    }
     // Border posts are tagged police in OSM; calling them a police station
     // would send someone in danger to a customs desk.
     if (/customs|immigration|uhamiaji|forodha|border post/i.test(name)) return { kind: 'police', subtype: 'border' };
     return { kind: 'police', subtype: /marine|bahari|maji/i.test(name) ? 'marine' : 'station' };
   }
   if (amenity === 'fire_station') return { kind: 'fire', subtype: 'station' };
+  if (!amenity && (p.government === 'public_service' || office === 'government') && /zimamoto|fire (and|&) rescue/i.test(nameAll)) {
+    return { kind: 'fire', subtype: 'station', correction: 'Mapped as a government office in OpenStreetMap; the name shows a fire and rescue station.' };
+  }
   const isHealth = amenity === 'hospital' || amenity === 'clinic' || amenity === 'doctors'
     || /(^|;)(hospital|clinic|centre|health_center|doctor|dispensary|dispensory|health_post)(;|$)/.test(healthcare);
   if (isHealth) {
@@ -234,6 +262,8 @@ function buildRecords(features, { sourceKey }) {
       // A security company is private unless it is tagged as government.
       operator: cls.kind === 'security' ? (operatorOf(p) === 'government' ? null : 'private') : operatorOf(p),
       source: p._source || sourceKey,
+      status: cls.review ? 'needs-review' : 'open-data',
+      note: cls.review || cls.correction || null,
     });
   }
   // Same kind, same normalised name, within DUPLICATE_RADIUS_M: one place
@@ -265,6 +295,26 @@ function buildRecords(features, { sourceKey }) {
   return { records: kept, rejected, duplicates };
 }
 
+/**
+ * Applies hand-reviewed decisions (curation.json) to built records. Pure:
+ * exported for tests. Excluded records are removed from what is served but
+ * returned so the coverage report can list them with their reasons.
+ */
+function applyCuration(records, curation) {
+  const overrides = (curation && curation.overrides) || {};
+  const kept = []; const excluded = [];
+  for (const r of records) {
+    const o = overrides[r.id];
+    if (!o) { kept.push(r); continue; }
+    const next = { ...r, status: o.status || r.status, note: o.reason || r.note };
+    if (o.kind) next.kind = o.kind;
+    if (o.subtype) next.subtype = o.subtype;
+    if (next.status === 'excluded') excluded.push(next);
+    else kept.push(next);
+  }
+  return { records: kept, excluded };
+}
+
 function parseArgs(argv) {
   const out = {};
   for (let i = 0; i < argv.length; i++) if (argv[i].startsWith('--')) out[argv[i].slice(2)] = argv[i + 1];
@@ -289,11 +339,19 @@ function main() {
   if (args.extra) {
     const shp = readShpPolygons(fs.readFileSync(args.adm2.replace(/\.dbf$/i, '.shp')));
     const districtShapes = shp.map((sh, i) => sh && { ...sh, district: adm[i].ADM2_PCODE, region: adm[i].ADM1_PCODE }).filter(Boolean);
-    const conv = overpassToFeatures(JSON.parse(fs.readFileSync(args.extra, 'utf8')).elements || [], districtShapes, EXTRA_SOURCE);
+    // Several saved queries may overlap; keep each OSM element once.
+    const seen = new Map();
+    for (const f of String(args.extra).split(',')) {
+      for (const e of JSON.parse(fs.readFileSync(f.trim(), 'utf8')).elements || []) seen.set(`${e.type}/${e.id}`, e);
+    }
+    const conv = overpassToFeatures([...seen.values()], districtShapes, EXTRA_SOURCE);
     extra = conv.features; outsideTanzania = conv.outside;
   }
   // Health layer first, so its richer health tags win for a shared object.
-  const { records, rejected, duplicates } = buildRecords([...health, ...poi, ...extra], { sourceKey: SOURCE });
+  const built = buildRecords([...health, ...poi, ...extra], { sourceKey: SOURCE });
+  const { rejected, duplicates } = built;
+  const curation = JSON.parse(fs.readFileSync(path.join(__dirname, 'curation.json'), 'utf8'));
+  const { records, excluded } = applyCuration(built.records, curation);
 
   const regions = {}; const districts = {};
   for (const r of adm) {
@@ -343,18 +401,28 @@ function main() {
     },
     regions,
     districts,
-    fields: ['id', 'kind', 'subtype', 'name', 'lat', 'lng', 'region', 'district', 'locality', 'address', 'source', 'operator'],
-    records: records.map((r) => [r.id, r.kind, r.subtype, r.name, r.lat, r.lng, r.region, r.district, r.locality, r.address, r.source, r.operator]),
+    fields: ['id', 'kind', 'subtype', 'name', 'lat', 'lng', 'region', 'district', 'locality', 'address', 'source', 'operator', 'status', 'note'],
+    records: records.map((r) => [r.id, r.kind, r.subtype, r.name, r.lat, r.lng, r.region, r.district, r.locality, r.address, r.source, r.operator, r.status, r.note]),
+    // Private services you call rather than walk to (no map pin): copied from
+    // curation.json with their source and limits.
+    providers: curation.providers || [],
+    // Kept out of the served data, with the reason, for the coverage report.
+    excluded: excluded.map((r) => ({ id: r.id, name: r.name, kind: r.kind, region: r.region, reason: r.note })),
+    notIncluded: curation.notIncluded || [],
+    knownUnmapped: curation.knownUnmapped || [],
+    candidatesNotConfirmed: curation.candidatesNotConfirmed || [],
   };
   fs.mkdirSync(args.out, { recursive: true });
   const file = path.join(args.out, 'tz-facilities.json');
   fs.writeFileSync(file, JSON.stringify(out));
   const counts = {};
   for (const r of records) counts[`${r.kind}/${r.subtype}`] = (counts[`${r.kind}/${r.subtype}`] || 0) + 1;
+  const statuses = {};
+  for (const r of records) statuses[r.status] = (statuses[r.status] || 0) + 1;
   const operators = {};
   for (const r of records) operators[r.operator || 'not tagged'] = (operators[r.operator || 'not tagged'] || 0) + 1;
-  console.log(JSON.stringify({ file, bytes: fs.statSync(file).size, records: records.length, counts, operators, extraInTanzania: extra.length, outsideTanzania, rejected, duplicates, unknownRegion, unknownDistrict, regions: Object.keys(regions).length, districts: Object.keys(districts).length, ms: Date.now() - t0 }, null, 1));
+  console.log(JSON.stringify({ file, bytes: fs.statSync(file).size, records: records.length, counts, statuses, excluded: excluded.length, providers: (curation.providers || []).length, operators, extraInTanzania: extra.length, outsideTanzania, rejected, duplicates, unknownRegion, unknownDistrict, regions: Object.keys(regions).length, districts: Object.keys(districts).length, ms: Date.now() - t0 }, null, 1));
 }
 
 if (require.main === module) main();
-module.exports = { classify, operatorOf, pointOf, validPoint, buildRecords, readDbf, readShpPolygons, inRings, locate, overpassToFeatures, normName, BBOX };
+module.exports = { classify, applyCuration, operatorOf, pointOf, validPoint, buildRecords, readDbf, readShpPolygons, inRings, locate, overpassToFeatures, normName, BBOX };

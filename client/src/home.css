@@ -317,3 +317,12 @@
 .fac-op-private { border-color: #64748b; color: var(--text); }
 .fac-op-government { border-color: #3b82f6; color: var(--text); }
 .fac-private { border-left: 3px solid #64748b; padding-left: 8px; }
+
+.fac-review { border-color: #f59e0b; color: #f59e0b; }
+.fac-review-note { font-size: 0.74rem; color: #f59e0b; }
+.fac-providers h3 { margin: 6px 0; font-size: 0.92rem; }
+.fac-providers ul { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.fac-provider { display: flex; flex-direction: column; gap: 3px; padding: 10px; border-radius: 10px; border: 1px solid var(--panel-border); background: var(--panel); }
+.fac-provider small { font-size: 0.78rem; color: var(--muted); }
+.fac-provider-calls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
+.fac-src { font-size: 0.78rem; color: var(--accent); }
