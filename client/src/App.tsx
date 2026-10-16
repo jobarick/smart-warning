@@ -1496,6 +1496,14 @@ export default function App() {
           onDismissReport={onDismissReport}
           token={token}
           selfPosition={telemetry.lat !== null && telemetry.lng !== null ? { lat: telemetry.lat, lng: telemetry.lng } : null}
+          selfLocation={
+            !settings.shareLocation ? 'off'
+              : telemetry.lat !== null && telemetry.lng !== null ? 'live'
+              : telemetry.locationError === 'Location permission denied' ? 'denied'
+              : telemetry.locationError ? 'unavailable'
+              : 'waiting'
+          }
+          onEnableLocation={() => patchSettings({ shareLocation: true })}
           onRespond={onRespond}
         />
         </Suspense>

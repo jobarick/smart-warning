@@ -165,6 +165,13 @@ function sendStatus(ws) {
   const current = statusFor(ws.orgId);
   if (current && ws.readyState === 1) ws.send(JSON.stringify(current));
 
+  // An emergency still running when this device joined.
+  const live = activeAlert.get(ws.orgId ?? null);
+  if (live && ws.readyState === 1) {
+    if (Date.now() - (Number(live.timestamp) || 0) <= ACTIVE_ALERT_MAX_MS) ws.send(JSON.stringify(live));
+    else activeAlert.delete(ws.orgId ?? null);
+  }
+
   // Same treatment for a supervisor already en route: someone whose phone
   // reconnects mid-incident must not lose the one piece of news that matters.
   const responder = orgResponding.get(ws.orgId ?? null);
@@ -187,6 +194,14 @@ const activeIncident = new Map(); // orgId (or null) → incident id
 // nothing more. Without this, any phone holding the team code could stop every
 // siren on site during a real emergency. Escalated reports have no raiser.
 const activeRaiser = new Map(); // orgId (or null) → { connId, workerId }
+
+// The live alert itself, so a device that joins after it was raised (a
+// coordinator opening the dashboard, a phone reconnecting) is shown the
+// emergency instead of a calm "all clear" with the SOS buried in history.
+// Cleared by the all-clear; ignored once older than ACTIVE_ALERT_MAX_MS so a
+// lost all-clear cannot keep replaying an ancient alarm.
+const activeAlert = new Map(); // orgId (or null) → alert message
+const ACTIVE_ALERT_MAX_MS = Number(process.env.ACTIVE_ALERT_MAX_MS) > 0 ? Number(process.env.ACTIVE_ALERT_MAX_MS) : 6 * 60 * 60 * 1000;
 
 function raisedLiveIncident(ws) {
   const r = activeRaiser.get(ws.orgId ?? null);
@@ -237,6 +252,7 @@ async function raiseAlert(orgId, alert, worker = null, origin = 'unknown', actor
   activeIncident.set(orgId ?? null, alert.id);
   if (raiser) activeRaiser.set(orgId ?? null, raiser);
   else activeRaiser.delete(orgId ?? null);
+  activeAlert.set(orgId ?? null, alert);
   // A new emergency invalidates any response to the last one. Carrying it over
   // would tell someone help was already on its way to them.
   clearResponding(orgId);
@@ -556,6 +572,7 @@ function attach(server) {
           // Only the person who raised it can say it was never real.
           if (msg.reason === 'false-alarm' && !isRaiser) msg.reason = 'resolved';
           activeRaiser.delete(ws.orgId ?? null);
+          activeAlert.delete(ws.orgId ?? null);
           const retracted = msg.reason === 'false-alarm';
           console.log(`[.] ${retracted ? 'FALSE ALARM retracted' : 'all-clear'} from #${ws.connId} "${msg.sender}" (org ${ws.orgId ?? 'global'})`);
           // Read before deleting: this is the incident the all-clear closes.

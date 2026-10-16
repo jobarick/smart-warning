@@ -94,3 +94,24 @@ Stop the pilot immediately if:
 - a participant was told help was coming when it was not.
 
 Then: tell every participant the test is paused; note the time; roll back with the steps in `docs/INCIDENT_RUNBOOK.md` (Vercel: promote the previous deployment; Railway: redeploy the previous successful deployment); open a GitHub issue with the defect report.
+
+## 9. Live SOS-to-rescue rehearsal (production, supervised)
+
+Run only with the owner's go-ahead, in the pilot organisation, with every participant told beforehand. Say and type "TEST". Never dial 112, 115 or any directory number, and do not open the Directions links into traffic.
+
+1. **Coordinator laptop or phone:** open `/dashboard`. If the map says your location is off or blocked, follow its message (allow location for the site, or turn on Windows Location) until a green "You (live)" dot appears.
+2. **Worker phone:** location sharing on, location permission allowed, app open. Confirm the worker appears on the coordinator map within 10 s.
+3. **Worker presses SOS** (type: Medical, message "TEST").
+4. **Coordinator checks, and records the time of each:**
+   - EMERGENCY banner and the worker's pin pulsing red on the map
+   - pin within about 50 m of the worker's real spot (walk to it, or compare with the worker's own map)
+   - "Nearest to them" shows a hospital, police and fire station, or says plainly that none were found
+   - "Directions to <worker>" opens Google Maps with the worker as the destination (check the address, do not drive)
+5. **Late-joiner check:** a second coordinator opens the dashboard after the SOS. It must show the live EMERGENCY, not "all clear".
+6. **Coordinator acknowledges.** The worker's phone shows "seen by …".
+7. **Coordinator stands down.** Every phone stops; the map loses the red pin and the Directions bar.
+8. **History:** the incident shows resolved, acknowledged, with raise and resolve times.
+9. **Map controls:** zoom with the mouse wheel, drag the handle under the map to make it bigger, use Full screen and Escape.
+10. Repeat 2 to 8 with the worker's location permission denied (the coordinator must see "not shared", not a wrong pin), and once outside a city centre (nearest help may be empty, and must say so).
+
+Stop at once and follow section 8 if an SOS is not seen, a pin is clearly in the wrong place, or the alarm cannot be stopped.

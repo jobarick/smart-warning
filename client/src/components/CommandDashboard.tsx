@@ -15,6 +15,7 @@ import { describePosition } from '../lib/position';
 
 // Leaflet and the tiles load only when the dashboard opens.
 const CoordinatorMap = lazy(() => import('./CoordinatorMap').then((m) => ({ default: m.CoordinatorMap })));
+type SelfLocationState = 'live' | 'off' | 'denied' | 'unavailable' | 'waiting';
 
 interface Props {
   roster: WorkerInfo[];
@@ -44,6 +45,8 @@ interface Props {
   token?: string;
   /** This supervisor's own live position, when they are sharing it. */
   selfPosition?: { lat: number; lng: number } | null;
+  selfLocation?: SelfLocationState;
+  onEnableLocation?: () => void;
   /** Tell the site this supervisor is en route, and how far off. */
   onRespond?: (r: { incidentId: string; etaS: number | null; distanceM: number | null; routed: boolean; lat: number | null; lng: number | null }) => void;
 }
@@ -96,7 +99,7 @@ function lastSeen(updatedAt: number, now: number): string {
  * about the page scrolls; the three list panels scroll inside themselves, so
  * the state of the site is never below the fold.
  */
-export function CommandDashboard({ roster, alarm, log, history, stats, persistence, historyError, profile, selfName, status, onAcknowledge, onAllClear, standing, onSetStatus, reports, reportsError, onEscalateReport, onDismissReport, token, selfPosition, onRespond }: Props) {
+export function CommandDashboard({ roster, alarm, log, history, stats, persistence, historyError, profile, selfName, status, onAcknowledge, onAllClear, standing, onSetStatus, reports, reportsError, onEscalateReport, onDismissReport, token, selfPosition, selfLocation, onEnableLocation, onRespond }: Props) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -483,6 +486,8 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
                   self={selfPosition ?? null}
                   route={navRoute ? { geometry: navRoute.geometry, degraded: navRoute.degraded } : null}
                   now={now}
+                  selfLocation={selfLocation}
+                  onEnableLocation={onEnableLocation}
                 />
               </Suspense>
               {unlocated.length > 0 && (

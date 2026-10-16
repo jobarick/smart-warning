@@ -606,7 +606,7 @@
 
 /* Coordinator street map (CoordinatorMap.tsx) */
 .cm-wrap { position: relative; display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; }
-.cm-el { flex: 1; min-height: 320px; border-radius: 10px; overflow: hidden; border: 1px solid var(--cmd-line, rgba(255,255,255,0.12)); }
+.cm-el { flex: 1; min-height: 200px; border-radius: 10px; overflow: hidden; border: 1px solid var(--cmd-line, rgba(255,255,255,0.12)); }
 .cm-loading { background: var(--cmd-panel, #111); }
 .cm-empty {
   position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 500; margin: 0;
@@ -634,3 +634,32 @@
 .mc-split > .mc-col:last-child > .mc-map { flex: 0 0 auto; }
 .mc-split > .mc-col:last-child > .mc-two { min-height: 240px; }
 .mc-map .mc-map-body, .mc-map .cm-wrap { flex: 0 0 auto; }
+
+/* Map tools, resize handle, full screen, own-location note */
+.cm-tools { display: flex; justify-content: flex-end; gap: 6px; }
+.cm-tools button {
+  padding: 5px 10px; border-radius: 8px; border: 1px solid var(--panel-border); background: var(--panel);
+  color: var(--text); font: inherit; font-size: 12px; cursor: pointer;
+}
+.cm-tools button:disabled { opacity: 0.4; cursor: default; }
+.cm-mapbox { position: relative; display: flex; flex-direction: column; }
+.cm-mapbox .cm-el { flex: 1 1 auto; min-height: 0; height: 100%; }
+.cm-resize {
+  height: 14px; margin-top: -4px; display: flex; align-items: center; justify-content: center;
+  cursor: ns-resize; touch-action: none; user-select: none;
+}
+.cm-resize span { width: 48px; height: 4px; border-radius: 4px; background: var(--muted, #888); opacity: 0.6; }
+.cm-resize:hover span { opacity: 1; }
+.cm-full {
+  position: fixed; inset: 0; z-index: 2000; padding: 12px; background: var(--bg, #000);
+}
+.cm-full .cm-mapbox { flex: 1 1 auto; min-height: 0; }
+.cm-self-note {
+  position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 500;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px;
+  max-width: calc(100% - 24px); padding: 8px 12px; border-radius: 10px;
+  background: rgba(0, 0, 0, 0.78); color: #fff; font-size: 12px; text-align: center;
+}
+.cm-self-note button {
+  padding: 5px 10px; border-radius: 8px; border: none; background: #22c55e; color: #04210f; font-weight: 700; cursor: pointer;
+}
