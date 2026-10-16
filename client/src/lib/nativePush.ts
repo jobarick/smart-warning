@@ -26,16 +26,23 @@ export function nativePushSupported(): boolean {
   return Capacitor.isNativePlatform();
 }
 
-async function plugin(): Promise<PushPlugin | null> {
+// The plugin is a Capacitor proxy that answers every property, `then`
+// included. Resolving a promise WITH it makes JavaScript call proxy.then(),
+// which on Android throws '"PushNotifications.then()" is not implemented' and
+// rejects: registration never ran on any device. So it is returned wrapped in
+// a plain object, never as a promise's value.
+async function loadPlugin(): Promise<{ push: PushPlugin } | null> {
   if (!nativePushSupported()) return null;
   try {
     const mod = await import('@capacitor/push-notifications');
-    return mod.PushNotifications;
+    return { push: mod.PushNotifications };
   } catch {
     // Plugin not installed in this build — the web bundle path.
     return null;
   }
 }
+
+export const _loadPluginForTest = loadPlugin;
 
 /** The token this device last registered, if any. */
 export function currentToken(): string | null {
@@ -138,7 +145,7 @@ async function persistToken(Push: PushPlugin, token: string): Promise<void> {
  * the token — it just no longer needs to settle anything.
  */
 export async function registerForPush(creds: { token?: string; orgCode?: string }, label?: string): Promise<RegisterResult> {
-  const Push = await plugin();
+  const Push = (await loadPlugin())?.push ?? null;
   if (!Push) return { status: 'unsupported' };
 
   try {
@@ -216,7 +223,7 @@ export async function unregisterFromPush(
   // that just signed out.
   activeCreds = null;
   activeLabel = undefined;
-  const Push = await plugin();
+  const Push = (await loadPlugin())?.push ?? null;
   if (Push) await Push.removeAllListeners().catch(() => {});
 }
 
@@ -232,7 +239,7 @@ export async function attachHandlers(handlers: {
   onReceived?: (data: Record<string, unknown>) => void;
   onAction?: (data: Record<string, unknown>) => void;
 }): Promise<void> {
-  const Push = await plugin();
+  const Push = (await loadPlugin())?.push ?? null;
   if (!Push) return;
   if (handlers.onReceived) {
     await Push.addListener('pushNotificationReceived', (n) => handlers.onReceived!(n.data ?? {}));

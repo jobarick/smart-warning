@@ -58,10 +58,11 @@ function load(file = DEFAULT_FILE) {
     state = {
       records, byKind, regions: raw.regions || {}, districts: raw.districts || {}, sources: raw.sources || {},
       providers: Array.isArray(raw.providers) ? raw.providers : [],
+      knownUnmapped: Array.isArray(raw.knownUnmapped) ? raw.knownUnmapped : [],
       generated: raw.generated || null, loadMs: Number(process.hrtime.bigint() - t0) / 1e6, error: null,
     };
   } catch (e) {
-    state = { records: [], byKind: new Map(), regions: {}, districts: {}, sources: {}, providers: [], generated: null, loadMs: 0, error: e.message };
+    state = { records: [], byKind: new Map(), regions: {}, districts: {}, sources: {}, providers: [], knownUnmapped: [], generated: null, loadMs: 0, error: e.message };
     console.error(`[directory] could not load ${file}: ${e.message}`);
   }
   return status();
@@ -180,6 +181,19 @@ function providers(kinds) {
   return list.filter((p) => !set || set.has(p.kind));
 }
 
+/**
+ * Places known to exist (from documents) that have no reliable map position,
+ * for a region and kinds. Shown by name with the evidence, never as a pin, so
+ * an empty area reads as "not mapped yet" rather than "none here".
+ */
+function knownUnmapped({ region, kinds } = {}) {
+  if (!region) return [];
+  const set = kinds && kinds.length ? new Set(kinds) : null;
+  return ensure().knownUnmapped
+    .filter((k) => k.region === region && (!set || set.has(k.kind)))
+    .map((k) => ({ name: k.name, kind: k.kind, region: k.region, reason: k.reason, evidence: k.evidence || [], checked: k.checked || null }));
+}
+
 function sources() {
   return ensure().sources;
 }
@@ -189,4 +203,4 @@ function kinds() {
   return [...new Set([...s.byKind.keys(), ...s.providers.map((p) => p.kind)])];
 }
 
-module.exports = { load, status, nearby, search, areas, sources, kinds, providers, CELL_DEG, MAX_LIMIT };
+module.exports = { load, status, nearby, search, areas, sources, kinds, providers, knownUnmapped, CELL_DEG, MAX_LIMIT };

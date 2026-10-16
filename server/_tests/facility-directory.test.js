@@ -194,10 +194,39 @@ test('every Tanzanian number carries an evidence level, and none claims to be of
     assert.notStrictEqual(s.evidence.level, 'official', `${s.id} must not be official without written confirmation`);
   }
   const by = Object.fromEntries(d.services.map((s) => [s.id, s.evidence]));
-  assert.strictEqual(by['116'].level, 'corroborated');
+  assert.strictEqual(by['116'].level, 'government-listed');
   assert.ok(by['116'].sources.length >= 2);
-  assert.strictEqual(by['113'].level, 'unconfirmed');
+  assert.strictEqual(by['113'].level, 'government-listed');
   assert.strictEqual(d.verification.status, 'unverified');
+});
+
+test('phase 3: a number is "government-listed" only with a government source, and weak ones say so', () => {
+  const d = numbers.directoryFor(numbers.countryByCode('TZ'));
+  const by = Object.fromEntries(d.services.map((s) => [s.id, s.evidence]));
+  for (const [id, ev] of Object.entries(by)) {
+    assert.ok(ev.checked, `${id} has a check date`);
+    if (ev.level === 'government-listed') assert.ok(ev.sources.some((u) => /\.go\.tz\//.test(u)), `${id} is government-listed without a .go.tz source`);
+    if (ev.level === 'unconfirmed') assert.strictEqual(ev.sources.length, 0, `${id} is unconfirmed but cites a source`);
+  }
+  // The Government portal's own emergency list.
+  for (const n of ['111', '112', '113', '114', '115', '116', '199', '190']) assert.strictEqual(by[n].level, 'government-listed', n);
+  // No credible source: kept, but flagged, never presented as established.
+  for (const n of ['117', '181', '0800110064', '0800711113']) assert.strictEqual(by[n].level, 'unconfirmed', n);
+  // 199 is the general health line, not an epidemics-only line.
+  assert.match(d.services.find((s) => s.id === '199').label, /Health/);
+});
+
+test('phase 3: places known from documents but not mappable are named for their area, never pinned', () => {
+  const np = directory.areas().find((r) => r.name === 'Kaskazini Pemba');
+  const fire = directory.knownUnmapped({ region: np.code, kinds: ['fire'] });
+  assert.ok(fire.some((k) => /Wete fire station/.test(k.name)));
+  for (const k of fire) {
+    assert.ok(k.reason && k.evidence.length && k.checked);
+    assert.strictEqual(k.lat, undefined, 'no coordinates are invented');
+  }
+  assert.ok(directory.knownUnmapped({ region: np.code, kinds: ['hospital'] }).some((k) => /Wete District Hospital/.test(k.name)));
+  assert.deepStrictEqual(directory.knownUnmapped({ region: np.code, kinds: ['police'] }), []);
+  assert.deepStrictEqual(directory.knownUnmapped({ region: null, kinds: ['fire'] }), []);
 });
 
 // --- API ---------------------------------------------------------------------------
@@ -248,6 +277,14 @@ test('API: facilities near a point, by area, and the area list', async (t) => {
   assert.ok(body.providers.length >= 2 && body.providers.every((p) => p.status === 'provider-published' && p.source.url));
   res = await fetch(`${BASE}/api/emergency/facilities?lat=-6.8&lng=39.28&kind=police`);
   assert.deepStrictEqual((await res.json()).providers, []);
+
+  // An empty area names what is known to exist there instead of implying none.
+  res = await fetch(`${BASE}/api/emergency/facilities?region=TZ54&kind=fire`);
+  body = await res.json();
+  assert.deepStrictEqual(body.results, []);
+  assert.ok(body.knownUnmapped.length >= 1 && body.knownUnmapped.every((k) => k.evidence.length && k.lat === undefined));
+  res = await fetch(`${BASE}/api/emergency/facilities?lat=-5.05&lng=39.77&kind=fire`);
+  assert.deepStrictEqual((await res.json()).knownUnmapped, [], 'nearby mode never adds unpinned places');
 
   // The existing nearby endpoint now answers from the bundled directory first.
   res = await fetch(`${BASE}/api/emergency/nearby?kind=police&lat=-6.816&lng=39.28`);

@@ -326,3 +326,13 @@
 .fac-provider small { font-size: 0.78rem; color: var(--muted); }
 .fac-provider-calls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
 .fac-src { font-size: 0.78rem; color: var(--accent); }
+
+.fac-note { font-size: 0.74rem; color: var(--muted); }
+.fac-unmapped h3 { margin: 6px 0; font-size: 0.92rem; }
+.fac-unmapped ul { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.fac-unmapped li { display: flex; flex-direction: column; gap: 3px; padding: 10px; border-radius: 10px; border: 1px dashed var(--panel-border); }
+.fac-unmapped small { font-size: 0.78rem; color: var(--muted); }
+.eg-evidence { margin: 6px 0 0; font-size: 0.76rem; color: var(--muted); }
+.eg-evidence a { color: var(--accent); }
+.eg-evidence-weak { color: #f59e0b; }
+.pocket-unconfirmed { font-size: 0.72rem; color: #f59e0b; }

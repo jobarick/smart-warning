@@ -113,6 +113,10 @@ export function EmergencyCallPocket({ lat, lng, alertType, defaultOpen = false, 
                   {label}
                 </span>
                 {description && <span className="pocket-svc-desc">{description}</span>}
+                {/* A number no official source supports is kept, but says so. */}
+                {(svc.evidence?.level === 'unconfirmed' || svc.evidence?.level === 'unchecked') && (
+                  <span className="pocket-unconfirmed" title={svc.evidence.note || undefined}>{t(locale, 'evidence.short')}</span>
+                )}
                 <span className="pocket-numbers">
                   {svc.numbers.map((n) =>
                     dialable && isDialable(n) ? (

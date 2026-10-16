@@ -1,10 +1,10 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import type { Locale } from '../types';
-import { fetchDirectory } from '../lib/api';
+import { fetchDirectory, type NumberEvidence } from '../lib/api';
 import { canDial, isDialable, telHref } from '../lib/emergency';
 import { EMERGENCY_SERVICE_FALLBACK, type EmergencyGridService } from '../lib/emergencyGrid';
 import { track } from '../lib/analytics';
-import { t } from '../lib/i18n';
+import { t, type StringKey } from '../lib/i18n';
 import { Icon } from './Icon';
 
 // The report form is the second choice under a category, after CALL NOW,
@@ -39,6 +39,26 @@ export const GRID_IDS = ['111', '112', '113', '114', '115', '116', '117', '08001
  * across borders), this grid exists specifically for the Tanzania audience the
  * product is built for.
  */
+const EVIDENCE_KEY: Record<NumberEvidence['level'], StringKey> = {
+  official: 'evidence.official',
+  'government-listed': 'evidence.governmentListed',
+  corroborated: 'evidence.corroborated',
+  reported: 'evidence.reported',
+  unconfirmed: 'evidence.unconfirmed',
+  unchecked: 'evidence.unconfirmed',
+};
+
+export function EvidenceLine({ evidence, locale }: { evidence: NumberEvidence; locale: Locale }) {
+  const weak = evidence.level === 'unconfirmed' || evidence.level === 'unchecked';
+  return (
+    <p className={`eg-evidence${weak ? ' eg-evidence-weak' : ''}`}>
+      {t(locale, EVIDENCE_KEY[evidence.level] || 'evidence.unconfirmed')}
+      {evidence.checked && <> · {t(locale, 'evidence.checked', { date: evidence.checked })}</>}
+      {evidence.sources[0] && <> · <a href={evidence.sources[0]} target="_blank" rel="noopener noreferrer">{t(locale, 'facilities.source')}</a></>}
+    </p>
+  );
+}
+
 export function EmergencyGrid({ locale, ids = GRID_IDS, bare = false }: Props) {
   const [byId, setById] = useState<Record<string, EmergencyGridService>>(EMERGENCY_SERVICE_FALLBACK);
   const [selected, setSelected] = useState<string | null>(null);
@@ -132,6 +152,10 @@ export function EmergencyGrid({ locale, ids = GRID_IDS, bare = false }: Props) {
             </div>
           )}
           {!dialable && <p className="eg-detail-note">{t(locale, 'emergencyGrid.cannotDial')}</p>}
+
+          {/* How sure we are of this number, with the source. Never claims
+              "official" without the agency's written confirmation. */}
+          {active.evidence && <EvidenceLine evidence={active.evidence} locale={locale} />}
 
           {!reporting && (
             <button type="button" className="eg-report-btn" onClick={() => setReporting(true)}>

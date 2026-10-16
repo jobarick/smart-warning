@@ -10,6 +10,9 @@ import { fetchDirectory, type EmergencyDirectory } from './api';
 
 const CACHE_KEY = 'sw-emergency-directory-v1';
 
+/** Shown when the position is unknown. */
+export const DEFAULT_COUNTRY = 'TZ';
+
 /**
  * The floor. 112 is the GSM-standard emergency number and 911 is accepted by
  * most networks that don't use it; a handset will usually route either to a
@@ -83,7 +86,10 @@ export async function resolveDirectory(
   }
 
   try {
-    const directory = await fetchDirectory(lat, lng);
+    // No position (location refused or unavailable): Tanzania's own numbers,
+    // the audience this app is built for, rather than the international
+    // fallback (112/911). A known position still follows the device abroad.
+    const directory = key === 'unknown' ? await fetchDirectory(null, null, DEFAULT_COUNTRY) : await fetchDirectory(lat, lng);
     if (directory?.services?.length) {
       writeCache({ at: Date.now(), key, directory });
       return { directory, stale: false };

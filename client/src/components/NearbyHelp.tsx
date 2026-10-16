@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import type { Locale } from '../types';
-import { fetchFacilities, fetchFacilityAreas, type Facility, type FacilityArea, type FacilityKind, type FacilityProvider } from '../lib/api';
+import { fetchFacilities, fetchFacilityAreas, type Facility, type FacilityArea, type FacilityKind, type FacilityKnownUnmapped, type FacilityProvider } from '../lib/api';
 import { canDial, telHref } from '../lib/emergency';
 import { directionsUrl } from '../lib/position';
 import { FACILITY_KINDS, HOTLINE_FOR, KIND_LETTER, PRIVATE_KINDS, formatDistance, placeLine } from '../lib/facilities';
@@ -52,12 +52,29 @@ const SUBTYPE_KEY: Record<string, StringKey> = {
  * instead: nobody should be locked out of this because a permission was
  * refused.
  */
+/** Only an authority's confirmation counts; open data never shows as verified. */
+export function isOfficiallyVerified(f: Facility): boolean {
+  return f.verified === true && f.verification === 'official';
+}
+
+/** Distance and directions only for a real position. */
+export function hasPosition(f: Pick<Facility, 'lat' | 'lng'>): boolean {
+  return Number.isFinite(f.lat) && Number.isFinite(f.lng) && Math.abs(f.lat) <= 90 && Math.abs(f.lng) <= 180 && !(f.lat === 0 && f.lng === 0);
+}
+
+function latestSnapshot(sources?: Record<string, { snapshot: string | null }>): string | null {
+  const dates = Object.values(sources || {}).map((s) => s.snapshot).filter((d): d is string => !!d).sort();
+  return dates.length ? dates[dates.length - 1] : null;
+}
+
 export function NearbyHelp({ lat, lng, locale }: Props) {
   const [open, setOpen] = useState(true);
   const [kind, setKind] = useState<FacilityKind>('hospital');
   const [view, setView] = useState<'list' | 'map'>('list');
   const [results, setResults] = useState<Facility[]>([]);
   const [providers, setProviders] = useState<FacilityProvider[]>([]);
+  const [unmapped, setUnmapped] = useState<FacilityKnownUnmapped[]>([]);
+  const [dataDate, setDataDate] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -80,6 +97,7 @@ export function NearbyHelp({ lat, lng, locale }: Props) {
     // Private providers do not depend on a location; ask even without one.
     if (!hasLocation && !region) {
       setResults([]);
+      setUnmapped([]);
       if (!PRIVATE_KINDS.has(kind)) { setProviders([]); return; }
     }
     let cancelled = false;
@@ -87,7 +105,14 @@ export function NearbyHelp({ lat, lng, locale }: Props) {
     setError(false);
     const query = hasLocation ? { lat: rLat!, lng: rLng! } : region ? { region, district: district || null } : { region: '__none__' };
     fetchFacilities(query, [kind], hasLocation ? 10 : 30)
-      .then((a) => { if (!cancelled) { setResults(a.results); setProviders(a.providers || []); setNotice(a.notice); } })
+      .then((a) => {
+        if (cancelled) return;
+        setResults(a.results);
+        setProviders(a.providers || []);
+        setUnmapped(a.knownUnmapped || []);
+        setNotice(a.notice);
+        setDataDate(latestSnapshot(a.sources));
+      })
       .catch(() => { if (!cancelled) setError(true); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
@@ -188,7 +213,24 @@ export function NearbyHelp({ lat, lng, locale }: Props) {
           )}
 
           {!loading && !error && (hasLocation || region) && results.length === 0 && providers.length === 0 && (
-            <p className="pocket-foot">{t(locale, hasLocation ? 'facilities.emptyNear' : 'facilities.emptyArea')}</p>
+            <p className="pocket-foot fac-empty">{t(locale, hasLocation ? 'facilities.emptyNear' : 'facilities.emptyArea')}</p>
+          )}
+
+          {/* Known from documents but with no reliable position: named so an
+              empty map does not read as "there is none", never pinned. */}
+          {!loading && !error && unmapped.length > 0 && (
+            <div className="fac-unmapped">
+              <h3>{t(locale, 'facilities.unmappedHeading')}</h3>
+              <ul>
+                {unmapped.map((u) => (
+                  <li key={u.name}>
+                    <b>{u.name}</b>
+                    <small>{u.reason}</small>
+                    {u.evidence[0] && <a className="fac-src" href={u.evidence[0]} target="_blank" rel="noopener noreferrer">{t(locale, 'facilities.source')}</a>}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {!loading && !error && results.length > 0 && view === 'map' && (
@@ -214,19 +256,22 @@ export function NearbyHelp({ lat, lng, locale }: Props) {
                       )}
                       {f.status === 'needs-review'
                         ? <span className="fac-tag fac-review" title={f.note || undefined}>{t(locale, 'facilities.needsReview')}</span>
-                        : <span className="fac-tag">{t(locale, f.verified ? 'nearby.verified' : 'facilities.openData')}</span>}
+                        : <span className="fac-tag">{t(locale, isOfficiallyVerified(f) ? 'nearby.verified' : 'facilities.openData')}</span>}
                     </span>
-                    {f.status === 'needs-review' && f.note && <small className="fac-review-note">{f.note}</small>}
+                    {f.note && <small className={f.status === 'needs-review' ? 'fac-review-note' : 'fac-note'}>{f.note}</small>}
                   </span>
-                  <a className="fac-go" href={directionsUrl(f.lat, f.lng, f.distanceM != null && f.distanceM <= 1500 ? 'walking' : 'driving')} target="_blank" rel="noopener noreferrer">
-                    <Icon name="navigation" /> {t(locale, 'facilities.directions')}
-                  </a>
+                  {hasPosition(f) && (
+                    <a className="fac-go" href={directionsUrl(f.lat, f.lng, f.distanceM != null && f.distanceM <= 1500 ? 'walking' : 'driving')} target="_blank" rel="noopener noreferrer">
+                      <Icon name="navigation" /> {t(locale, 'facilities.directions')}
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>
           )}
 
           <p className="pocket-foot">{notice ? t(locale, 'facilities.notice') : t(locale, 'nearby.disclaimer')}</p>
+          {dataDate && <p className="fac-attr">{t(locale, 'facilities.dataDate', { date: dataDate })}</p>}
           <p className="fac-attr">© OpenStreetMap contributors (ODbL) · NBS / UN OCHA</p>
         </>
       )}

@@ -22,7 +22,7 @@ export const EMERGENCY_SERVICE_FALLBACK: Record<string, EmergencyGridService> = 
   '116': { id: '116', numbers: ['116'], iconName: 'child', label: 'Child Helpline', labelSw: 'Msaada wa Watoto' },
   '117': { id: '117', numbers: ['117'], iconName: 'medical', label: 'Health', labelSw: 'Afya' },
   '195': { id: '195', numbers: ['195'], iconName: 'lock', label: 'Human Trafficking', labelSw: 'Kupinga Usafirishaji Haramu' },
-  '199': { id: '199', numbers: ['199'], iconName: 'epidemic', label: 'Epidemic Diseases', labelSw: 'Magonjwa ya Mlipuko' },
+  '199': { id: '199', numbers: ['199'], iconName: 'epidemic', label: 'Health line (Afya)', labelSw: 'Afya (Kituo cha Simu)' },
   '0800110064': { id: '0800110064', numbers: ['0800110064'], iconName: 'hazard', label: 'Disaster Management', labelSw: 'Maafa (Bara)' },
   '181': { id: '181', numbers: ['181'], iconName: 'utility', label: 'DAWASA (Dar es Salaam water)', labelSw: 'DAWASA (Maji Dar es Salaam)' },
   '0800711113': { id: '0800711113', numbers: ['0800711113'], iconName: 'utility', label: 'Utility Emergency', labelSw: 'Huduma za Umeme/Maji' },
