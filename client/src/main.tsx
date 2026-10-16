@@ -1,6 +1,5 @@
 import { lazy, StrictMode, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
-import { registerSW } from 'virtual:pwa-register';
 import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { VercelInsights } from './components/VercelInsights';
@@ -8,7 +7,7 @@ import { PUBLIC_REPORT_PATTERN } from './lib/routes';
 import { registerNativeBackButton } from './lib/nativeBack';
 import { loadLocale } from './lib/i18n';
 import { loadSettings } from './lib/settings';
-import { checkForUpdates, newVersionReady } from './lib/updateGate';
+import { startServiceWorker } from './lib/serviceWorker';
 // Bundled, not fetched. An emergency PWA has to render identically on a locked
 // -down site network or offline, so the typeface ships with the app rather than
 // coming from a font CDN. One variable file: the monospace face that used to
@@ -23,8 +22,8 @@ import './landing.css';
 import './demo.css';
 import './home.css';
 
-// A new version never reloads a phone mid-alarm (see lib/updateGate.ts).
-registerSW({ immediate: true, onNeedReload: newVersionReady, onRegisteredSW: checkForUpdates });
+// Website only; inside the Android app the code ships in the APK (see lib/serviceWorker.ts).
+startServiceWorker();
 registerNativeBackButton();
 
 // /r/<site code> is the public reporting page. Routed here rather than inside

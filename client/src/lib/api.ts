@@ -183,6 +183,8 @@ export interface Facility {
   operator?: 'private' | 'government' | 'faith' | 'ngo' | null;
   /** Always false for open data: nobody has confirmed it. */
   verified: boolean;
+  /** "official" only once an authority confirms; open data is "unverified". */
+  verification?: string;
   /** open-data, or needs-review (the reason is in note). */
   status?: 'open-data' | 'needs-review';
   note?: string | null;
@@ -210,6 +212,19 @@ export interface FacilityAnswer {
   attribution: string;
   results: Facility[];
   providers?: FacilityProvider[];
+  /** Data sources with their snapshot dates. */
+  sources?: Record<string, { title: string; snapshot: string | null; license: string }>;
+  /** Known to exist from documents, but no reliable map position (area mode). Never pinned. */
+  knownUnmapped?: FacilityKnownUnmapped[];
+}
+
+export interface FacilityKnownUnmapped {
+  name: string;
+  kind: FacilityKind;
+  region: string;
+  reason: string;
+  evidence: string[];
+  checked: string | null;
 }
 
 export interface FacilityArea {
@@ -981,10 +996,20 @@ export async function fetchSafeRoute(
 
 // --- Emergency call directory ---
 
+/** How sure we are of a number (server/emergency-numbers.js TZ_EVIDENCE). */
+export interface NumberEvidence {
+  level: 'unchecked' | 'unconfirmed' | 'reported' | 'corroborated' | 'government-listed' | 'official';
+  checked: string | null;
+  note: string | null;
+  sources: string[];
+}
+
 export interface EmergencyService {
   id: string;
   label: string;
   numbers: string[];
+  /** Tanzania only: the evidence behind this number. */
+  evidence?: NumberEvidence;
   /** Present only for a country with its own per-service directory (Tanzania today) — see server/emergency-numbers.js. */
   icon?: string;
   description?: string;

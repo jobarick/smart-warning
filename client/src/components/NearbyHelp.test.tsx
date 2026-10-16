@@ -11,7 +11,7 @@ const api = vi.hoisted(() => ({
 vi.mock('../lib/api', () => api);
 vi.mock('../lib/emergency', () => ({ canDial: () => true, telHref: (n: string) => `tel:${n}` }));
 
-import { NearbyHelp } from './NearbyHelp';
+import { NearbyHelp, hasPosition, isOfficiallyVerified } from './NearbyHelp';
 
 const answer = (results: unknown[], mode = 'nearby') => ({ mode, notice: 'From OpenStreetMap…', attribution: '© OSM', results });
 const amana = {
@@ -94,5 +94,50 @@ describe('NearbyHelp', () => {
     fireEvent.click(screen.getByRole('button', { name: /Pharmacy/ }));
     await waitFor(() => expect(api.fetchFacilities).toHaveBeenLastCalledWith(expect.anything(), ['pharmacy'], 10));
     expect(screen.queryByRole('link', { name: /Call/ })).toBeNull();
+  });
+
+  it('an empty area names what is known to exist there, without a pin or directions', async () => {
+    api.fetchFacilityAreas.mockResolvedValue([{ code: 'TZ54', name: 'Kaskazini Pemba', counts: { hospital: 14 }, districts: [] }]);
+    api.fetchFacilities.mockResolvedValue({
+      ...answer([], 'area'),
+      sources: { a: { title: 'x', snapshot: '2026-10-07', license: 'ODbL' }, b: { title: 'y', snapshot: '2026-10-16', license: 'ODbL' } },
+      knownUnmapped: [{ name: 'Wete fire station', kind: 'fire', region: 'TZ54', reason: 'Described in Zanzibar House of Representatives records.', evidence: ['https://zanzibarassembly.go.tz/x.pdf'], checked: '2026-10-16' }],
+    });
+    render(<NearbyHelp lat={null} lng={null} locale="en" />);
+    fireEvent.click(screen.getByRole('button', { name: /Fire/ }));
+    const select = await screen.findByRole('combobox');
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Kaskazini Pemba' })).toBeTruthy());
+    fireEvent.change(select, { target: { value: 'TZ54' } });
+    await screen.findByText('Wete fire station');
+    expect(screen.getByText('Known to exist, not on the map yet')).toBeTruthy();
+    expect(screen.getByText(/That does not mean there is none/)).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /Directions/ })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Source' }).getAttribute('href')).toBe('https://zanzibarassembly.go.tz/x.pdf');
+    expect(screen.getByText('Map data as of 2026-10-16')).toBeTruthy();
+    expect(screen.getByRole('link', { name: /Call 114/ })).toBeTruthy();
+  });
+
+  it('a corrected record shows why it was corrected', async () => {
+    api.fetchFacilities.mockResolvedValue(answer([{ ...amana, kind: 'fire', subtype: 'station', name: 'Fire and Rescue Service', status: 'open-data', note: 'Tagged amenity=police in OpenStreetMap; the name shows a fire and rescue service.' }]));
+    render(<NearbyHelp lat={-6.816} lng={39.28} locale="en" />);
+    fireEvent.click(screen.getByRole('button', { name: /Fire/ }));
+    await screen.findByText('Fire and Rescue Service');
+    expect(screen.getByText(/the name shows a fire and rescue service/)).toBeTruthy();
+    expect(screen.getByText('Open data, unconfirmed')).toBeTruthy();
+  });
+});
+
+describe('trust rules', () => {
+  it('open data can never show as verified, even if a flag says so', () => {
+    expect(isOfficiallyVerified({ ...amana, verified: true } as never)).toBe(false);
+    expect(isOfficiallyVerified({ ...amana, verified: true, verification: 'official' } as never)).toBe(true);
+    expect(isOfficiallyVerified({ ...amana, verified: false, verification: 'official' } as never)).toBe(false);
+  });
+
+  it('directions only for a real position', () => {
+    expect(hasPosition({ lat: -6.83, lng: 39.25 })).toBe(true);
+    expect(hasPosition({ lat: NaN, lng: 39.25 })).toBe(false);
+    expect(hasPosition({ lat: 0, lng: 0 })).toBe(false);
+    expect(hasPosition({ lat: 120, lng: 39 })).toBe(false);
   });
 });

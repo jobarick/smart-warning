@@ -157,6 +157,8 @@ async function handle({ req, res, url, path }) {
       results,
       // Private services you call (no pin), from the provider's own website.
       providers: directory.providers(kinds),
+      // Known to exist but not mappable yet (area mode only): named, no pin.
+      knownUnmapped: hasPoint ? [] : directory.knownUnmapped({ region, kinds }),
     });
     return true;
   }

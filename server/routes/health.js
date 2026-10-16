@@ -27,6 +27,9 @@ const { requireAuth } = require('../guards');
 // today — the synthetic canary (.github/workflows/canary.yml) only ever
 // reads `database.ok`, and Render's own health check only looks at the HTTP
 // status.
+// How old the last database check may be before /api/ready stops trusting it.
+const READY_MAX_AGE_MS = 90_000;
+
 function health({ authenticated = false } = {}) {
   return {
     service: 'alert-backend',
@@ -93,9 +96,14 @@ async function handle({ req, res, path }) {
   // without it). This one answers 503 when the database is configured but its
   // last check failed, so a simple "is it 200?" monitor pages someone.
   if (path === '/api/ready' && req.method === 'GET') {
-    const { ok } = db.livenessStatus?.() ?? {};
-    const ready = !db.enabled() || ok === true;
-    sendJson(res, ready ? 200 : 503, { ready, database: db.enabled() ? ok ?? null : 'not configured' });
+    const { ok, at } = db.livenessStatus?.() ?? {};
+    // The check runs every 20 s (index.js). A result older than 90 s means it
+    // has stopped coming back, most likely a query hanging on a dead
+    // connection; an old "ok" must not keep reporting ready.
+    const fresh = Number.isFinite(at) && Date.now() - at < READY_MAX_AGE_MS;
+    const dbReady = ok === true && fresh;
+    const ready = !db.enabled() || dbReady;
+    sendJson(res, ready ? 200 : 503, { ready, database: db.enabled() ? (ok === true && !fresh ? 'stale' : ok ?? null) : 'not configured' });
     return true;
   }
 

@@ -15,13 +15,13 @@
 // only the full app holds), the siren, the live timeline, voice notes. The full
 // app is one link away, and opening it shows the incident from the server.
 import './sos.css';
-import { registerSW } from 'virtual:pwa-register';
+import { startServiceWorker } from '../lib/serviceWorker';
 import { sendPersonalAlert, resolvePersonalAlert } from '../lib/api';
 import { personalDelivery, needsFallback, smsHref, FALLBACK_EMERGENCY_NUMBER, type DeliveryState } from '../lib/delivery';
 import { canDial } from '../lib/emergency';
 import { loadSession } from '../lib/session';
 import { loadSettings } from '../lib/settings';
-import { checkForUpdates, holdUpdates, newVersionReady } from '../lib/updateGate';
+import { holdUpdates } from '../lib/updateGate';
 
 type Lang = 'sw' | 'en';
 type TypeId = 'security' | 'medical' | 'fire' | 'hazard';
@@ -271,7 +271,7 @@ function render() {
 
 // Installs the same service worker as the app, so opening this page once is
 // enough for it, and the app, to open again with no signal.
-registerSW({ immediate: true, onNeedReload: newVersionReady, onRegisteredSW: checkForUpdates });
+startServiceWorker();
 
 // If drawing ever throws, put the no-JavaScript links back rather than leave
 // an empty page: 112 and SMS must survive any bug in this file.

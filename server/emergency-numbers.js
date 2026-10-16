@@ -82,7 +82,10 @@ const COUNTRIES = {
       { number: '181', icon: '💧', category: 'utility', sw: { label: 'DAWASA (Maji Dar es Salaam)', description: 'Dharura za maji na majitaka, Dar es Salaam' }, en: { label: 'DAWASA (Dar es Salaam water)', description: 'Water and sewerage emergencies in Dar es Salaam' } },
       { number: '190', icon: '🏝️', category: 'disaster', sw: { label: 'Zanzibar', description: 'Huduma za maafa Zanzibar' }, en: { label: 'Zanzibar', description: 'Zanzibar disaster services' } },
       { number: '195', icon: '🚫', category: null, sw: { label: 'Kupinga Usafirishaji Haramu wa Binadamu', description: 'Toa taarifa za usafirishaji haramu wa binadamu' }, en: { label: 'Human Trafficking', description: 'Report human trafficking' } },
-      { number: '199', icon: '🏥', category: null, sw: { label: 'Magonjwa ya Mlipuko', description: 'Dharura za magonjwa ya mlipuko' }, en: { label: 'Epidemic Diseases', description: 'Epidemic and outbreak emergencies' } },
+      // Relabelled 2026-10-16: the Government portal lists 199 as "Afya", the
+      // Ministry of Health Afya Call Centre (advice, referral, outbreaks), not
+      // an epidemics-only line. Number unchanged.
+      { number: '199', icon: '🏥', category: null, sw: { label: 'Afya (Kituo cha Simu)', description: 'Ushauri wa afya, rufaa na magonjwa ya mlipuko' }, en: { label: 'Health line (Afya)', description: 'Ministry of Health call centre: health advice, referral and outbreaks' } },
       // Not in the owner's new list, but a real published number this file
       // already had — kept rather than silently dropped.
       { number: '0800110064', icon: '🆘', category: 'disaster', sw: { label: 'Maafa (Bara)', description: 'Usimamizi wa maafa Tanzania Bara' }, en: { label: 'Disaster Management (Mainland)', description: 'Mainland Tanzania disaster management' } },
@@ -359,32 +362,37 @@ function countryByCode(code) {
  * only so the client's alert-type priority sort keeps working; everything
  * else it needs (icon, bilingual label/description) is on the row itself.
  */
-// What could be checked about each Tanzanian number, and how well (2026-10-16).
+// What could be checked about each Tanzanian number, and how well.
 // Levels, weakest to strongest:
-//   unchecked     no public source looked at yet
-//   unconfirmed   looked for, no supporting public source found
-//   reported      press reports or travel/medical guides, not an authority
-//   corroborated  consistent reports from UN agencies or the operator itself
-//   official      published by the responsible Tanzanian authority (none yet)
-// No number is "official" until TCRA or the responsible agency confirms it in
-// writing (see the numbers checklist pack). This never changes a number; it
-// only says how sure we are.
+//   unchecked           no public source looked at yet
+//   unconfirmed         looked for, no supporting public source found
+//   reported            press reports or travel/medical guides, not an authority
+//   corroborated        consistent reports from UN agencies or the operator itself
+//   government-listed   listed on an official Tanzanian government website
+//                       (the Government portal or the responsible agency's own
+//                       site). Strong, but not a written confirmation.
+//   official            confirmed in writing by TCRA or the responsible agency.
+//                       None yet: see docs/NUMBERS_VERIFICATION.md.
+// This never changes a number; it only says how sure we are. Re-checked
+// 2026-10-16: the Government portal's "Namba za Dharura" list
+// (tanzania.go.tz/topics/health) names 111, 112, 113, 114, 115, 116, 199, 190.
+const GOV_PORTAL = 'https://www.tanzania.go.tz/topics/health';
 const TZ_EVIDENCE = {
-  '112': { level: 'reported', checked: '2026-10-16', note: 'GOV.UK travel advice lists 112 for police, fire and ambulance (not police only). A medical-logistics guide reports it does not connect reliably outside Dar es Salaam.', sources: ['https://www.gov.uk/foreign-travel-advice/tanzania/getting-help', 'https://trekmedics.org/database/tanzania-2/'] },
-  '114': { level: 'reported', checked: '2026-10-16', note: 'Press (Mwanza campaign) and guides give 114 for fire and rescue; reported as not yet available in every region or on every network.', sources: ['https://medicopress.media/if-you-see-an-accident-victim-in-mwanza-dont-take-photos-call-114', 'https://trekmedics.org/database/tanzania-2/'] },
-  '115': { level: 'reported', checked: '2026-10-16', note: 'Guides list 115 for ambulance; the same guide reports government ambulance coverage is limited.', sources: ['https://trekmedics.org/database/tanzania-2/'] },
-  '116': { level: 'corroborated', checked: '2026-10-16', note: 'National Child Helpline run by C-Sema with the Government: toll free, 24/7, all networks, mainland and Zanzibar (UNFPA, UN News).', sources: ['https://www.unfpa.org/news/tanzanian-helpline-reaching-thousands-risk-women-and-girls-every-day', 'https://news.un.org/en/node/1091972', 'https://www.sematanzania.org/post/improving-the-child-helpline-service-in-zanzibar'] },
-  '113': { level: 'unconfirmed', checked: '2026-10-16', note: 'No public source found confirming 113 as the TAKUKURU line. Confirm with TAKUKURU (takukuru.go.tz).', sources: [] },
-  '199': { level: 'reported', checked: '2026-10-16', note: 'Listed as the Ministry of Health call centre by secondary directories only.', sources: ['https://en.wikipedia.org/wiki/List_of_emergency_telephone_numbers'] },
-  '110': { level: 'unchecked', checked: null, note: null, sources: [] },
-  '111': { level: 'unchecked', checked: null, note: null, sources: [] },
-  '117': { level: 'unchecked', checked: null, note: null, sources: [] },
-  '119': { level: 'unchecked', checked: null, note: null, sources: [] },
-  '181': { level: 'unchecked', checked: null, note: 'Dar es Salaam only (DAWASA).', sources: [] },
-  '190': { level: 'unchecked', checked: null, note: 'Zanzibar only.', sources: [] },
-  '195': { level: 'unchecked', checked: null, note: null, sources: [] },
-  '0800110064': { level: 'unchecked', checked: null, note: 'Mainland only.', sources: [] },
-  '0800711113': { level: 'unchecked', checked: null, note: 'Which utility this reaches is not established; do not present it as a national utility line.', sources: [] },
+  '112': { level: 'government-listed', checked: '2026-10-16', note: 'Government portal: "Polisi 112". TCRA numbering FAQ gives 112 as the police emergency short code. A medical-logistics guide reports patchy connection outside Dar es Salaam.', sources: [GOV_PORTAL, 'https://www.tcra.go.tz/faq/frequent-asked-questions-on-numbering', 'https://trekmedics.org/database/tanzania-2/'] },
+  '111': { level: 'government-listed', checked: '2026-10-16', note: 'Government portal: "Kuzuia Uhalifu 111" (crime prevention). The TCRA signalling plan lists the Police call centre on 111/112.', sources: [GOV_PORTAL] },
+  '113': { level: 'government-listed', checked: '2026-10-16', note: 'Government portal: "Rushwa 113". TAKUKURU regional offices advertise 113 as free. TAKUKURU covers the Mainland; in Zanzibar 113 is advertised by ZAECA, a separate body.', sources: [GOV_PORTAL, 'https://shinyanga.go.tz/new/takukuru-yajipanga-kuongeza-uelewa-kwa-wadau-kuhusu-rushwa-na-madhara-yake-kabla-na-baada-ya-uchaguzi-wa-mwaka-2024', 'https://zaeca.go.tz/'] },
+  '114': { level: 'government-listed', checked: '2026-10-16', note: 'Government portal: "Zimamoto na Uokoaji 114". The Fire and Rescue Force site and a 2015 Parliament record say free on all networks, 24 hours, routed to the nearest station. Press reports patchy availability by region and network.', sources: [GOV_PORTAL, 'https://www.zimamoto.go.tz/', 'https://medicopress.media/if-you-see-an-accident-victim-in-mwanza-dont-take-photos-call-114'] },
+  '115': { level: 'government-listed', checked: '2026-10-16', note: 'Government portal: "Gari la Wagonjwa m-mama 115". Launched March 2024 for emergencies of pregnant women and newborns (M-mama); the Zanzibar health ministry says it is free. Not a general ambulance service everywhere.', sources: [GOV_PORTAL, 'https://www.moh.go.tz/en/news-single/dharura-zaidi-60000-zasafirishwa-kupitia-mfumo-wa-m-mama', 'https://www.mwananchi.co.tz/mw/habari/kitaifa/-namba-115-ya-simu-ya-dharura-suluhisho-vifo-vya-wajawazito-yazinduliwa-tanzania-4568530'] },
+  '116': { level: 'government-listed', checked: '2026-10-16', note: 'Government portal: "Dawati la Jinsia na Watoto 116" (gender and children desk). UN agencies describe it as the National Child Helpline run by C-Sema with the Government: toll free, 24/7, all networks, Mainland and Zanzibar.', sources: [GOV_PORTAL, 'https://www.unfpa.org/news/tanzanian-helpline-reaching-thousands-risk-women-and-girls-every-day', 'https://news.un.org/en/node/1091972'] },
+  '199': { level: 'government-listed', checked: '2026-10-16', note: 'Government portal: "Afya 199". The Ministry of Health Afya Call Centre: a toll-free, 24/7 health line (advice, symptoms, referral, outbreaks), not only epidemics.', sources: [GOV_PORTAL, 'https://www.villagereach.org/resource/enhancing-the-effectiveness-of-afya-call-center-hotline-199-complaints-and-feedback-system/'] },
+  '190': { level: 'government-listed', checked: '2026-10-16', note: 'Government portal: "Zanzibar 190". A World Bank (GFDRR) article describes 190 as a free TCRA-provided emergency number used for disaster alerts; its exact scope outside Zanzibar is not established.', sources: [GOV_PORTAL, 'https://www.gfdrr.org/en/feature-story/assessment-action-how-tanzania-strengthening-emergency-preparedness'] },
+  '119': { level: 'government-listed', checked: '2026-10-16', note: 'Drug Control and Enforcement Authority (DCEA) site: "Piga Simu Bure 119" (free).', sources: ['https://www.dcea.go.tz/'] },
+  '195': { level: 'reported', checked: '2026-10-16', note: 'The Citizen (25 May 2026): the Ministry of Home Affairs Counter Trafficking in Persons Call Centre, toll-free 195. Not found on a government site.', sources: ['https://www.thecitizen.co.tz/tanzania/news/national/tanzania-rescues-trafficking-victims-from-gulf-asia-5472380'] },
+  '110': { level: 'reported', checked: '2026-10-16', note: 'EACO harmonised short codes assign 110 to emergencies on Lake Victoria and other water bodies. A January 2026 report says the Mwanza maritime rescue centre will take toll-free 110 calls once fully operational, so it may not answer yet.', sources: ['https://www.kenyanews.go.ke/eac-eyes-safer-lake-victoria-as-mwanza-maritime-rescue-centre/', 'https://en.wikipedia.org/wiki/Telephone_numbers_in_Tanzania'] },
+  '117': { level: 'unconfirmed', checked: '2026-10-16', note: 'No official or credible source found for 117 as a health line; the Government portal lists 199 for health. Confirm with the Ministry of Health or TCRA before relying on it.', sources: [] },
+  '181': { level: 'unconfirmed', checked: '2026-10-16', note: 'Dar es Salaam only (DAWASA). No public source found for 181; confirm with DAWASA.', sources: [] },
+  '0800110064': { level: 'unconfirmed', checked: '2026-10-16', note: "Mainland only. No public source found linking this number to the Prime Minister's Office Disaster Management Department; confirm with them.", sources: [] },
+  '0800711113': { level: 'unconfirmed', checked: '2026-10-16', note: 'No public source found for this number. Which utility it reaches is not established; do not present it as a national utility line.', sources: [] },
 };
 
 function directoryFor(country) {
