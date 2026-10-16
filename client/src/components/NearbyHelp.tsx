@@ -3,7 +3,7 @@ import type { Locale } from '../types';
 import { fetchFacilities, fetchFacilityAreas, type Facility, type FacilityArea, type FacilityKind } from '../lib/api';
 import { canDial, telHref } from '../lib/emergency';
 import { directionsUrl } from '../lib/position';
-import { FACILITY_KINDS, HOTLINE_FOR, KIND_LETTER, formatDistance, placeLine } from '../lib/facilities';
+import { FACILITY_KINDS, HOTLINE_FOR, KIND_LETTER, PRIVATE_KINDS, formatDistance, placeLine } from '../lib/facilities';
 import { t, type StringKey } from '../lib/i18n';
 import { Icon } from './Icon';
 
@@ -22,6 +22,14 @@ const KIND_KEY: Record<FacilityKind, StringKey> = {
   pharmacy: 'facilities.kind.pharmacy',
   utility: 'facilities.kind.utility',
   anticorruption: 'facilities.kind.anticorruption',
+  security: 'facilities.kind.security',
+  ambulance: 'facilities.kind.ambulance',
+};
+const OPERATOR_KEY: Record<string, StringKey> = {
+  private: 'facilities.operator.private',
+  government: 'facilities.operator.government',
+  faith: 'facilities.operator.faith',
+  ngo: 'facilities.operator.ngo',
 };
 const SUBTYPE_KEY: Record<string, StringKey> = {
   hospital: 'facilities.subtype.hospital',
@@ -30,6 +38,8 @@ const SUBTYPE_KEY: Record<string, StringKey> = {
   marine: 'facilities.subtype.marine',
   border: 'facilities.subtype.border',
   health_centre: 'facilities.subtype.health_centre',
+  community: 'facilities.subtype.community',
+  company: 'facilities.subtype.company',
 };
 
 /**
@@ -80,7 +90,7 @@ export function NearbyHelp({ lat, lng, locale }: Props) {
 
   const label = useCallback((f: Facility) => {
     const name = f.name || t(locale, 'facilities.unnamed', { kind: t(locale, KIND_KEY[f.kind]) });
-    const sub = SUBTYPE_KEY[f.subtype] && f.subtype !== f.kind ? ` (${t(locale, SUBTYPE_KEY[f.subtype])})` : '';
+    const sub = SUBTYPE_KEY[f.subtype] && f.subtype !== f.kind && f.subtype !== 'company' ? ` (${t(locale, SUBTYPE_KEY[f.subtype])})` : '';
     return `${name}${sub}`;
   }, [locale]);
 
@@ -113,6 +123,8 @@ export function NearbyHelp({ lat, lng, locale }: Props) {
               </button>
             ))}
           </div>
+
+          {PRIVATE_KINDS.has(kind) && <p className="pocket-foot fac-private">{t(locale, 'facilities.privateNote')}</p>}
 
           {!hasLocation && (
             <div className="fac-area">
@@ -166,7 +178,12 @@ export function NearbyHelp({ lat, lng, locale }: Props) {
                       {f.distanceM != null ? `${formatDistance(f.distanceM)} · ` : ''}
                       {placeLine(f)}
                     </small>
-                    <span className="fac-tag">{t(locale, f.verified ? 'nearby.verified' : 'facilities.openData')}</span>
+                    <span className="fac-tags">
+                      {f.operator && OPERATOR_KEY[f.operator] && (
+                        <span className={`fac-tag fac-op fac-op-${f.operator}`}>{t(locale, OPERATOR_KEY[f.operator])}</span>
+                      )}
+                      <span className="fac-tag">{t(locale, f.verified ? 'nearby.verified' : 'facilities.openData')}</span>
+                    </span>
                   </span>
                   <a className="fac-go" href={directionsUrl(f.lat, f.lng, f.distanceM != null && f.distanceM <= 1500 ? 'walking' : 'driving')} target="_blank" rel="noopener noreferrer">
                     <Icon name="navigation" /> {t(locale, 'facilities.directions')}

@@ -31,6 +31,18 @@ const DUPLICATE_RADIUS_M = 60;
 /** Which facility kind an OSM feature is, or null when it is not one we keep. */
 function classify(p) {
   const amenity = p.amenity || null;
+  const office = p.office || null;
+  const emergency = p.emergency || null;
+  const nameAll = `${p.name || ''} ${p.name_en || ''}`;
+  if (office === 'security' || office === 'guard') {
+    // Community police offices are tagged office=security in Dar; they are
+    // public police, not a company.
+    if (/polic|polisi/i.test(nameAll)) return { kind: 'police', subtype: 'community' };
+    return { kind: 'security', subtype: 'company' };
+  }
+  if (emergency === 'ambulance_station' || amenity === 'ambulance_station' || p.healthcare === 'ambulance') {
+    return { kind: 'ambulance', subtype: 'station' };
+  }
   const healthcare = String(p.healthcare || '');
   const name = `${p.name || ''} ${p.name_en || ''}`;
   if (amenity === 'police') {
@@ -72,6 +84,17 @@ function pointOf(geometry) {
   return { lng: lng / ring.length, lat: lat / ring.length, approx: false };
 }
 
+/** Who runs it, from operator:type, or null when it is not tagged or mixed. */
+function operatorOf(p) {
+  const v = String(p.operator_type || p['operator:type'] || '').trim().toLowerCase();
+  if (!v || v.includes(';')) return null;
+  if (v === 'private') return 'private';
+  if (['public', 'government', 'local_authority'].includes(v)) return 'government';
+  if (v === 'religious') return 'faith';
+  if (v.startsWith('ngo') || v === 'community') return 'ngo';
+  return null;
+}
+
 function validPoint(pt) {
   return pt && Number.isFinite(pt.lat) && Number.isFinite(pt.lng)
     && pt.lat >= BBOX.minLat && pt.lat <= BBOX.maxLat && pt.lng >= BBOX.minLng && pt.lng <= BBOX.maxLng;
@@ -108,6 +131,78 @@ function readDbf(buf) {
   return rows;
 }
 
+/** Minimal ESRI shapefile reader for polygon records (shape type 5). */
+function readShpPolygons(buf) {
+  const shapes = [];
+  let off = 100;
+  while (off + 8 <= buf.length) {
+    const contentLen = buf.readInt32BE(off + 4) * 2;
+    const c = off + 8;
+    const type = buf.readInt32LE(c);
+    if (type === 5) {
+      const bbox = [buf.readDoubleLE(c + 4), buf.readDoubleLE(c + 12), buf.readDoubleLE(c + 20), buf.readDoubleLE(c + 28)];
+      const numParts = buf.readInt32LE(c + 36);
+      const numPoints = buf.readInt32LE(c + 40);
+      const parts = [];
+      for (let i = 0; i < numParts; i++) parts.push(buf.readInt32LE(c + 44 + i * 4));
+      const pts = c + 44 + numParts * 4;
+      const rings = [];
+      for (let i = 0; i < numParts; i++) {
+        const end = i + 1 < numParts ? parts[i + 1] : numPoints;
+        const ring = [];
+        for (let k = parts[i]; k < end; k++) ring.push([buf.readDoubleLE(pts + k * 16), buf.readDoubleLE(pts + k * 16 + 8)]);
+        rings.push(ring);
+      }
+      shapes.push({ bbox, rings });
+    } else {
+      shapes.push(null);
+    }
+    off = c + contentLen;
+  }
+  return shapes;
+}
+
+/** Even-odd test across every ring, so holes are respected. */
+function inRings(lng, lat, rings) {
+  let inside = false;
+  for (const ring of rings) {
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i]; const [xj, yj] = ring[j];
+      if ((yi > lat) !== (yj > lat) && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/** The district (and its region) a point lies in, or null outside Tanzania. */
+function locate(lng, lat, districtShapes) {
+  for (const d of districtShapes) {
+    const [x0, y0, x1, y1] = d.bbox;
+    if (lng < x0 || lng > x1 || lat < y0 || lat > y1) continue;
+    if (inRings(lng, lat, d.rings)) return d;
+  }
+  return null;
+}
+
+/** Live OSM elements (Overpass JSON) as GeoJSON-like features with admin codes. */
+function overpassToFeatures(elements, districtShapes, sourceKey) {
+  const out = [];
+  let outside = 0;
+  for (const e of elements) {
+    const lat = e.lat ?? e.center?.lat;
+    const lng = e.lon ?? e.center?.lon;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    const d = locate(lng, lat, districtShapes);
+    if (!d) { outside++; continue; } // Kenya, Rwanda, Mozambique... caught by the box
+    out.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [lng, lat] },
+      properties: { ...e.tags, id: `${e.type}/${e.id}`, adm0_pcode: 'TZA', adm1_pcode: d.region, adm2_pcode: d.district, adm3_name: null, _source: sourceKey },
+    });
+  }
+  return { features: out, outside };
+}
+
 /**
  * Turns raw GeoJSON features into directory records. Pure: exported for tests.
  * @returns {{ records: object[], rejected: Record<string, number>, duplicates: number }}
@@ -136,7 +231,9 @@ function buildRecords(features, { sourceKey }) {
       district: p.adm2_pcode || null,
       locality: (p.adm3_name || p.addr_city || '').trim() || null,
       address: (p.addr_full || [p.addr_housenumber, p.addr_street].filter(Boolean).join(' ') || '').trim() || null,
-      source: sourceKey,
+      // A security company is private unless it is tagged as government.
+      operator: cls.kind === 'security' ? (operatorOf(p) === 'government' ? null : 'private') : operatorOf(p),
+      source: p._source || sourceKey,
     });
   }
   // Same kind, same normalised name, within DUPLICATE_RADIUS_M: one place
@@ -181,10 +278,23 @@ function main() {
   const health = JSON.parse(fs.readFileSync(args.health, 'utf8')).features;
   const poi = JSON.parse(fs.readFileSync(args.poi, 'utf8')).features;
   const SOURCE = 'hotosm-osm-2026-10-07';
-  // Health layer first, so its richer health tags win for a shared object.
-  const { records, rejected, duplicates } = buildRecords([...health, ...poi], { sourceKey: SOURCE });
-
+  const EXTRA_SOURCE = 'osm-overpass-2026-10-16';
   const adm = readDbf(fs.readFileSync(args.adm2));
+  // Private security companies and ambulance stations are not in the HOT
+  // exports (they keep no office=* or emergency=* tags), so they come from a
+  // live OpenStreetMap query saved to a file (see DIRECTORY_SOURCES.md),
+  // clipped to Tanzania with the OCHA district polygons.
+  let extra = [];
+  let outsideTanzania = 0;
+  if (args.extra) {
+    const shp = readShpPolygons(fs.readFileSync(args.adm2.replace(/\.dbf$/i, '.shp')));
+    const districtShapes = shp.map((sh, i) => sh && { ...sh, district: adm[i].ADM2_PCODE, region: adm[i].ADM1_PCODE }).filter(Boolean);
+    const conv = overpassToFeatures(JSON.parse(fs.readFileSync(args.extra, 'utf8')).elements || [], districtShapes, EXTRA_SOURCE);
+    extra = conv.features; outsideTanzania = conv.outside;
+  }
+  // Health layer first, so its richer health tags win for a shared object.
+  const { records, rejected, duplicates } = buildRecords([...health, ...poi, ...extra], { sourceKey: SOURCE });
+
   const regions = {}; const districts = {};
   for (const r of adm) {
     regions[r.ADM1_PCODE] = r.ADM1_EN;
@@ -214,6 +324,15 @@ function main() {
         verification: 'unverified',
         notice: 'From OpenStreetMap. Official status and current operating availability not confirmed.',
       },
+      [EXTRA_SOURCE]: {
+        title: 'OpenStreetMap, live query for office=security|guard and ambulance/rescue stations in Tanzania',
+        snapshot: '2026-10-16',
+        urls: ['https://overpass-api.de/api/interpreter'],
+        license: 'ODbL-1.0',
+        attribution: '© OpenStreetMap contributors',
+        verification: 'unverified',
+        notice: 'From OpenStreetMap. Official status and current operating availability not confirmed.',
+      },
       'ocha-cod-ab-2018-10-19': {
         title: 'United Republic of Tanzania subnational administrative boundaries (names and codes only)',
         published: '2018-10-19',
@@ -224,16 +343,18 @@ function main() {
     },
     regions,
     districts,
-    fields: ['id', 'kind', 'subtype', 'name', 'lat', 'lng', 'region', 'district', 'locality', 'address', 'source'],
-    records: records.map((r) => [r.id, r.kind, r.subtype, r.name, r.lat, r.lng, r.region, r.district, r.locality, r.address, r.source]),
+    fields: ['id', 'kind', 'subtype', 'name', 'lat', 'lng', 'region', 'district', 'locality', 'address', 'source', 'operator'],
+    records: records.map((r) => [r.id, r.kind, r.subtype, r.name, r.lat, r.lng, r.region, r.district, r.locality, r.address, r.source, r.operator]),
   };
   fs.mkdirSync(args.out, { recursive: true });
   const file = path.join(args.out, 'tz-facilities.json');
   fs.writeFileSync(file, JSON.stringify(out));
   const counts = {};
   for (const r of records) counts[`${r.kind}/${r.subtype}`] = (counts[`${r.kind}/${r.subtype}`] || 0) + 1;
-  console.log(JSON.stringify({ file, bytes: fs.statSync(file).size, records: records.length, counts, rejected, duplicates, unknownRegion, unknownDistrict, regions: Object.keys(regions).length, districts: Object.keys(districts).length, ms: Date.now() - t0 }, null, 1));
+  const operators = {};
+  for (const r of records) operators[r.operator || 'not tagged'] = (operators[r.operator || 'not tagged'] || 0) + 1;
+  console.log(JSON.stringify({ file, bytes: fs.statSync(file).size, records: records.length, counts, operators, extraInTanzania: extra.length, outsideTanzania, rejected, duplicates, unknownRegion, unknownDistrict, regions: Object.keys(regions).length, districts: Object.keys(districts).length, ms: Date.now() - t0 }, null, 1));
 }
 
 if (require.main === module) main();
-module.exports = { classify, pointOf, validPoint, buildRecords, readDbf, normName, BBOX };
+module.exports = { classify, operatorOf, pointOf, validPoint, buildRecords, readDbf, readShpPolygons, inRings, locate, overpassToFeatures, normName, BBOX };

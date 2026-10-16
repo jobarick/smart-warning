@@ -312,3 +312,8 @@
 }
 .fac-map { height: 320px; border-radius: 12px; overflow: hidden; border: 1px solid var(--panel-border); }
 .fac-attr { margin: 2px 0 0; font-size: 0.68rem; color: var(--faint, var(--muted)); }
+
+.fac-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.fac-op-private { border-color: #64748b; color: var(--text); }
+.fac-op-government { border-color: #3b82f6; color: var(--text); }
+.fac-private { border-left: 3px solid #64748b; padding-left: 8px; }

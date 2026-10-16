@@ -166,7 +166,7 @@ export interface Place {
  */
 // --- Nationwide facilities directory (server/directory.js) ---
 
-export type FacilityKind = 'hospital' | 'police' | 'fire' | 'pharmacy' | 'anticorruption' | 'utility';
+export type FacilityKind = 'hospital' | 'police' | 'fire' | 'pharmacy' | 'anticorruption' | 'utility' | 'security' | 'ambulance';
 
 export interface Facility {
   id: string;
@@ -179,6 +179,8 @@ export interface Facility {
   district: string | null;
   locality: string | null;
   address: string | null;
+  /** Who runs it, when the source says: private, government, faith or ngo. */
+  operator?: 'private' | 'government' | 'faith' | 'ngo' | null;
   /** Always false for open data: nobody has confirmed it. */
   verified: boolean;
   /** Only in "nearby" answers. */

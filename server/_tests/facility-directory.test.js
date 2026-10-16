@@ -68,6 +68,32 @@ test('nothing is invented: no phone, no hours, and the source is kept', () => {
   assert.ok(!('opening_hours' in records[0]));
 });
 
+test('private security companies are kept and labelled private; community police stay police', () => {
+  assert.deepStrictEqual(build.classify({ office: 'security', name: 'Greenland Security Services Ltd' }), { kind: 'security', subtype: 'company' });
+  assert.deepStrictEqual(build.classify({ office: 'security', name: 'Community Police Office' }), { kind: 'police', subtype: 'community' });
+  assert.strictEqual(build.classify({ emergency: 'ambulance_station' }).kind, 'ambulance');
+  const { records } = build.buildRecords([
+    feature({ id: 'node/30', office: 'security', name: 'G1 security group' }, pt(39.27, -6.81)),
+    feature({ id: 'node/31', amenity: 'hospital', name: 'Private Hosp', operator_type: 'private' }, pt(39.20, -6.70)),
+    feature({ id: 'node/32', amenity: 'hospital', name: 'Gov Hosp', operator_type: 'public' }, pt(39.21, -6.70)),
+    feature({ id: 'node/33', amenity: 'clinic', name: 'Mixed', operator_type: 'private;government' }, pt(39.22, -6.70)),
+  ], { sourceKey: 't' });
+  const by = Object.fromEntries(records.map((r) => [r.id, r.operator]));
+  assert.deepStrictEqual(by, { 'node/30': 'private', 'node/31': 'private', 'node/32': 'government', 'node/33': null });
+});
+
+test('live OSM places outside Tanzania are cut out by the district polygons', () => {
+  const square = { bbox: [39, -7, 40, -6], rings: [[[39, -7], [40, -7], [40, -6], [39, -6], [39, -7]]], region: 'TZ07', district: 'TZ0701' };
+  const { features, outside } = build.overpassToFeatures([
+    { type: 'node', id: 1, lat: -6.5, lon: 39.5, tags: { office: 'security', name: 'In' } },
+    { type: 'node', id: 2, lat: -1.29, lon: 36.82, tags: { office: 'security', name: 'Nairobi' } },
+    { type: 'way', id: 3, center: { lat: -6.2, lon: 39.9 }, tags: { office: 'security' } },
+  ], [square], 'live');
+  assert.strictEqual(outside, 1);
+  assert.deepStrictEqual(features.map((f) => f.properties.id), ['node/1', 'way/3']);
+  assert.strictEqual(features[0].properties.adm2_pcode, 'TZ0701');
+});
+
 // --- the index over the real bundled data -----------------------------------
 
 before(() => { directory.load(); });
@@ -100,6 +126,13 @@ test('results are the requested kinds only, nearest first, with true distances',
   for (let i = 1; i < out.length; i++) assert.ok(out[i].distanceM >= out[i - 1].distanceM);
   const geo = require('../geo');
   assert.ok(Math.abs(geo.haversine(-6.816, 39.28, out[0].lat, out[0].lng) - out[0].distanceM) <= 1);
+});
+
+test('private security companies are in the directory, marked private', () => {
+  const dar = directory.areas().find((r) => r.name === 'Dar-es-salaam');
+  const out = directory.search({ region: dar.code, kinds: ['security'] });
+  assert.ok(out.length > 0);
+  assert.ok(out.every((r) => r.kind === 'security' && r.operator === 'private'));
 });
 
 test('every result says it is unverified open data', () => {

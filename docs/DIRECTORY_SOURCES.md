@@ -17,6 +17,17 @@ status and current operating availability not confirmed." A record is only
 | Points of Interest of Tanzania (OpenStreetMap export) | HOT via HDX | OSM snapshot 2026-10-07, published 2026-10-08 | ODbL 1.0 | `hotosm_tza_points_of_interest_osm_geojson.zip`, 10,123,678 B, `f95a251d…46c7bf` from <https://production-raw-data-api.s3.amazonaws.com/ISO3/TZA/points_of_interest/hotosm_tza_points_of_interest_osm_geojson.zip> |
 | United Republic of Tanzania subnational administrative boundaries, admin 2 | Tanzania National Bureau of Statistics; UN OCHA ROSA, <https://data.humdata.org/dataset/cod-ab-tza> | 2018-10-19 | CC BY-IGO | `tza_admbnda_adm2_20181019.zip`, 5,523,250 B, `cf354d74…7ca7799`. Only the attribute table (region and district names and codes) is used. |
 
+| Private security companies, community police offices, ambulance and rescue stations (live OpenStreetMap query) | OpenStreetMap via the Overpass API, <https://overpass-api.de/api/interpreter> | Queried 2026-10-16 02:55 UTC | ODbL 1.0 | 38 elements in the Tanzania box; 25 inside Tanzania after clipping with the OCHA district polygons, 13 outside (Kenya, Rwanda, Burundi, Mozambique) dropped. |
+
+The live query (saved to a file and passed to the build with `--extra`):
+```
+[out:json][timeout:120][bbox:-11.8,29.3,-0.95,40.6];
+(nwr["office"~"^(security|guard)$"];nwr["emergency"="ambulance_station"];
+ nwr["amenity"="ambulance_station"];nwr["healthcare"="ambulance"];
+ nwr["emergency"~"^(rescue_station|lifeboat_station|water_rescue)$"];);
+out center tags;
+```
+
 Full checksums:
 ```
 07b74b643b31f324e3fa13eaa57d5fbf6b348e96e56ee044416c4c8d11ed09e9  hotosm_tza_health_facilities_osm_geojson.zip
@@ -51,13 +62,28 @@ The source archives are **not** committed (16 MB); only the derived file is.
 5. Merges the same OSM object appearing in both layers, and the same kind with
    the same normalised name within 60 m (a node plus a building outline).
    Unnamed places are never merged.
-6. Keeps the exporter's region and district codes (all 7,084 matched the
-   OCHA list) and adds the OCHA names.
-7. Adds nothing: no phone numbers, opening hours or names are invented. The
-   exports contain no phone numbers at all.
+6. Keeps the exporter's region and district codes (all matched the OCHA
+   list) and adds the OCHA names. Live-query places get their region and
+   district from the OCHA district polygons (point in polygon); anything
+   outside every district is outside Tanzania and is dropped.
+7. **Private and public operators.** Where OSM says who runs a place
+   (`operator:type`), it is kept as private, government, faith-based or
+   NGO/community; mixed or untagged values stay blank rather than guessed.
+   Security companies (`office=security|guard`) are private unless tagged
+   government; ones named police/polisi (community police offices) are filed
+   under police.
+8. Adds nothing: no phone numbers, opening hours or names are invented. The
+   exports contain no phone numbers; a few live-query places have an OSM
+   phone tag, which is not shown because it is unconfirmed.
 
-Result (2026-10-16): 7,084 records. 173 duplicates merged, 0 coordinates
-rejected (the exporter had already clipped to Tanzania).
+Result (2026-10-16): 7,105 records, including 13 private security companies
+and 8 community police offices. Operators: 472 private, 437 government, 56
+NGO/community, 11 faith-based, 6,129 not stated. 176 duplicates merged.
+
+**Private ambulance services:** none are mapped in OpenStreetMap inside
+Tanzania (the two ambulance points the query found are across the border).
+Private ambulance and security providers should be added through the verified
+directory once their details are confirmed with them.
 
 ## Updating
 
@@ -69,6 +95,7 @@ rejected (the exporter had already clipped to Tanzania).
      --health <dir>/health_facilities.geojson \
      --poi <dir>/points_of_interest.geojson \
      --adm2 <dir>/tza_admbnda_adm2_20181019.dbf \
+     --extra <dir>/private.json \
      --out server/data
    node server/tools/directory-build/coverage.js > docs/DIRECTORY_COVERAGE.md
    ```

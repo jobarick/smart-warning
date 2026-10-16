@@ -7,8 +7,8 @@
 const directory = require('../../directory');
 
 const ZANZIBAR = new Set(['Kaskazini Pemba', 'Kusini Pemba', 'Kaskazini Unguja', 'Kusini Unguja', 'Mjini Magharibi']);
-const KINDS = ['hospital', 'police', 'fire', 'pharmacy', 'utility', 'anticorruption'];
-const LABEL = { hospital: 'Health', police: 'Police', fire: 'Fire', pharmacy: 'Pharmacy', utility: 'TANESCO', anticorruption: 'TAKUKURU' };
+const KINDS = ['hospital', 'police', 'fire', 'security', 'pharmacy', 'utility', 'anticorruption'];
+const LABEL = { hospital: 'Health', police: 'Police', fire: 'Fire', security: 'Private security', pharmacy: 'Pharmacy', utility: 'TANESCO', anticorruption: 'TAKUKURU' };
 
 const st = directory.load();
 const regions = directory.areas();
@@ -43,8 +43,9 @@ lines.push('');
 lines.push(`- Regions with **no mapped health facility**: ${gapsHealth.join(', ') || 'none'}`);
 lines.push(`- Regions with **no mapped police**: ${gapsPolice.join(', ') || 'none'}`);
 lines.push(`- Regions with **no mapped fire station** (${gapsFire.length} of ${regions.length}): ${gapsFire.join(', ') || 'none'}`);
-lines.push('- Categories with **no records at all**: disaster management offices, coast guard / lake rescue stations (beyond 15 marine police), ambulance bases, child protection / social welfare offices, human trafficking response offices, water utility offices. The HOT exports keep only `amenity`, `shop`, `tourism` and `man_made` tags, so `office=*`, `emergency=*` and phone numbers are not in the source at all.');
+lines.push('- Categories with **no records at all**: disaster management offices, coast guard / lake rescue stations (beyond 15 marine police), ambulance bases (public or private), child protection / social welfare offices, human trafficking response offices, water utility offices. The HOT exports keep only `amenity`, `shop`, `tourism` and `man_made` tags, so `office=*`, `emergency=*` and phone numbers are not in the source at all.');
 lines.push('- Only 1 TAKUKURU office and 7 TANESCO offices are tagged in a way this import can recognise.');
+lines.push('- Private sector: only 13 private security companies (Dar es Salaam and Mwanza) and no private ambulance services are mapped in OpenStreetMap. 472 health facilities are tagged private, 437 government; most (about 86%) do not say who runs them.');
 const allDistricts = regions.flatMap((r) => r.districts.map((d) => ({ ...d, region: r.name })));
 const emptyDistricts = allDistricts.filter((d) => !n(d.counts, 'hospital') && !n(d.counts, 'police'));
 lines.push(`- Districts with neither a mapped health facility nor police (${emptyDistricts.length} of ${allDistricts.length}): ${emptyDistricts.map((d) => `${d.name} (${d.region})`).join(', ') || 'none'}`);

@@ -43,6 +43,7 @@ function load(file = DEFAULT_FILE) {
         id: row[idx.id], kind: row[idx.kind], subtype: row[idx.subtype], name: row[idx.name],
         lat: row[idx.lat], lng: row[idx.lng], region: row[idx.region], district: row[idx.district],
         locality: row[idx.locality], address: row[idx.address], source: row[idx.source],
+        operator: idx.operator != null ? row[idx.operator] || null : null,
       };
       if (!Number.isFinite(r.lat) || !Number.isFinite(r.lng) || !r.kind || !r.id) continue;
       records.push(r);
@@ -77,7 +78,7 @@ function decorate(r, extra = {}) {
     id: r.id, name: r.name, kind: r.kind, subtype: r.subtype, lat: r.lat, lng: r.lng,
     region: s.regions[r.region] || null, regionCode: r.region || null,
     district: s.districts[r.district]?.[0] || null, districtCode: r.district || null,
-    locality: r.locality || null, address: r.address || null,
+    locality: r.locality || null, address: r.address || null, operator: r.operator || null,
     verified: false, verification: src.verification || 'unverified', source: r.source,
     ...extra,
   };

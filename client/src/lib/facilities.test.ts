@@ -8,6 +8,7 @@ describe('facility display rules', () => {
     expect(HOTLINE_FOR.hospital).toBe('115');
     expect(HOTLINE_FOR.pharmacy).toBeUndefined();
     expect(HOTLINE_FOR.utility).toBeUndefined();
+    expect(HOTLINE_FOR.security).toBe('112');
   });
 
   it('puts health, police and fire first', () => {

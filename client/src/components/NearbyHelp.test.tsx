@@ -48,6 +48,16 @@ describe('NearbyHelp', () => {
     expect(api.fetchFacilities).toHaveBeenLastCalledWith({ region: 'TZ07', district: null }, ['police'], 30);
   });
 
+  it('private companies carry a Private tag and their own notice, with 112 still first', async () => {
+    api.fetchFacilities.mockResolvedValue(answer([{ ...amana, id: 'node/9', kind: 'security', subtype: 'company', name: 'G1 security group', operator: 'private' }]));
+    render(<NearbyHelp lat={-6.816} lng={39.28} locale="en" />);
+    fireEvent.click(screen.getByRole('button', { name: /Private security/ }));
+    await screen.findByText('G1 security group');
+    expect(screen.getByText('Private')).toBeTruthy();
+    expect(screen.getByText(/Private companies\. Services, hours and charges vary/)).toBeTruthy();
+    expect(screen.getByRole('link', { name: /Call 112/ })).toBeTruthy();
+  });
+
   it('says so plainly when nothing is mapped nearby', async () => {
     api.fetchFacilities.mockResolvedValue(answer([]));
     render(<NearbyHelp lat={-9.6} lng={38.9} locale="en" />);

@@ -13,10 +13,16 @@ export const HOTLINE_FOR: Partial<Record<FacilityKind, string>> = {
   fire: '114',
   hospital: '115',
   anticorruption: '113',
+  ambulance: '115',
+  // A private guard company is not a substitute for the police number.
+  security: '112',
 };
 
+/** Kinds that are private businesses: their own notice, no national number. */
+export const PRIVATE_KINDS = new Set<FacilityKind>(['security']);
+
 /** Order of the category chips: the ones a person in danger needs first. */
-export const FACILITY_KINDS: FacilityKind[] = ['hospital', 'police', 'fire', 'pharmacy', 'utility', 'anticorruption'];
+export const FACILITY_KINDS: FacilityKind[] = ['hospital', 'police', 'fire', 'security', 'pharmacy', 'utility', 'anticorruption'];
 
 export const KIND_LETTER: Record<FacilityKind, { letter: string; color: string }> = {
   hospital: { letter: 'H', color: '#ef4444' },
@@ -25,6 +31,8 @@ export const KIND_LETTER: Record<FacilityKind, { letter: string; color: string }
   pharmacy: { letter: '+', color: '#10b981' },
   utility: { letter: 'U', color: '#eab308' },
   anticorruption: { letter: 'T', color: '#a855f7' },
+  security: { letter: 'S', color: '#64748b' },
+  ambulance: { letter: 'A', color: '#dc2626' },
 };
 
 export function formatDistance(m: number): string {
