@@ -44,6 +44,8 @@ function load(file = DEFAULT_FILE) {
         lat: row[idx.lat], lng: row[idx.lng], region: row[idx.region], district: row[idx.district],
         locality: row[idx.locality], address: row[idx.address], source: row[idx.source],
         operator: idx.operator != null ? row[idx.operator] || null : null,
+        status: idx.status != null ? row[idx.status] || 'open-data' : 'open-data',
+        note: idx.note != null ? row[idx.note] || null : null,
       };
       if (!Number.isFinite(r.lat) || !Number.isFinite(r.lng) || !r.kind || !r.id) continue;
       records.push(r);
@@ -55,10 +57,11 @@ function load(file = DEFAULT_FILE) {
     }
     state = {
       records, byKind, regions: raw.regions || {}, districts: raw.districts || {}, sources: raw.sources || {},
+      providers: Array.isArray(raw.providers) ? raw.providers : [],
       generated: raw.generated || null, loadMs: Number(process.hrtime.bigint() - t0) / 1e6, error: null,
     };
   } catch (e) {
-    state = { records: [], byKind: new Map(), regions: {}, districts: {}, sources: {}, generated: null, loadMs: 0, error: e.message };
+    state = { records: [], byKind: new Map(), regions: {}, districts: {}, sources: {}, providers: [], generated: null, loadMs: 0, error: e.message };
     console.error(`[directory] could not load ${file}: ${e.message}`);
   }
   return status();
@@ -80,6 +83,8 @@ function decorate(r, extra = {}) {
     district: s.districts[r.district]?.[0] || null, districtCode: r.district || null,
     locality: r.locality || null, address: r.address || null, operator: r.operator || null,
     verified: false, verification: src.verification || 'unverified', source: r.source,
+    // open-data, or needs-review with the reason in note.
+    status: r.status || 'open-data', note: r.note || null,
     ...extra,
   };
 }
@@ -168,12 +173,20 @@ function areas() {
   return regions;
 }
 
+/** Private services to call (no map pin), with their source, for the given kinds. */
+function providers(kinds) {
+  const list = ensure().providers;
+  const set = kinds && kinds.length ? new Set(kinds) : null;
+  return list.filter((p) => !set || set.has(p.kind));
+}
+
 function sources() {
   return ensure().sources;
 }
 
 function kinds() {
-  return [...ensure().byKind.keys()];
+  const s = ensure();
+  return [...new Set([...s.byKind.keys(), ...s.providers.map((p) => p.kind)])];
 }
 
-module.exports = { load, status, nearby, search, areas, sources, kinds, CELL_DEG, MAX_LIMIT };
+module.exports = { load, status, nearby, search, areas, sources, kinds, providers, CELL_DEG, MAX_LIMIT };

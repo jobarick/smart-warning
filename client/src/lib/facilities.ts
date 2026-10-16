@@ -19,10 +19,10 @@ export const HOTLINE_FOR: Partial<Record<FacilityKind, string>> = {
 };
 
 /** Kinds that are private businesses: their own notice, no national number. */
-export const PRIVATE_KINDS = new Set<FacilityKind>(['security']);
+export const PRIVATE_KINDS = new Set<FacilityKind>(['security', 'ambulance']);
 
 /** Order of the category chips: the ones a person in danger needs first. */
-export const FACILITY_KINDS: FacilityKind[] = ['hospital', 'police', 'fire', 'security', 'pharmacy', 'utility', 'anticorruption'];
+export const FACILITY_KINDS: FacilityKind[] = ['hospital', 'police', 'fire', 'ambulance', 'security', 'pharmacy', 'utility', 'anticorruption'];
 
 export const KIND_LETTER: Record<FacilityKind, { letter: string; color: string }> = {
   hospital: { letter: 'H', color: '#ef4444' },

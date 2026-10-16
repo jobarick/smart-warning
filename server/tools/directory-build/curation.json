@@ -1,0 +1,93 @@
+{
+  "about": "Hand-reviewed corrections and additions to the facilities directory. Every entry says what was decided, why, on what evidence, and when. Applied by build.js after the OpenStreetMap import. Statuses: open-data (default), needs-review (shown with a warning), excluded (kept here, never served), provider-published (from the provider's own public website), official (published by the responsible authority; none yet).",
+  "overrides": {
+    "node/4507890589": {
+      "status": "excluded",
+      "reason": "Tagged amenity=police in OpenStreetMap but named \"Omurusimbi market\" (name and name:en). A market, not a police station.",
+      "evidence": ["https://www.openstreetmap.org/node/4507890589"],
+      "checked": "2026-10-16"
+    },
+    "node/5411577921": {
+      "status": "excluded",
+      "reason": "Tagged both amenity=police and shop=stationery, named \"ZEENATH STATIONARY SHOP\". A shop, not a police station.",
+      "evidence": ["https://www.openstreetmap.org/node/5411577921"],
+      "checked": "2026-10-16"
+    },
+    "node/8957496769": {
+      "status": "needs-review",
+      "reason": "Tagged amenity=police, named \"UNGA LTD\", added 2021 and never edited. \"Unga Limited\" is an Arusha ward named after the former mill, so this may be a real police post labelled with the area name, or a mistake. No public source found confirming a police post here.",
+      "evidence": ["https://www.openstreetmap.org/node/8957496769", "https://en.wikipedia.org/wiki/Unga_Limited"],
+      "checked": "2026-10-16"
+    },
+    "node/5437168723": {
+      "status": "needs-review",
+      "reason": "Tagged amenity=fire_station, named \"Rock City Moil\", operator \"Rock City\", check_date 2023-05-17. Possibly a private fire point at a commercial site; not the Fire and Rescue Force. Unconfirmed.",
+      "evidence": ["https://www.openstreetmap.org/node/5437168723"],
+      "checked": "2026-10-16"
+    },
+    "node/10983835167": {
+      "status": "excluded",
+      "reason": "\"MICHEWENI CORTAGE HOSPITAL\", 50 m from \"HOSPITALI YA WILAYA MICHEWENI\" mapped by the same contributor the same day. Most likely the district hospital's earlier name (cottage hospital); kept out to avoid two pins for one hospital.",
+      "evidence": ["https://www.openstreetmap.org/node/10983835167", "https://www.openstreetmap.org/node/10983835165"],
+      "checked": "2026-10-16"
+    }
+  },
+  "notIncluded": [
+    { "id": "node/4847972628", "name": "Morogoro Fire Station", "reason": "amenity=fuel with diesel and petrol tags; a filling station named after the area, despite a description mentioning fire services. Not added as a fire station.", "checked": "2026-10-16" },
+    { "id": "node/9275336422", "name": "Fire Station Filling Station", "reason": "amenity=fuel on United Nations Road, Dar es Salaam. A filling station.", "checked": "2026-10-16" },
+    { "id": "node/10857786364", "name": "Chuo cha Zimamoto", "reason": "amenity=school: the fire service academy, not a response station.", "checked": "2026-10-16" },
+    { "id": "node/10741842407", "name": "mazimbu hospital", "reason": "disused:amenity=fixme with fixme:type=hospital: marked disused by the mapper. Not added until confirmed operating.", "checked": "2026-10-16" }
+  ],
+  "knownUnmapped": [
+    {
+      "name": "Wete District Hospital",
+      "kind": "hospital",
+      "region": "TZ54",
+      "reason": "Exists (staff housing project reported December 2024; financed by the Abu Dhabi Fund for Development), but no reliable map location found. Not pinned.",
+      "evidence": ["https://ippmedia.co.tz/the-guardian/news/local-news/read/zbar-launches-housing-project-for-wete-district-hospital-staff-2024-12-26-123823", "https://www.adfd.ae/en/what-we-do/projects/wete-hospital"],
+      "checked": "2026-10-16"
+    }
+  ],
+  "providers": [
+    {
+      "id": "provider/eplus-tanzania",
+      "name": "E-Plus Tanzania",
+      "kind": "ambulance",
+      "service": "Ground ambulance and emergency medical response (BLS and ACLS)",
+      "hours": "24 hours (provider's claim)",
+      "coverage": "Office in Dar es Salaam; areas served not stated",
+      "address": "House No. 18, Chato Street, Dar es Salaam",
+      "phones": [
+        { "number": "080001199", "display": "0800 01199", "label": "Emergency (provider's website)" }
+      ],
+      "operator": "private",
+      "status": "provider-published",
+      "source": { "url": "https://eplus.co.tz/", "org": "E-Plus Tanzania (provider's own website)", "checked": "2026-10-16" },
+      "limits": "A private, paid service. Not confirmed by Smart Warning or any authority; availability, charges and response times are the provider's."
+    },
+    {
+      "id": "provider/arusha-medivac",
+      "name": "Arusha Medivac",
+      "kind": "ambulance",
+      "service": "Air ambulance from Arusha Airport; airport to hospital transfers",
+      "hours": "24/7 response (provider's claim); night landing only at specific airstrips",
+      "coverage": "Northern National Parks, all of Tanzania and Nairobi (provider's claim)",
+      "address": "Arusha Airport",
+      "phones": [
+        { "number": "+255767996996", "display": "+255 767 996 996", "label": "24 hour emergency (provider's website)" },
+        { "number": "+255683996996", "display": "+255 683 996 996", "label": "24 hour emergency (provider's website)" }
+      ],
+      "operator": "private",
+      "status": "provider-published",
+      "source": { "url": "https://arushamedivac.org/", "org": "Arusha Medivac (provider's own website)", "checked": "2026-10-16" },
+      "limits": "A private, paid air service, weather and airstrip dependent. Not confirmed by Smart Warning or any authority."
+    }
+  ],
+  "candidatesNotConfirmed": [
+    { "name": "City Ambulance Tanzania", "kind": "ambulance", "note": "Social media pages give Plot 486, Haile Selassie Rd, Masaki, Dar es Salaam and 24/7 rescue; no reachable website. Not added.", "evidence": ["https://www.facebook.com/CityAmbulanceTanzania/", "https://x.com/cityambulancetz"] },
+    { "name": "Knight Support (T) Ltd", "kind": "ambulance / security", "note": "Named in a 2023-era guide as a ground ambulance provider in Dar es Salaam and Arusha and as radio alarm response; website unreachable. Not added.", "evidence": ["https://trekmedics.org/database/tanzania-2/", "https://www.devex.com/organizations/knight-support-178766"] },
+    { "name": "Divine Heart", "kind": "ambulance", "note": "Website describes ground ambulances in Dar es Salaam and partner air ambulances, but publishes no emergency line (general contact only). Not added as an emergency contact.", "evidence": ["https://www.divineheart.or.tz/"] },
+    { "name": "G4S Secure Solutions (Tanzania)", "kind": "security", "note": "Branch lists differ between its own pages (Dar es Salaam, Arusha, Mbeya, Mwanza, and Dodoma or Mtwara); pages could not be read automatically to confirm. Not added.", "evidence": ["https://www.g4s.com/en-tz"] },
+    { "name": "Telesecurity Company Limited", "kind": "security", "note": "A job listing names branches in more than ten regions; its website refused automated access. Not added.", "evidence": ["https://mabumbe.com/jobs/marketing-officers-at-telesecurity-company-limited-january-2022/"] }
+  ]
+}

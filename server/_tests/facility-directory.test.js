@@ -242,6 +242,13 @@ test('API: facilities near a point, by area, and the area list', async (t) => {
   assert.strictEqual(body.mode, 'area');
   assert.ok(body.results.length > 0 && body.results.every((r) => r.region === 'Kigoma' && r.distanceM === undefined));
 
+  // Private ambulance providers ride along with the ambulance kind, location or not.
+  res = await fetch(`${BASE}/api/emergency/facilities?lat=-6.8&lng=39.28&kind=ambulance`);
+  body = await res.json();
+  assert.ok(body.providers.length >= 2 && body.providers.every((p) => p.status === 'provider-published' && p.source.url));
+  res = await fetch(`${BASE}/api/emergency/facilities?lat=-6.8&lng=39.28&kind=police`);
+  assert.deepStrictEqual((await res.json()).providers, []);
+
   // The existing nearby endpoint now answers from the bundled directory first.
   res = await fetch(`${BASE}/api/emergency/nearby?kind=police&lat=-6.816&lng=39.28`);
   body = await res.json();
@@ -249,3 +256,82 @@ test('API: facilities near a point, by area, and the area list', async (t) => {
 });
 
 after(() => {});
+
+// --- phase 2: corrections, review status, providers ------------------------------
+
+const curation = require('../tools/directory-build/curation.json');
+
+test('unresolved "fixme" places count only when the mapper named an emergency kind, and are marked for review', () => {
+  const h = build.classify({ amenity: 'fixme', 'fixme:type': 'hospi', name: 'KONDE HOSPITAL' });
+  assert.strictEqual(h.kind, 'hospital');
+  assert.match(h.review, /unresolved type/);
+  assert.strictEqual(build.classify({ amenity: 'fixme', 'fixme:type': 'health care', name: 'KITUO CHA AFYA MICHEWENI' }).subtype, 'health_centre');
+  assert.strictEqual(build.classify({ amenity: 'fixme', 'fixme:type': 'pharmarcy' }).kind, 'pharmacy');
+  assert.strictEqual(build.classify({ amenity: 'fixme', 'fixme:type': 'saloon' }), null);
+  assert.strictEqual(build.classify({ 'disused:amenity': 'fixme', 'fixme:type': 'hospital' }), null, 'disused is not added');
+});
+
+test('fire services and security companies mis-tagged as police are corrected, with the reason kept', () => {
+  const f = build.classify({ amenity: 'police', name: 'Tanzania Fire and Rescue Force' });
+  assert.strictEqual(f.kind, 'fire');
+  assert.match(f.correction, /amenity=police/);
+  assert.strictEqual(build.classify({ amenity: 'police', name: 'Jeshi la Zimamoto' }).kind, 'fire');
+  assert.strictEqual(build.classify({ amenity: 'police', name: 'Liganga Security Company' }).kind, 'security');
+  assert.strictEqual(build.classify({ government: 'public_service', name: 'Kituo Cha Zimamoto na Uokoaji' }).kind, 'fire');
+  assert.strictEqual(build.classify({ amenity: 'fuel', name: 'Morogoro Fire Station' }), null, 'a filling station is not a fire station');
+});
+
+test('curation excludes, flags and reclassifies, and never silently drops', () => {
+  const recs = [
+    { id: 'a', kind: 'police', subtype: 'station', status: 'open-data', note: null },
+    { id: 'b', kind: 'police', subtype: 'station', status: 'open-data', note: null },
+    { id: 'c', kind: 'fire', subtype: 'station', status: 'open-data', note: null },
+    { id: 'd', kind: 'hospital', subtype: 'clinic', status: 'open-data', note: null },
+  ];
+  const { records, excluded } = build.applyCuration(recs, { overrides: {
+    a: { status: 'excluded', reason: 'a market' },
+    b: { status: 'needs-review', reason: 'unclear' },
+    c: { kind: 'security', subtype: 'company', reason: 'a company' },
+  } });
+  assert.deepStrictEqual(excluded.map((r) => [r.id, r.note]), [['a', 'a market']]);
+  assert.deepStrictEqual(records.map((r) => [r.id, r.kind, r.status]), [['b', 'police', 'needs-review'], ['c', 'security', 'open-data'], ['d', 'hospital', 'open-data']]);
+});
+
+test('every curation decision carries a reason, evidence and a date; nothing is marked official', () => {
+  for (const [id, o] of Object.entries(curation.overrides)) {
+    assert.ok(o.reason && o.checked && Array.isArray(o.evidence) && o.evidence.length, `${id} lacks reason/evidence/date`);
+    assert.notStrictEqual(o.status, 'official');
+  }
+  for (const p of curation.providers) {
+    assert.strictEqual(p.status, 'provider-published');
+    assert.ok(/^https:\/\//.test(p.source.url) && p.source.checked, `${p.id} lacks a source`);
+    assert.ok(p.phones.length && p.limits, `${p.id} lacks phones or limits`);
+  }
+  for (const k of curation.knownUnmapped) assert.ok(k.evidence.length && k.reason);
+});
+
+test('excluded records are not served; flagged ones say why', () => {
+  const all = directory.search({ q: 'omurusimbi', limit: 50 });
+  assert.strictEqual(all.length, 0, 'the market tagged as police must not be served');
+  const unga = directory.search({ q: 'unga ltd', limit: 5 }).find((r) => r.name === 'UNGA LTD');
+  assert.ok(unga && unga.status === 'needs-review' && /ward/.test(unga.note));
+  const flagged = directory.nearby({ lat: -4.98, lng: 39.83, kinds: ['hospital'], radiusM: 30000, limit: 50 });
+  assert.ok(flagged.length > 0, 'North Pemba now has health facilities');
+  assert.ok(flagged.every((r) => r.status !== 'needs-review' || r.note), 'every flagged record explains itself');
+});
+
+test('North Pemba is no longer empty, and every record there is marked for review', () => {
+  const np = directory.areas().find((r) => r.name === 'Kaskazini Pemba');
+  assert.ok((np.counts.hospital || 0) >= 10);
+  const recs = directory.search({ region: np.code, limit: 50 });
+  assert.ok(recs.every((r) => r.status === 'needs-review'));
+});
+
+test('private ambulance providers come with their source and limits, only for the ambulance kind', async () => {
+  assert.ok(directory.providers(['ambulance']).length >= 2);
+  assert.strictEqual(directory.providers(['police']).length, 0);
+  for (const p of directory.providers(['ambulance'])) {
+    assert.strictEqual(p.operator, 'private');
+    assert.match(p.limits, /Not confirmed/);
+  }
+});

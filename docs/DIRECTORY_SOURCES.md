@@ -123,3 +123,60 @@ by `/api/emergency/directory` as `evidence`. No number was changed.
 
 Official confirmation is still pending from TCRA and each agency (see the
 numbers checklist pack in `smart-warning-packs/`).
+
+## Phase 2 (2026-10-16): review, corrections and additions
+
+**Hand review file:** `server/tools/directory-build/curation.json`. Every
+decision (exclude, flag for review, reclassify, add a provider, note a known
+but unmapped facility, or note a candidate that could not be confirmed) has a
+reason, evidence links and a date. `build.js` applies it after the import;
+excluded records are never served but stay listed in the coverage report.
+
+**Additional live OpenStreetMap queries** (Overpass, passed with `--extra`
+as a comma-separated list):
+
+1. Nationwide places with an unresolved type and untagged fire services:
+   ```
+   [out:json][timeout:150][bbox:-11.8,29.3,-0.95,40.6];
+   (nwr["amenity"="fixme"];nwr["fixme:type"];
+    nwr["name"~"zimamoto|fire and rescue|fire & rescue|fire station|fire brigade",i]["amenity"!="fire_station"];);
+   out center tags;
+   ```
+   312 elements (osm base 2026-10-16T03:56Z); most are not emergency-related
+   or are outside Tanzania. Kept: places whose `fixme:type` names a hospital,
+   clinic, dispensary, health centre, pharmacy or police station, all marked
+   **needs review**.
+2. North Pemba detail (`bbox:-5.25,39.55,-4.85,39.95`, osm base
+   2026-10-16T03:55Z): 21 elements, including 15 health facilities a single
+   contributor mapped in June 2023 with `amenity=fixme`.
+
+**Status model** (served as `status` on each record): `open-data` (default),
+`needs-review` (with the reason in `note`), and, outside the record list,
+`provider-published` for the private services in `providers` (from the
+provider's own website). No record is `official` yet. The separate verified
+table (`directory_entries`) remains the place for confirmed entries.
+
+**Corrections applied** (reason kept in each record's `note`):
+- amenity=police named as a fire service → fire: Tanzania Fire and Rescue
+  Force (Temeke), Jeshi la Zimamoto (Katavi), Fire and Rescue Service
+  (Mindu, Morogoro)
+- government office named Kituo cha Zimamoto na Uokoaji (Upanga) → fire
+- amenity=police named as a security company → private security: Liganga
+  Security Company
+- Excluded: Omurusimbi market and ZEENATH STATIONARY SHOP (tagged police),
+  Micheweni Cottage Hospital (duplicate of the district hospital)
+- Needs review: UNGA LTD (Arusha police?), Rock City Moil (Mwanza fire?)
+
+**Private providers** (from their own websites, checked 2026-10-16):
+E-Plus Tanzania (<https://eplus.co.tz/>) and Arusha Medivac
+(<https://arushamedivac.org/>). Candidates not confirmed are listed in the
+coverage report with the reason.
+
+Rebuild:
+```
+node server/tools/directory-build/build.js \
+  --health <dir>/health_facilities.geojson --poi <dir>/points_of_interest.geojson \
+  --adm2 <dir>/tza_admbnda_adm2_20181019.dbf \
+  --extra <dir>/private.json,<dir>/fixme.json,<dir>/npemba.json --out server/data
+node server/tools/directory-build/coverage.js > docs/DIRECTORY_COVERAGE.md
+```
