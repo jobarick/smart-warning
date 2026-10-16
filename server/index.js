@@ -112,6 +112,10 @@ async function start() {
     console.error('[fcm] init failed, continuing without native push:', err.message);
   }
   sms.init(); // never throws; only reports whether SMS is on and why not
+  {
+    const d = require('./directory').load(); // never throws
+    console.log(d.error ? `[directory] not loaded: ${d.error}` : `[directory] ${d.records} facilities loaded in ${d.loadMs} ms (data ${d.generated})`);
+  }
   try {
     await mailer.init();
   } catch (err) {

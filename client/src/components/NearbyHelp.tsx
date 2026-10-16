@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import type { Locale } from '../types';
-import { fetchNearby, type Place, type PlaceKind } from '../lib/api';
-import { canDial, isDialable, telHref } from '../lib/emergency';
-import { t, PLACE_KIND_KEY } from '../lib/i18n';
+import { fetchFacilities, fetchFacilityAreas, type Facility, type FacilityArea, type FacilityKind } from '../lib/api';
+import { canDial, telHref } from '../lib/emergency';
+import { directionsUrl } from '../lib/position';
+import { FACILITY_KINDS, HOTLINE_FOR, KIND_LETTER, formatDistance, placeLine } from '../lib/facilities';
+import { t, type StringKey } from '../lib/i18n';
 import { Icon } from './Icon';
-import type { IconName } from './Icon';
+
+const FacilitiesMap = lazy(() => import('./FacilitiesMap').then((m) => ({ default: m.FacilitiesMap })));
 
 interface Props {
   lat: number | null;
@@ -12,133 +15,169 @@ interface Props {
   locale: Locale;
 }
 
-const KINDS: PlaceKind[] = ['hospital', 'police', 'fire', 'shelter', 'pharmacy'];
-const KIND_ICON: Record<PlaceKind, IconName> = {
-  hospital: 'medical',
-  police: 'lock',
-  fire: 'flame',
-  shelter: 'home',
-  pharmacy: 'flask',
+const KIND_KEY: Record<FacilityKind, StringKey> = {
+  hospital: 'facilities.kind.hospital',
+  police: 'facilities.kind.police',
+  fire: 'facilities.kind.fire',
+  pharmacy: 'facilities.kind.pharmacy',
+  utility: 'facilities.kind.utility',
+  anticorruption: 'facilities.kind.anticorruption',
+};
+const SUBTYPE_KEY: Record<string, StringKey> = {
+  hospital: 'facilities.subtype.hospital',
+  clinic: 'facilities.subtype.clinic',
+  dispensary: 'facilities.subtype.dispensary',
+  marine: 'facilities.subtype.marine',
+  border: 'facilities.subtype.border',
+  health_centre: 'facilities.subtype.health_centre',
 };
 
-function formatDistance(m: number): string {
-  return m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`;
-}
-
 /**
- * A general "what's around me" browser, distinct from EmergencyCallPocket's
- * verified national emergency numbers — this shows specific, named, located
- * facilities from OpenStreetMap, which is a live public dataset, not a
- * verified directory (see places.js's own header comment). The disclaimer is
- * not boilerplate: showing an unverified pin with the same confidence as a
- * country's official ambulance number would be exactly the "blurred source"
- * the platform audit's trust principle exists to prevent.
+ * Emergency services near you, nationwide: hospitals, clinics, police, fire
+ * and more from the bundled directory (server/directory.js, OpenStreetMap
+ * data). Every result is labelled as unconfirmed open data and comes with
+ * the national number to call, because a pin on a map is not help arriving.
  *
- * The backend endpoint this calls (server/places.js `nearby()`) already
- * existed and was already proven — this is the general browsing surface for
- * it that was missing, not new backend work.
+ * With location off, the person picks a region (and optionally a district)
+ * instead: nobody should be locked out of this because a permission was
+ * refused.
  */
 export function NearbyHelp({ lat, lng, locale }: Props) {
-  const [open, setOpen] = useState(false);
-  const [kind, setKind] = useState<PlaceKind>('hospital');
-  const [places, setPlaces] = useState<Place[]>([]);
+  const [open, setOpen] = useState(true);
+  const [kind, setKind] = useState<FacilityKind>('hospital');
+  const [view, setView] = useState<'list' | 'map'>('list');
+  const [results, setResults] = useState<Facility[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const [areas, setAreas] = useState<FacilityArea[] | null>(null);
+  const [region, setRegion] = useState('');
+  const [district, setDistrict] = useState('');
   const dialable = canDial();
   const hasLocation = lat !== null && lng !== null;
+  const rLat = lat === null ? null : Math.round(lat * 500) / 500;
+  const rLng = lng === null ? null : Math.round(lng * 500) / 500;
+
+  // Region list, only needed when there is no location.
+  useEffect(() => {
+    if (!open || hasLocation || areas) return;
+    fetchFacilityAreas().then(setAreas).catch(() => setAreas([]));
+  }, [open, hasLocation, areas]);
 
   useEffect(() => {
-    if (!open || !hasLocation) return;
+    if (!open) return;
+    if (!hasLocation && !region) { setResults([]); return; }
     let cancelled = false;
     setLoading(true);
-    setError(null);
-    fetchNearby(kind, lat!, lng!)
-      .then((result) => { if (!cancelled) setPlaces(result); })
-      .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : 'failed'); })
+    setError(false);
+    const query = hasLocation ? { lat: rLat!, lng: rLng! } : { region, district: district || null };
+    fetchFacilities(query, [kind], hasLocation ? 10 : 30)
+      .then((a) => { if (!cancelled) { setResults(a.results); setNotice(a.notice); } })
+      .catch(() => { if (!cancelled) setError(true); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-    // Rounded so normal GPS jitter while standing still does not re-fetch —
-    // the server-side cache keys on the same ~1km rounding for the same reason.
-  }, [open, kind, hasLocation, lat === null ? null : Math.round(lat * 100), lng === null ? null : Math.round(lng * 100)]);
+  }, [open, kind, hasLocation, rLat, rLng, region, district]);
+
+  const label = useCallback((f: Facility) => {
+    const name = f.name || t(locale, 'facilities.unnamed', { kind: t(locale, KIND_KEY[f.kind]) });
+    const sub = SUBTYPE_KEY[f.subtype] && f.subtype !== f.kind ? ` (${t(locale, SUBTYPE_KEY[f.subtype])})` : '';
+    return `${name}${sub}`;
+  }, [locale]);
+
+  const hotline = HOTLINE_FOR[kind];
+  const regionAreas = areas?.find((a) => a.code === region);
 
   return (
-    <section className="pocket">
+    <section className="pocket fac">
       <button className="pocket-head" onClick={() => setOpen((o) => !o)} aria-expanded={open} type="button">
         <span className="pocket-title">
-          <Icon name="map-pin" /> {t(locale, 'nearby.heading')}
+          <Icon name="map-pin" /> {t(locale, 'facilities.heading')}
         </span>
         <span className="pocket-chevron" aria-hidden="true">{open ? '−' : '+'}</span>
       </button>
 
-      {open && !hasLocation && <p className="pocket-foot">{t(locale, 'nearby.needLocation')}</p>}
-
-      {open && hasLocation && (
+      {open && (
         <>
-          <div className="sos-types" role="group" aria-label={t(locale, 'nearby.heading')}>
-            {KINDS.map((k) => (
-              <button
-                key={k}
-                type="button"
-                className={`sos-type ${kind === k ? 'active' : ''}`}
-                aria-pressed={kind === k}
-                onClick={() => setKind(k)}
-              >
-                <Icon name={KIND_ICON[k]} className="sos-type-ic" />
-                <span>{t(locale, PLACE_KIND_KEY[k])}</span>
+          {/* The number first: it works with or without a location. */}
+          {hotline && (
+            dialable
+              ? <a className="fac-hotline" href={telHref(hotline)}><Icon name="phone" /> {t(locale, 'facilities.call', { n: hotline })}</a>
+              : <p className="fac-hotline fac-hotline-static"><Icon name="phone" /> {t(locale, 'facilities.dial', { n: hotline })}</p>
+          )}
+
+          <div className="fac-kinds" role="group" aria-label={t(locale, 'facilities.heading')}>
+            {FACILITY_KINDS.map((k) => (
+              <button key={k} type="button" className={`fac-kind${kind === k ? ' on' : ''}`} aria-pressed={kind === k} onClick={() => setKind(k)}>
+                <span className="fac-glyph" style={{ background: KIND_LETTER[k].color }} aria-hidden="true">{KIND_LETTER[k].letter}</span>
+                {t(locale, KIND_KEY[k])}
               </button>
             ))}
           </div>
 
+          {!hasLocation && (
+            <div className="fac-area">
+              <p className="pocket-foot">{t(locale, 'facilities.noLocation')}</p>
+              <label>
+                <span>{t(locale, 'facilities.region')}</span>
+                <select value={region} onChange={(e) => { setRegion(e.target.value); setDistrict(''); }}>
+                  <option value="">{t(locale, 'facilities.chooseRegion')}</option>
+                  {(areas || []).map((a) => <option key={a.code} value={a.code}>{a.name}</option>)}
+                </select>
+              </label>
+              {regionAreas && (
+                <label>
+                  <span>{t(locale, 'facilities.district')}</span>
+                  <select value={district} onChange={(e) => setDistrict(e.target.value)}>
+                    <option value="">{t(locale, 'facilities.allDistricts')}</option>
+                    {regionAreas.districts.map((d) => <option key={d.code} value={d.code}>{d.name}</option>)}
+                  </select>
+                </label>
+              )}
+            </div>
+          )}
+
+          {(hasLocation || region) && (
+            <div className="fac-view" role="group" aria-label={t(locale, 'facilities.view')}>
+              <button type="button" className={view === 'list' ? 'on' : ''} aria-pressed={view === 'list'} onClick={() => setView('list')}>{t(locale, 'facilities.list')}</button>
+              <button type="button" className={view === 'map' ? 'on' : ''} aria-pressed={view === 'map'} onClick={() => setView('map')}>{t(locale, 'facilities.map')}</button>
+            </div>
+          )}
+
           {loading && <p className="pocket-foot">{t(locale, 'nearby.loading')}</p>}
           {!loading && error && <p className="pocket-foot" role="alert">{t(locale, 'nearby.error')}</p>}
-          {!loading && !error && places.length === 0 && <p className="pocket-foot">{t(locale, 'nearby.empty')}</p>}
+          {!loading && !error && (hasLocation || region) && results.length === 0 && (
+            <p className="pocket-foot">{t(locale, hasLocation ? 'facilities.emptyNear' : 'facilities.emptyArea')}</p>
+          )}
 
-          {!loading && !error && places.length > 0 && (
-            <ul className="pocket-list">
-              {places.map((p) => (
-                <li key={`${p.lat},${p.lng},${p.name}`} className="pocket-svc">
-                  <span className="pocket-svc-label">
-                    <Icon name={KIND_ICON[p.kind]} />
-                    <span>
-                      <b>{p.name}</b>
-                      <br />
-                      <small>
-                        {formatDistance(p.distanceM)}
-                        {p.address ? ` · ${p.address}` : ''}
-                      </small>
-                    </span>
+          {!loading && !error && results.length > 0 && view === 'map' && (
+            <Suspense fallback={<div className="fac-map" aria-hidden="true" />}>
+              <FacilitiesMap facilities={results} self={hasLocation ? { lat: lat!, lng: lng! } : null} label={label} />
+            </Suspense>
+          )}
+
+          {!loading && !error && results.length > 0 && view === 'list' && (
+            <ul className="fac-list">
+              {results.map((f) => (
+                <li key={f.id} className="fac-item">
+                  <span className="fac-glyph" style={{ background: KIND_LETTER[f.kind].color }} aria-hidden="true">{KIND_LETTER[f.kind].letter}</span>
+                  <span className="fac-main">
+                    <b>{label(f)}</b>
+                    <small>
+                      {f.distanceM != null ? `${formatDistance(f.distanceM)} · ` : ''}
+                      {placeLine(f)}
+                    </small>
+                    <span className="fac-tag">{t(locale, f.verified ? 'nearby.verified' : 'facilities.openData')}</span>
                   </span>
-                  {/* Most results come from OSM (see places.js) and repeat
-                      that trust signal at the point of decision, the way
-                      SafeRoutePanel's "Site plan" / "Nearest public" tags
-                      already do, rather than leaving it to the one disclaimer
-                      line at the bottom. A `verified` entry (server/db.js's
-                      directory_entries — someone actually confirmed it) gets
-                      its own distinct tag instead. */}
-                  <span className={`route-tag ${p.verified ? 'route-tag-verified' : 'route-tag-public'}`}>
-                    {t(locale, p.verified ? 'nearby.verified' : 'nearby.communitySourced')}
-                  </span>
-                  <span className="pocket-numbers">
-                    {p.phone && dialable && isDialable(p.phone) && (
-                      <a className="pocket-call" href={telHref(p.phone)}>
-                        <Icon name="phone" /> {p.phone}
-                      </a>
-                    )}
-                    <a
-                      className="pocket-num"
-                      href={`https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lng}#map=17/${p.lat}/${p.lng}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <Icon name="navigation" /> {t(locale, 'nearby.openInMaps')}
-                    </a>
-                  </span>
+                  <a className="fac-go" href={directionsUrl(f.lat, f.lng, f.distanceM != null && f.distanceM <= 1500 ? 'walking' : 'driving')} target="_blank" rel="noopener noreferrer">
+                    <Icon name="navigation" /> {t(locale, 'facilities.directions')}
+                  </a>
                 </li>
               ))}
             </ul>
           )}
 
-          <p className="pocket-foot">{t(locale, 'nearby.disclaimer')}</p>
+          <p className="pocket-foot">{notice ? t(locale, 'facilities.notice') : t(locale, 'nearby.disclaimer')}</p>
+          <p className="fac-attr">© OpenStreetMap contributors (ODbL) · NBS / UN OCHA</p>
         </>
       )}
     </section>

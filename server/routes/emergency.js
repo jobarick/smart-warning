@@ -4,6 +4,7 @@ const db = require('../db');
 const mailer = require('../mailer');
 const emergencyNumbers = require('../emergency-numbers');
 const places = require('../places');
+const directory = require('../directory');
 const routing = require('../routing');
 const { sendJson, readJson } = require('../http');
 const { orgContext, allowPlaces, allowEmergencyReport } = require('../guards');
@@ -118,6 +119,51 @@ async function handle({ req, res, url, path }) {
 
     console.log(`[!] emergency report received: ${category}${audio ? ' (+voice note)' : ''}`);
     sendJson(res, 201, { ok: true });
+    return true;
+  }
+
+  // --- Nationwide facilities directory (directory.js) ---
+  //
+  // Public: someone in danger may have no account. Two ways in:
+  //   ?lat&lng[&kind=hospital,police][&radius][&limit]  nearest first
+  //   ?region=TZ07[&district=TZ0701][&q=name][&kind=…]   browse without GPS
+  // Every result is open data, unverified; the answer says so and carries
+  // the source and licence. Positions sent here are not logged or stored.
+  if (path === '/api/emergency/facilities' && req.method === 'GET') {
+    if (!allowPlaces(req)) { sendJson(res, 429, { error: 'too many lookups, please wait a moment' }); return true; }
+    const kinds = (url.searchParams.get('kind') || '').split(',').map((k) => k.trim()).filter(Boolean).slice(0, 8);
+    const known = new Set(directory.kinds());
+    if (kinds.some((k) => !known.has(k))) { sendJson(res, 400, { error: `unknown kind; use one of ${[...known].join(', ')}` }); return true; }
+    const lat = Number(url.searchParams.get('lat'));
+    const lng = Number(url.searchParams.get('lng'));
+    const region = (url.searchParams.get('region') || '').slice(0, 12) || null;
+    const district = (url.searchParams.get('district') || '').slice(0, 12) || null;
+    const q = (url.searchParams.get('q') || '').trim().slice(0, 60) || null;
+    const limit = url.searchParams.get('limit');
+    const hasPoint = url.searchParams.has('lat') && url.searchParams.has('lng') && Number.isFinite(lat) && Number.isFinite(lng);
+    if (!hasPoint && !region && !district && !q) {
+      sendJson(res, 400, { error: 'give lat and lng, or a region, district or name to search' });
+      return true;
+    }
+    const results = hasPoint
+      ? directory.nearby({ lat, lng, kinds, radiusM: Number(url.searchParams.get('radius')) || 25000, limit })
+      : directory.search({ region, district, kinds, q, limit });
+    const sources = directory.sources();
+    sendJson(res, 200, {
+      mode: hasPoint ? 'nearby' : 'area',
+      notice: 'From OpenStreetMap. Official status and current operating availability not confirmed.',
+      attribution: '© OpenStreetMap contributors (ODbL); areas: Tanzania NBS / UN OCHA (CC BY-IGO)',
+      sources: Object.fromEntries(Object.entries(sources).map(([k, v]) => [k, { title: v.title, snapshot: v.snapshot || v.published, license: v.license }])),
+      results,
+    });
+    return true;
+  }
+
+  // Regions and districts with per-kind counts, gaps included, for the
+  // "search without location" pickers and the coverage report.
+  if (path === '/api/emergency/facilities/areas' && req.method === 'GET') {
+    if (!allowPlaces(req)) { sendJson(res, 429, { error: 'too many lookups, please wait a moment' }); return true; }
+    sendJson(res, 200, { status: directory.status(), regions: directory.areas() });
     return true;
   }
 

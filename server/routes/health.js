@@ -8,6 +8,7 @@ const push = require('../push');
 const fcm = require('../fcm');
 const mailer = require('../mailer');
 const sms = require('../sms');
+const directory = require('../directory');
 const routing = require('../routing');
 const payments = require('../payments');
 const staticFiles = require('../static');
@@ -57,6 +58,7 @@ function health({ authenticated = false } = {}) {
       mailQueue: mailer.queueSnapshot?.() ?? null,
       // Provider name and on/off only, never a credential or a number.
       sms: sms.status(),
+      directory: directory.status(),
       // Reported so "is the ETA a real road route or a straight line?" is
       // answerable without reading logs.
       routing: routing.status(),

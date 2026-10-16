@@ -20,6 +20,9 @@ before(() => {
   process.env.OVERPASS_TIMEOUT_MS = '400';
   process.env.NOMINATIM_HEDGE_MS = '60';
   stub('db.js', { listDirectoryNearby: async () => [] });
+  // These tests cover the live lookup path; the bundled nationwide
+  // directory (directory.js) would otherwise answer first.
+  stub('directory.js', { nearby: () => [] });
   places = require('../places');
   global.fetch = async (url, opts) => {
     const host = new URL(url).host;

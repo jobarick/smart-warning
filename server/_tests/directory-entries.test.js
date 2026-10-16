@@ -20,6 +20,9 @@ before(() => {
   });
   // Fresh module each run of this file — the real Overpass fetch is stubbed
   // per-test below via global.fetch, never actually hitting the network.
+  // These tests cover the live lookup path; the bundled nationwide
+  // directory (directory.js) would otherwise answer first.
+  stub('directory.js', { nearby: () => [] });
   places = require('../places');
 });
 
