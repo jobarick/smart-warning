@@ -37,7 +37,10 @@ interface Cached {
 // ~100km. Fine enough that crossing a border re-fetches, coarse enough that
 // ordinary movement doesn't.
 function posKey(lat: number | null, lng: number | null): string {
-  if (lat == null || lng == null) return 'unknown';
+  // Names the country shown without a position. Before 2026-10-16 this was
+  // plain 'unknown' and held the international fallback; a new key makes
+  // those week-long cache entries miss instead of hiding Tanzania's list.
+  if (lat == null || lng == null) return `unknown:${DEFAULT_COUNTRY}`;
   return `${lat.toFixed(0)},${lng.toFixed(0)}`;
 }
 
@@ -89,7 +92,7 @@ export async function resolveDirectory(
     // No position (location refused or unavailable): Tanzania's own numbers,
     // the audience this app is built for, rather than the international
     // fallback (112/911). A known position still follows the device abroad.
-    const directory = key === 'unknown' ? await fetchDirectory(null, null, DEFAULT_COUNTRY) : await fetchDirectory(lat, lng);
+    const directory = lat == null || lng == null ? await fetchDirectory(null, null, DEFAULT_COUNTRY) : await fetchDirectory(lat, lng);
     if (directory?.services?.length) {
       writeCache({ at: Date.now(), key, directory });
       return { directory, stale: false };

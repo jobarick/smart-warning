@@ -26,6 +26,15 @@ describe('resolveDirectory', () => {
     expect(api.fetchDirectory).toHaveBeenCalledWith(-1.29, 36.82);
   });
 
+  it('an old "unknown" cache entry holding the international list is not trusted', async () => {
+    const intl = { country: { code: null, name: 'International', dial: '' }, services: [{ id: 'police', label: 'Police', numbers: ['112', '911'] }] };
+    localStorage.setItem('sw-emergency-directory-v1', JSON.stringify({ at: Date.now() - 10 * 3600e3, key: 'unknown', directory: intl }));
+    api.fetchDirectory.mockResolvedValue(tz);
+    const { directory } = await resolveDirectory(null, null);
+    expect(api.fetchDirectory).toHaveBeenCalledWith(null, null, DEFAULT_COUNTRY);
+    expect(directory.country.code).toBe('TZ');
+  });
+
   it('offline with nothing cached: the bundled last resort, never empty', async () => {
     api.fetchDirectory.mockRejectedValue(new Error('offline'));
     const { directory, stale } = await resolveDirectory(null, null);
