@@ -359,6 +359,34 @@ function countryByCode(code) {
  * only so the client's alert-type priority sort keeps working; everything
  * else it needs (icon, bilingual label/description) is on the row itself.
  */
+// What could be checked about each Tanzanian number, and how well (2026-10-16).
+// Levels, weakest to strongest:
+//   unchecked     no public source looked at yet
+//   unconfirmed   looked for, no supporting public source found
+//   reported      press reports or travel/medical guides, not an authority
+//   corroborated  consistent reports from UN agencies or the operator itself
+//   official      published by the responsible Tanzanian authority (none yet)
+// No number is "official" until TCRA or the responsible agency confirms it in
+// writing (see the numbers checklist pack). This never changes a number; it
+// only says how sure we are.
+const TZ_EVIDENCE = {
+  '112': { level: 'reported', checked: '2026-10-16', note: 'GOV.UK travel advice lists 112 for police, fire and ambulance (not police only). A medical-logistics guide reports it does not connect reliably outside Dar es Salaam.', sources: ['https://www.gov.uk/foreign-travel-advice/tanzania/getting-help', 'https://trekmedics.org/database/tanzania-2/'] },
+  '114': { level: 'reported', checked: '2026-10-16', note: 'Press (Mwanza campaign) and guides give 114 for fire and rescue; reported as not yet available in every region or on every network.', sources: ['https://medicopress.media/if-you-see-an-accident-victim-in-mwanza-dont-take-photos-call-114', 'https://trekmedics.org/database/tanzania-2/'] },
+  '115': { level: 'reported', checked: '2026-10-16', note: 'Guides list 115 for ambulance; the same guide reports government ambulance coverage is limited.', sources: ['https://trekmedics.org/database/tanzania-2/'] },
+  '116': { level: 'corroborated', checked: '2026-10-16', note: 'National Child Helpline run by C-Sema with the Government: toll free, 24/7, all networks, mainland and Zanzibar (UNFPA, UN News).', sources: ['https://www.unfpa.org/news/tanzanian-helpline-reaching-thousands-risk-women-and-girls-every-day', 'https://news.un.org/en/node/1091972', 'https://www.sematanzania.org/post/improving-the-child-helpline-service-in-zanzibar'] },
+  '113': { level: 'unconfirmed', checked: '2026-10-16', note: 'No public source found confirming 113 as the TAKUKURU line. Confirm with TAKUKURU (takukuru.go.tz).', sources: [] },
+  '199': { level: 'reported', checked: '2026-10-16', note: 'Listed as the Ministry of Health call centre by secondary directories only.', sources: ['https://en.wikipedia.org/wiki/List_of_emergency_telephone_numbers'] },
+  '110': { level: 'unchecked', checked: null, note: null, sources: [] },
+  '111': { level: 'unchecked', checked: null, note: null, sources: [] },
+  '117': { level: 'unchecked', checked: null, note: null, sources: [] },
+  '119': { level: 'unchecked', checked: null, note: null, sources: [] },
+  '181': { level: 'unchecked', checked: null, note: 'Dar es Salaam only (DAWASA).', sources: [] },
+  '190': { level: 'unchecked', checked: null, note: 'Zanzibar only.', sources: [] },
+  '195': { level: 'unchecked', checked: null, note: null, sources: [] },
+  '0800110064': { level: 'unchecked', checked: null, note: 'Mainland only.', sources: [] },
+  '0800711113': { level: 'unchecked', checked: null, note: 'Which utility this reaches is not established; do not present it as a national utility line.', sources: [] },
+};
+
 function directoryFor(country) {
   if (country.richServices) {
     const services = country.richServices.map((s) => ({
@@ -370,6 +398,7 @@ function directoryFor(country) {
       description: s.en.description,
       labelSw: s.sw.label,
       descriptionSw: s.sw.description,
+      evidence: country.code === 'TZ' ? (TZ_EVIDENCE[s.number] || { level: 'unchecked', checked: null, note: null, sources: [] }) : undefined,
     }));
     return {
       country: { code: country.code, name: country.name, dial: country.dial },
@@ -389,4 +418,4 @@ function directoryFor(country) {
   return { country: { code: country.code, name: country.name, dial: country.dial }, services };
 }
 
-module.exports = { CATEGORIES, COUNTRIES, countryAt, countryByCode, directoryFor, FALLBACK };
+module.exports = { CATEGORIES, COUNTRIES, countryAt, countryByCode, directoryFor, FALLBACK, TZ_EVIDENCE };

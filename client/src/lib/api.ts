@@ -164,6 +164,63 @@ export interface Place {
  * degrades to `{ places: [] }`, so the only errors this can surface are a
  * network failure to our own API or the 429 from that rate limit.
  */
+// --- Nationwide facilities directory (server/directory.js) ---
+
+export type FacilityKind = 'hospital' | 'police' | 'fire' | 'pharmacy' | 'anticorruption' | 'utility' | 'security' | 'ambulance';
+
+export interface Facility {
+  id: string;
+  name: string | null;
+  kind: FacilityKind;
+  subtype: string;
+  lat: number;
+  lng: number;
+  region: string | null;
+  district: string | null;
+  locality: string | null;
+  address: string | null;
+  /** Who runs it, when the source says: private, government, faith or ngo. */
+  operator?: 'private' | 'government' | 'faith' | 'ngo' | null;
+  /** Always false for open data: nobody has confirmed it. */
+  verified: boolean;
+  /** Only in "nearby" answers. */
+  distanceM?: number;
+}
+
+export interface FacilityAnswer {
+  mode: 'nearby' | 'area';
+  notice: string;
+  attribution: string;
+  results: Facility[];
+}
+
+export interface FacilityArea {
+  code: string;
+  name: string;
+  counts: Partial<Record<FacilityKind, number>>;
+  districts: { code: string; name: string; counts: Partial<Record<FacilityKind, number>> }[];
+}
+
+/** Nearest first around a point, or by region/district when there is no location. */
+export async function fetchFacilities(
+  query: { lat: number; lng: number } | { region: string; district?: string | null },
+  kinds: FacilityKind[],
+  limit = 10,
+): Promise<FacilityAnswer> {
+  const params = new URLSearchParams({ kind: kinds.join(','), limit: String(limit) });
+  if ('lat' in query) { params.set('lat', String(query.lat)); params.set('lng', String(query.lng)); }
+  else { params.set('region', query.region); if (query.district) params.set('district', query.district); }
+  const res = await fetch(`${API_BASE}/api/emergency/facilities?${params.toString()}`);
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not search the directory'));
+  return res.json();
+}
+
+export async function fetchFacilityAreas(): Promise<FacilityArea[]> {
+  const res = await fetch(`${API_BASE}/api/emergency/facilities/areas`);
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not load regions'));
+  return (await res.json()).regions;
+}
+
 export async function fetchNearby(kind: PlaceKind, lat: number, lng: number): Promise<Place[]> {
   const params = new URLSearchParams({ kind, lat: String(lat), lng: String(lng) });
   const res = await fetch(`${API_BASE}/api/emergency/nearby?${params.toString()}`);

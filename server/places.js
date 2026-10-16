@@ -13,6 +13,7 @@
 // with no network at all.
 const geo = require('./geo');
 const db = require('./db');
+const directory = require('./directory');
 
 // Several public Overpass servers, tried in order. Any one of them is often
 // overloaded or briefly down (2026-10-15: overpass-api.de at capacity and
@@ -242,6 +243,22 @@ async function nearby(kind, lat, lng, { radius = SEARCH_RADIUS_M, limit = 5 } = 
   const verified = await verifiedNearby(kind, lat, lng, radius, limit);
   const remaining = limit - verified.length;
   if (remaining <= 0) return verified;
+
+  // The nationwide directory (directory.js, built from the HOT OpenStreetMap
+  // exports) answers in microseconds with no network. Only when it has
+  // nothing of this kind within the radius do we ask the live services,
+  // which may know of something mapped since the export.
+  try {
+    const local = directory.nearby({ lat, lng, kinds: [kind], radiusM: radius, limit: remaining });
+    if (local.length) {
+      return [...verified, ...local.map((p) => ({
+        name: p.name || defaultName(kind), lat: p.lat, lng: p.lng, kind,
+        phone: null, address: p.address, distanceM: p.distanceM, verified: false, source: p.source,
+      }))];
+    }
+  } catch (e) {
+    console.warn(`[places] directory lookup failed: ${e.message}`);
+  }
 
   const key = cacheKey(kind, lat, lng);
   const cached = cacheGet(key);

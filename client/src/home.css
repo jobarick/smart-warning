@@ -270,3 +270,50 @@
 }
 .livemap-teaser { margin: 0; font-size: 0.82rem; color: var(--muted); }
 .livemap-teaser button { background: none; border: none; padding: 0; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
+
+/* Emergency services near you (NearbyHelp.tsx) */
+.fac-hotline {
+  display: flex; align-items: center; justify-content: center; gap: 8px; margin: 10px 0 4px;
+  padding: 12px; border-radius: 12px; background: var(--danger, #dc2626); color: #fff;
+  font-weight: 800; font-size: 1.05rem; text-decoration: none;
+}
+.fac-hotline-static { background: var(--panel-2); color: var(--text); }
+.fac-kinds { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; scrollbar-width: none; }
+.fac-kinds::-webkit-scrollbar { display: none; }
+.fac-kind {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px;
+  border: 1px solid var(--panel-border); background: var(--panel); color: var(--text); font: inherit; font-size: 0.86rem; cursor: pointer;
+}
+.fac-kind.on { border-color: var(--accent); color: var(--accent); }
+.fac-glyph {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px;
+  border-radius: 50%; color: #fff; font-size: 11px; font-weight: 800;
+}
+.fac-area { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 8px; }
+.fac-area label { display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; color: var(--muted); }
+.fac-area select {
+  padding: 10px; border-radius: 10px; border: 1px solid var(--panel-border); background: var(--panel); color: var(--text); font: inherit;
+}
+.fac-view { display: inline-flex; border: 1px solid var(--panel-border); border-radius: 10px; overflow: hidden; margin: 4px 0 8px; }
+.fac-view button { padding: 6px 14px; border: none; background: var(--panel); color: var(--text); font: inherit; font-size: 0.84rem; cursor: pointer; }
+.fac-view button.on { background: var(--accent); color: #fff; }
+.fac-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.fac-item {
+  display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px;
+  border: 1px solid var(--panel-border); background: var(--panel);
+}
+.fac-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.fac-main b { font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fac-main small { font-size: 0.78rem; color: var(--muted); }
+.fac-tag { align-self: flex-start; font-size: 0.7rem; padding: 1px 6px; border-radius: 6px; border: 1px solid var(--panel-border); color: var(--muted); }
+.fac-go {
+  flex: none; display: inline-flex; align-items: center; gap: 5px; padding: 8px 10px; border-radius: 8px;
+  background: var(--accent); color: #fff; font-weight: 700; font-size: 0.82rem; text-decoration: none;
+}
+.fac-map { height: 320px; border-radius: 12px; overflow: hidden; border: 1px solid var(--panel-border); }
+.fac-attr { margin: 2px 0 0; font-size: 0.68rem; color: var(--faint, var(--muted)); }
+
+.fac-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.fac-op-private { border-color: #64748b; color: var(--text); }
+.fac-op-government { border-color: #3b82f6; color: var(--text); }
+.fac-private { border-left: 3px solid #64748b; padding-left: 8px; }
