@@ -98,3 +98,42 @@ test('after the all-clear, a newcomer is not shown the old alert', async () => {
   assert.strictEqual(alertsIn(late).length, 0, 'a resolved incident must not come back as active');
   raiser.close(); late.close();
 });
+
+test('the same alert again while it is live: one alarm, the sender still gets its confirmation', async () => {
+  const raiser = await connect({ kind: 'join', orgCode: JOIN_CODE });
+  const coord = await connect({ kind: 'join', token: SUPERVISOR_TOKEN });
+  const alert = { kind: 'alert', id: 'dup-1', type: 'medical', severity: 'high', message: 'TEST', sender: 'Asha', timestamp: Date.now() };
+  raiser.send(JSON.stringify(alert));
+  await sleep(300);
+  await sleep(600); // past the per-connection cooldown: this is a retry, not a double tap
+  raiser.send(JSON.stringify({ ...alert, replayed: true }));
+  await sleep(300);
+  assert.strictEqual(alertsIn(coord).filter((m) => m.id === 'dup-1').length, 1, 'the coordinator hears it once');
+  assert.ok(alertsIn(raiser).filter((m) => m.id === 'dup-1').length >= 2, 'the sender gets its copy back (outbox confirmation)');
+  raiser.send(JSON.stringify({ kind: 'all-clear', id: 'ac-dup-1', sender: 'Asha', timestamp: Date.now() }));
+  await sleep(200);
+  raiser.close(); coord.close();
+});
+
+test('a late copy of a stood-down alert does not reopen it, and its sender is told it is over', async () => {
+  const raiser = await connect({ kind: 'join', orgCode: JOIN_CODE });
+  const coord = await connect({ kind: 'join', token: SUPERVISOR_TOKEN });
+  const alert = { kind: 'alert', id: 'dup-2', type: 'fire', severity: 'high', message: '', sender: 'Juma', timestamp: Date.now() };
+  raiser.send(JSON.stringify(alert));
+  await sleep(300);
+  raiser.send(JSON.stringify({ kind: 'all-clear', id: 'ac-dup-2', sender: 'Juma', timestamp: Date.now() }));
+  await sleep(300);
+  const before = alertsIn(coord).length;
+  // The phone reconnects and its outbox replays the old alert.
+  const phone = await connect({ kind: 'join', orgCode: JOIN_CODE });
+  phone.send(JSON.stringify({ ...alert, replayed: true }));
+  await sleep(400);
+  assert.strictEqual(alertsIn(coord).length, before, 'no second alarm reaches the coordinator');
+  const echo = alertsIn(phone).find((m) => m.id === 'dup-2');
+  assert.ok(echo && echo.alreadyResolved === true, 'the sender gets a confirmation marked as already resolved');
+  assert.ok(phone.received.some((m) => m.kind === 'all-clear' && m.closes === 'dup-2'), 'and is told it is over');
+  const late = await connect({ kind: 'join', token: SUPERVISOR_TOKEN });
+  await sleep(300);
+  assert.strictEqual(alertsIn(late).length, 0, 'a coordinator opening the dashboard now is not shown it as live');
+  raiser.close(); coord.close(); phone.close(); late.close();
+});

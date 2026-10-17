@@ -704,6 +704,9 @@ export default function App() {
         // emergency would be logged twice and re-raised after its all-clear.
         if (handledIds.current.has(m.id)) return;
         remember(m.id);
+        // The relay's reply to a late copy of an alert that was already stood
+        // down: it only confirms the outbox entry, and must not sound.
+        if (m.alreadyResolved === true) return;
 
         setSirenTesting(false);
         setLastAlert(m.timestamp);

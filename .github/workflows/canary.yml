@@ -14,6 +14,9 @@ name: Synthetic canary
 # mechanism — no Slack/PagerDuty wiring, on purpose, so this has nothing to
 # misconfigure and nothing to go stale. Escalating from "a GitHub issue" to
 # a paged on-call is real, separate work (see the P0 list in the audit doc).
+# NOTE: GitHub runs scheduled workflows late. Over 2026-10-11..17 this ran
+# about every 2 to 6 hours, not every 10 minutes, so it is a backstop, not
+# the uptime monitor: docs/MONITORING_SETUP.md sets up an external one.
 on:
   schedule:
     - cron: '*/10 * * * *'
@@ -25,6 +28,8 @@ permissions:
 
 env:
   BACKEND_HEALTH_URL: https://smart-warning-production.up.railway.app/api/health
+  BACKEND_READY_URL: https://smart-warning-production.up.railway.app/api/ready
+  NUMBERS_URL: https://smart-warning-production.up.railway.app/api/emergency/directory?country=TZ
   FRONTEND_URL: https://smart-warning.vercel.app/
   CANARY_LABEL: canary-failure
 
@@ -68,6 +73,44 @@ jobs:
           fi
           echo "Backend healthy: HTTP 200, database.ok=true"
 
+      # /api/ready answers 503 when the database check failed or has stopped
+      # coming back (a hung query), which /api/health alone does not catch.
+      - name: Check backend readiness (/api/ready)
+        id: ready
+        if: always()
+        run: |
+          response=$(curl -sS --max-time 15 --retry 2 --retry-delay 3 -w '
+%{http_code}' "$BACKEND_READY_URL") || {
+            echo "reason=Readiness endpoint unreachable" >> "$GITHUB_OUTPUT"; echo "::error::ready unreachable"; exit 1; }
+          http_status=$(echo "$response" | tail -n1); json=$(echo "$response" | sed '$d')
+          echo "HTTP status: $http_status, body: $json"
+          ready=$(echo "$json" | jq -r '.ready // "null"' 2>/dev/null || echo "not-json")
+          if [ "$http_status" != "200" ] || [ "$ready" != "true" ]; then
+            echo "reason=Backend not ready (HTTP $http_status, ready=$ready, database=$(echo "$json" | jq -r '.database // "?"' 2>/dev/null))" >> "$GITHUB_OUTPUT"
+            echo "::error::backend not ready"; exit 1
+          fi
+          echo "Backend ready"
+
+      # The emergency numbers are the one thing the app must always be able to
+      # show. Checks the public Tanzania list still answers with 112 and the
+      # verified health line, and never with the removed 117.
+      - name: Check Tanzania emergency numbers
+        id: numbers
+        if: always()
+        run: |
+          json=$(curl -sS --max-time 15 --retry 2 --retry-delay 3 "$NUMBERS_URL") || {
+            echo "reason=Emergency numbers endpoint unreachable" >> "$GITHUB_OUTPUT"; echo "::error::numbers unreachable"; exit 1; }
+          country=$(echo "$json" | jq -r '.country.code // "null"' 2>/dev/null || echo "not-json")
+          has112=$(echo "$json" | jq 'any(.services[]?.numbers[]?; . == "112")' 2>/dev/null || echo false)
+          has199=$(echo "$json" | jq 'any(.services[]?.numbers[]?; . == "199")' 2>/dev/null || echo false)
+          has117=$(echo "$json" | jq 'any(.services[]?.numbers[]?; . == "117")' 2>/dev/null || echo true)
+          echo "country=$country 112=$has112 199=$has199 117=$has117"
+          if [ "$country" != "TZ" ] || [ "$has112" != "true" ] || [ "$has199" != "true" ] || [ "$has117" != "false" ]; then
+            echo "reason=Tanzania emergency numbers wrong or missing (country=$country, 112=$has112, 199=$has199, 117=$has117)" >> "$GITHUB_OUTPUT"
+            echo "::error::emergency numbers check failed"; exit 1
+          fi
+          echo "Emergency numbers OK"
+
       # Runs regardless of whether the backend check above passed, so one
       # outage doesn't hide whether the other half is also down.
       - name: Check frontend
@@ -89,6 +132,8 @@ jobs:
         uses: actions/github-script@v8
         env:
           BACKEND_REASON: ${{ steps.backend.outputs.reason }}
+          READY_REASON: ${{ steps.ready.outputs.reason }}
+          NUMBERS_REASON: ${{ steps.numbers.outputs.reason }}
           FRONTEND_REASON: ${{ steps.frontend.outputs.reason }}
         with:
           script: |
@@ -103,7 +148,7 @@ jobs:
               console.log(`Issue #${open[0].number} is already open for this — not filing a duplicate.`);
               return;
             }
-            const reasons = [process.env.BACKEND_REASON, process.env.FRONTEND_REASON]
+            const reasons = [process.env.BACKEND_REASON, process.env.READY_REASON, process.env.NUMBERS_REASON, process.env.FRONTEND_REASON]
               .filter(Boolean)
               .map((r) => `- ${r}`)
               .join('\n');

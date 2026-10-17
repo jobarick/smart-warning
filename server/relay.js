@@ -203,6 +203,26 @@ const activeRaiser = new Map(); // orgId (or null) → { connId, workerId }
 const activeAlert = new Map(); // orgId (or null) → alert message
 const ACTIVE_ALERT_MAX_MS = Number(process.env.ACTIVE_ALERT_MAX_MS) > 0 ? Number(process.env.ACTIVE_ALERT_MAX_MS) : 6 * 60 * 60 * 1000;
 
+// Alert ids already raised and stood down, per org, so a late copy of one (a
+// phone's outbox replaying after it reconnects, a network retry) cannot put
+// the site back into an emergency, restart position tracking on a closed
+// incident, or replay it to coordinators who join later. Bounded and kept for
+// as long as an active alert would be.
+const resolvedAlerts = new Map(); // orgId (or null) → Map(alertId → resolvedAt)
+const RESOLVED_ALERT_MEMORY = 200;
+function rememberResolved(orgId, alertId) {
+  if (!alertId) return;
+  const key = orgId ?? null;
+  const ids = resolvedAlerts.get(key) || new Map();
+  ids.set(alertId, Date.now());
+  while (ids.size > RESOLVED_ALERT_MEMORY) ids.delete(ids.keys().next().value);
+  resolvedAlerts.set(key, ids);
+}
+function wasResolved(orgId, alertId) {
+  const at = resolvedAlerts.get(orgId ?? null)?.get(alertId);
+  return at != null && Date.now() - at <= ACTIVE_ALERT_MAX_MS;
+}
+
 function raisedLiveIncident(ws) {
   const r = activeRaiser.get(ws.orgId ?? null);
   if (!r) return false;
@@ -547,6 +567,27 @@ function attach(server) {
             await fileStaleReplay(ws, msg, age);
             return;
           }
+          // The same alert again. The sender still gets its copy back, which is
+          // what confirms the entry in its outbox (lib/outbox.ts), but nothing
+          // is raised a second time.
+          const live = activeAlert.get(ws.orgId ?? null);
+          if (msg.id && live && live.id === msg.id) {
+            // Already sounding. Raising it again would broadcast a second
+            // alarm and wipe a coordinator's "on the way" (clearResponding).
+            console.log(`[=] ${msg.id} is already live; confirmed to #${ws.connId} only`);
+            if (ws.readyState === 1) ws.send(JSON.stringify(live));
+            return;
+          }
+          if (msg.id && wasResolved(ws.orgId, msg.id)) {
+            // Already stood down. Tell this phone it is over instead of
+            // reopening it for everyone.
+            console.log(`[=] ${msg.id} was already stood down; not reopened (from #${ws.connId})`);
+            if (ws.readyState === 1) {
+              ws.send(JSON.stringify({ ...msg, alreadyResolved: true }));
+              ws.send(JSON.stringify({ kind: 'all-clear', id: `closed-${msg.id}`, closes: msg.id, reason: 'resolved', sender: 'Smart Warning', timestamp: Date.now() }));
+            }
+            return;
+          }
           const sinceLast = Date.now() - (ws.lastAlertAt || 0);
           if (sinceLast < ALERT_COOLDOWN_MS) {
             console.warn(`[!] duplicate alert from #${ws.connId} ${sinceLast}ms after the last one — ignored`);
@@ -572,6 +613,7 @@ function attach(server) {
           // Only the person who raised it can say it was never real.
           if (msg.reason === 'false-alarm' && !isRaiser) msg.reason = 'resolved';
           activeRaiser.delete(ws.orgId ?? null);
+          rememberResolved(ws.orgId, activeAlert.get(ws.orgId ?? null)?.id ?? activeIncident.get(ws.orgId ?? null));
           activeAlert.delete(ws.orgId ?? null);
           const retracted = msg.reason === 'false-alarm';
           console.log(`[.] ${retracted ? 'FALSE ALARM retracted' : 'all-clear'} from #${ws.connId} "${msg.sender}" (org ${ws.orgId ?? 'global'})`);

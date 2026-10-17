@@ -6,13 +6,13 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 const emergencyNumbers = require('../emergency-numbers');
 
-test('Tanzania resolves to its own 15-row directory, not the generic categories', () => {
+test('Tanzania resolves to its own 14-row directory, not the generic categories', () => {
   const country = emergencyNumbers.countryAt(-6.79, 39.21); // Dar es Salaam
   assert.strictEqual(country.code, 'TZ');
   const { services } = emergencyNumbers.directoryFor(country);
-  assert.strictEqual(services.length, 15);
+  assert.strictEqual(services.length, 14);
   const numbers = services.map((s) => s.id);
-  for (const n of ['110', '111', '112', '113', '114', '115', '116', '117', '119', '181', '190', '195', '199']) {
+  for (const n of ['110', '111', '112', '113', '114', '115', '116', '119', '181', '190', '195', '199']) {
     assert.ok(numbers.includes(n), `missing ${n}`);
   }
 });
@@ -48,4 +48,15 @@ test('the international fallback is unaffected', () => {
   assert.strictEqual(country.code, null);
   const { services } = emergencyNumbers.directoryFor(country);
   assert.ok(services.some((s) => s.numbers.includes('112')));
+});
+
+test('117 is not served: no source supports it, and 199 is the verified health line', () => {
+  const { services } = emergencyNumbers.directoryFor(emergencyNumbers.countryByCode('TZ'));
+  assert.ok(!services.some((s) => s.numbers.includes('117')), '117 must not be offered');
+  const health = services.find((s) => s.id === '199');
+  assert.match(health.label, /Health/);
+  assert.match(health.description, /112 or 115/, 'an advice line must point a medical emergency elsewhere');
+  assert.ok(health.evidence.sources.some((u) => u.startsWith('https://www.moh.go.tz/')), 'the Ministry of Health is cited');
+  // The decision stays on record.
+  assert.strictEqual(emergencyNumbers.TZ_EVIDENCE['117'].level, 'unconfirmed');
 });

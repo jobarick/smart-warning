@@ -538,7 +538,7 @@ const EN: Record<StringKey, string> = {
     'landing.premium.freeNote': 'No card needed to start. SOS, 112 and the numbers on this page never cost anything.',
     'landing.premium.cta': 'Start free month',
     'landing.directory.heading': 'Emergency directory, Tanzania',
-    'landing.directory.unverified': 'These numbers are not yet confirmed by the authorities. If one does not connect, call 112.',
+    'landing.directory.unverified': 'Listed on official government websites unless marked. None is confirmed in writing by the agencies yet. If one does not connect, call 112.',
     'landing.stories.heading': 'Where it helps',
     'landing.stories.sub': 'Examples of how people use it, not testimonials.',
     'landing.story.1.title': 'Walking home after dark',
