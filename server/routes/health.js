@@ -49,6 +49,8 @@ function health({ authenticated = false } = {}) {
       nativePush: fcm.enabled(),
       mail: mailer.enabled(),
       mailProvider: mailer.providerName(),
+      // { domain, testSender }: testSender true means real recipients are refused.
+      mailSender: mailer.senderInfo?.() ?? null,
       // Counts only, never an address, and read from memory rather than the
       // database — this endpoint is public and pollable. Refreshed on the mail
       // drain timer, so `at` says how stale the numbers are.
