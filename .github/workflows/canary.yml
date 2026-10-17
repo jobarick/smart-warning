@@ -79,8 +79,7 @@ jobs:
         id: ready
         if: always()
         run: |
-          response=$(curl -sS --max-time 15 --retry 2 --retry-delay 3 -w '
-%{http_code}' "$BACKEND_READY_URL") || {
+          response=$(curl -sS --max-time 15 --retry 2 --retry-delay 3 -w '\n%{http_code}' "$BACKEND_READY_URL") || {
             echo "reason=Readiness endpoint unreachable" >> "$GITHUB_OUTPUT"; echo "::error::ready unreachable"; exit 1; }
           http_status=$(echo "$response" | tail -n1); json=$(echo "$response" | sed '$d')
           echo "HTTP status: $http_status, body: $json"
