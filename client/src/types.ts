@@ -23,6 +23,8 @@ export interface AlertMessage extends Replayable {
   message: string;
   sender: string;
   timestamp: number;
+  /** Set by the relay on its reply to a late copy of an alert that was already stood down. */
+  alreadyResolved?: boolean;
 }
 
 export interface AllClearMessage extends Replayable {
