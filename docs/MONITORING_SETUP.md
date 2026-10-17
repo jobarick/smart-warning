@@ -2,7 +2,14 @@
 
 **Status: NOT CONFIGURED.** No external uptime monitor exists yet. The only
 automated check is the GitHub Actions canary, which GitHub runs every 3 to 5
-hours rather than every 10 minutes, so an outage can go unnoticed for hours.
+hours rather than every 10 minutes, so an outage can go unnoticed for hours
+(re-measured 2026-10-17: about every 2 to 6 hours over the previous week).
+Since 2026-10-17 the canary also checks `/api/ready` and that the public
+Tanzania number list still contains 112 and 199 and not the removed 117.
+
+`/api/ready` reports 503 `{"database":"stale"}` when the last database check
+is more than 90 seconds old (a hung query), not only when it failed, so an
+HTTP monitor on it catches both.
 
 ## The correct URLs (checked 2026-10-15)
 
