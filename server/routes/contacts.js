@@ -290,7 +290,10 @@ async function handle({ req, res, path }) {
       contacted.push({
         id: contact.id, name: contact.name,
         delivered: result.delivered === true || smsStatus === 'accepted',
-        email: result.delivered === true ? 'sent' : 'queued',
+        // 'refused': the mail provider permanently turned it down (for example
+        // a test sender that only delivers to its own account); it will not be
+        // retried, so calling it 'queued' would promise a delivery that never comes.
+        email: result.delivered === true ? 'sent' : result.refused === true ? 'refused' : 'queued',
         sms: smsStatus,
       });
     }
