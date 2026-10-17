@@ -97,21 +97,65 @@ Then: tell every participant the test is paused; note the time; roll back with t
 
 ## 9. Live SOS-to-rescue rehearsal (production, supervised)
 
-Run only with the owner's go-ahead, in the pilot organisation, with every participant told beforehand. Say and type "TEST". Never dial 112, 115 or any directory number, and do not open the Directions links into traffic.
+**Not run yet. Run only with the owner's written go-ahead.** The same flow already passes an isolated rehearsal (real server, throwaway database, 38 checks, 2026-10-17). This live run adds what that cannot: real phones, real GPS, real networks and real push.
 
-1. **Coordinator laptop or phone:** open `/dashboard`. If the map says your location is off or blocked, follow its message (allow location for the site, or turn on Windows Location) until a green "You (live)" dot appears.
-2. **Worker phone:** location sharing on, location permission allowed, app open. Confirm the worker appears on the coordinator map within 10 s.
-3. **Worker presses SOS** (type: Medical, message "TEST").
-4. **Coordinator checks, and records the time of each:**
-   - EMERGENCY banner and the worker's pin pulsing red on the map
-   - pin within about 50 m of the worker's real spot (walk to it, or compare with the worker's own map)
-   - "Nearest to them" shows a hospital, police and fire station, or says plainly that none were found
-   - "Directions to <worker>" opens Google Maps with the worker as the destination (check the address, do not drive)
-5. **Late-joiner check:** a second coordinator opens the dashboard after the SOS. It must show the live EMERGENCY, not "all clear".
-6. **Coordinator acknowledges.** The worker's phone shows "seen by …".
-7. **Coordinator stands down.** Every phone stops; the map loses the red pin and the Directions bar.
-8. **History:** the incident shows resolved, acknowledged, with raise and resolve times.
-9. **Map controls:** zoom with the mouse wheel, drag the handle under the map to make it bigger, use Full screen and Escape.
-10. Repeat 2 to 8 with the worker's location permission denied (the coordinator must see "not shared", not a wrong pin), and once outside a city centre (nearest help may be empty, and must say so).
+### 9.1 Before the day (owner)
 
-Stop at once and follow section 8 if an SOS is not seen, a pin is clearly in the wrong place, or the alarm cannot be stopped.
+- [ ] Written go-ahead from the owner, with the date, time window and place.
+- [ ] A **test organisation** created only for this, e.g. "Rehearsal Site". Never the pilot or customer organisation. Its join code is given only to the participants below.
+- [ ] Participants, each told in writing that this is a **TEST** and agreeing to take part:
+  - 1 coordinator, on a laptop (dashboard)
+  - 2 workers with Android phones, location on
+  - 1 person with a personal (individual) account, for the Trusted Circle check
+- [ ] Test accounts use the participants' own email addresses or addresses they control. **No real Trusted Circle contacts:** the personal account's circle holds only participants' own addresses.
+- [ ] One participant's circle contact has **no email** (phone only), for the failed-delivery check.
+- [ ] Mail check (§9.3 step 9) only after PR #69's real-email test has passed, or with the current mail library.
+- [ ] Nobody dials 112, 114, 115, 199 or any directory number. Directions links are opened but not driven.
+- [ ] No deploy during the rehearsal. A redeploy clears the relay's in-memory "live alert" and "on the way" state.
+
+### 9.2 Announce
+
+Read to everyone at the start: "This is a test of Smart Warning. Every alert today says TEST. Nobody is in danger. Do not call any emergency number. If you see an alert outside this group, tell me at once."
+
+### 9.3 Steps (record the time of each)
+
+1. **Coordinator:** open `/dashboard`. The green "You (live)" dot appears; if not, allow location for the site.
+2. **Workers A and B:** join the test org, allow location. Both appear on the coordinator map within 10 s.
+3. **Alert creation:** worker A presses SOS (Medical, message "TEST"). Check:
+   - [ ] EMERGENCY banner on the coordinator dashboard and worker B's phone
+   - [ ] A's pin pulses red, within about 50 m of A's real spot
+   - [ ] "Nearest to them" shows places, or says none were found
+   - [ ] Push arrives on B's phone with the app **closed** and the screen **locked** (needs the FCM build, §9.4)
+4. **Duplicate send:** right after raising it, A taps SOS a second time within 1 s.
+   - [ ] The coordinator sees one alarm, not two.
+5. **Reconnection:** A turns on flight mode for 30 s, then turns it off.
+   - [ ] A's phone still shows the live alert.
+   - [ ] The coordinator still sees one alarm.
+   - [ ] A second coordinator who opens the dashboard now sees the live EMERGENCY, not "all clear".
+6. **Acknowledgement:** the coordinator presses Acknowledge.
+   - [ ] A's phone shows "seen by …" within 5 s.
+7. **Who may stand down:** worker B tries to stand it down.
+   - [ ] It stops only on B's phone; the coordinator and A still see the emergency.
+   - Then A (or the coordinator) stands it down: every device stops, and the map loses the red pin.
+8. **Organisation isolation:** someone in another org (or the pilot org) keeps their dashboard open throughout.
+   - [ ] They saw nothing from the test org.
+9. **Failed notification delivery (personal account):** the personal tester presses SOS.
+   - [ ] The phone-only contact is shown as **not notified** (or SMS status), never as sent.
+   - [ ] The email contact shows "sent" only once the mail server accepted it; it arrives in their inbox.
+   - Then press "I am safe".
+10. **Location refused:** repeat 3 and 7 with A's location permission denied.
+    - [ ] The coordinator sees "not shared", never a wrong or old pin.
+11. **History:** each incident shows raised, acknowledged and resolved, with times.
+12. **Clean-up:** close the test org, or leave it empty. Record any defect as a GitHub issue.
+
+### 9.4 Android push build for the rehearsal
+
+- Build from `main` with `client/android/app/google-services.json` (Firebase project `smart-warning`, package `com.smartwarning.app`): `cd client; npm run build; npx cap sync android; cd android; .\gradlew assembleDebug`.
+- Install `app/build/outputs/apk/debug/app-debug.apk` **only on the participants' phones, signed in to the test org.** Never on a device signed in to a real team: it would register for that team's real alerts.
+
+### 9.5 Stop at once (then follow section 8) if
+
+- an SOS is not seen by the coordinator within 30 s,
+- a pin is clearly in the wrong place,
+- an alarm cannot be stopped, or
+- anyone outside the test group receives an alert.
