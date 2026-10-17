@@ -174,7 +174,7 @@ async function signupIndividual({ name, email, password, phone, country }) {
   // Start the trial as part of registration, so an account is never in the
   // state of existing with no subscription row at all.
   await db.ensureUserSubscription(user.id);
-  console.log(`[auth] individual account created for ${user.email}`);
+  console.log(`[auth] individual account created (user ${user.id})`);
   return { token: signToken(user), user: publicUser(user, null) };
 }
 
@@ -285,7 +285,7 @@ async function requestPasswordReset({ email }) {
     refId: null,
     orgId: user.org_id || null,
   });
-  console.log(`[auth] reset link issued for ${user.email} (delivered: ${res.delivered})`);
+  console.log(`[auth] reset link issued for user ${user.id} (delivered: ${res.delivered})`);
   return out;
 }
 
@@ -308,7 +308,7 @@ async function resetPassword({ token, password }) {
   if (!updated) throw httpError(404, 'that account no longer exists');
 
   const org = await db.getOrgById(updated.org_id);
-  console.log(`[auth] password reset completed for ${updated.email}`);
+  console.log(`[auth] password reset completed for user ${updated.id}`);
   return { token: signToken(updated), user: publicUser(updated, org) };
 }
 
@@ -422,7 +422,7 @@ async function acceptInvite({ token, name, password }) {
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
   const user = await db.createUser({ orgId: consumed.org_id, email: consumed.email, passwordHash, name: name.trim() });
   const org = await db.getOrgById(consumed.org_id);
-  console.log(`[auth] invite accepted: ${user.email} joined org ${consumed.org_id}`);
+  console.log(`[auth] invite accepted: user ${user.id} joined org ${consumed.org_id}`);
   return { token: signToken(user), user: publicUser(user, org) };
 }
 

@@ -52,7 +52,7 @@ async function handle({ req, res, path }) {
       .then((sent) => (sent ? db.markFeedbackDelivered(row.id) : null))
       .catch((e) => console.error(`[mail] feedback not delivered: ${e.message}`));
 
-    console.log(`[*] feedback ${kind} from ${ctx.user?.email || 'supervisor'}`);
+    console.log(`[*] feedback ${kind} from ${ctx.user?.id ? `user ${ctx.user.id}` : 'supervisor'}`);
     sendJson(res, 201, {
       ok: true,
       feedback: { ...publicFeedback(row), delivered: false },
