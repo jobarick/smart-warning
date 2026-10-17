@@ -102,6 +102,22 @@ const SMTP_TIMEOUTS = {
  * So: parse it here, and keep query parameters so existing configuration like
  * `?pool=true` still applies.
  */
+/**
+ * Reply-To comes from what a visitor typed on the public emergency report and
+ * feedback forms. Only a single, plain, well-formed address of at most 254
+ * characters is passed on; anything else is dropped (the message still goes,
+ * with no Reply-To). This keeps free text away from the mail library's address
+ * parser, which has had denial-of-service advisories (GHSA-v53p-9fqp-m79j,
+ * GHSA-prgh-xp8r-p3m5), whatever version is installed.
+ */
+const SAFE_EMAIL_RE = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
+function safeReplyTo(value) {
+  if (typeof value !== 'string') return undefined;
+  const v = value.trim();
+  if (!v || v.length > 254 || !SAFE_EMAIL_RE.test(v)) return undefined;
+  return v;
+}
+
 function smtpOptions(url) {
   const u = new URL(url);
   const secure = u.protocol === 'smtps:';
@@ -152,7 +168,7 @@ function smtpProvider(url, { from }) {
         const info = await transport.sendMail({
           from,
           to: message.to,
-          replyTo: message.replyTo || undefined,
+          replyTo: safeReplyTo(message.replyTo),
           subject: message.subject,
           text: message.body,
           attachments: message.attachments || undefined,
@@ -199,4 +215,4 @@ function fromEnv(env = process.env, { from } = {}) {
   return env.NODE_ENV === 'production' ? nullProvider() : logProvider();
 }
 
-module.exports = { nullProvider, logProvider, memoryProvider, smtpProvider, fromEnv, smtpOptions };
+module.exports = { nullProvider, logProvider, memoryProvider, smtpProvider, fromEnv, smtpOptions, safeReplyTo };

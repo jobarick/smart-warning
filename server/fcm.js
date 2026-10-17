@@ -180,7 +180,20 @@ function buildMessage(token, payload) {
 }
 
 /** FCM's way of saying "this token is dead, stop using it". */
-const DEAD = new Set(['UNREGISTERED', 'INVALID_ARGUMENT', 'SENDER_ID_MISMATCH']);
+const DEAD = new Set(['UNREGISTERED', 'SENDER_ID_MISMATCH']);
+
+/**
+ * INVALID_ARGUMENT means either a bad token or a bad message. Only the first
+ * is a reason to delete the token: treating both alike would let one payload
+ * bug wipe every registered phone, which would then silently stop receiving
+ * alarms until each one registered again.
+ */
+function isDeadToken(status, body) {
+  const code = errorCodeOf(body);
+  if (status === 404 || DEAD.has(code)) return true;
+  if (code === 'INVALID_ARGUMENT') return /registration token/i.test(String(body?.error?.message || ''));
+  return false;
+}
 
 function errorCodeOf(body) {
   const details = body?.error?.details || [];
@@ -246,9 +259,11 @@ async function sendToTokens(tokens, payload) {
       });
       if (res.ok) { sent++; return; }
       const body = await res.json().catch(() => ({}));
-      const code = errorCodeOf(body);
-      if (DEAD.has(code) || res.status === 404) dead.push(token);
-      else failed++;
+      if (isDeadToken(res.status, body)) dead.push(token);
+      else {
+        failed++;
+        console.error(`[fcm] send rejected (${res.status} ${errorCodeOf(body) || 'no code'}); token kept`);
+      }
     } catch (e) {
       failed++;
       console.error('[fcm] send failed:', e.message);
@@ -261,4 +276,4 @@ async function sendToTokens(tokens, payload) {
   return { sent, pruned: dead.length, failed };
 }
 
-module.exports = { init, enabled, status, notifyOrg, notifyUser, sendToTokens, accessToken, buildMessage, loadAccount, _dead: DEAD };
+module.exports = { init, enabled, status, notifyOrg, notifyUser, sendToTokens, accessToken, buildMessage, loadAccount, isDeadToken, _dead: DEAD };
