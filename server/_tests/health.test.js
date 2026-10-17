@@ -18,6 +18,7 @@ function stub(relPath, exports) {
 
 let app;
 let dbOk = true;
+let dbAt = () => Date.now();
 
 before(async () => {
   process.env.PORT = String(PORT);
@@ -26,7 +27,7 @@ before(async () => {
   stub('db.js', {
     enabled: () => true,
     init: async () => true,
-    livenessStatus: () => ({ ok: dbOk, at: Date.now() }),
+    livenessStatus: () => ({ ok: dbOk, at: dbAt() }),
     listPendingTransactions: async () => [],
     listExpiredSubscriptions: async () => [],
   });
@@ -91,4 +92,17 @@ test('/api/ready is 200 while the database answers and 503 when it does not', as
   // Liveness stays 200, so the platform does not restart the relay over it.
   assert.strictEqual((await fetch(`${BASE}/api/health`)).status, 200);
   dbOk = true;
+});
+
+test('/api/ready does not trust an old "ok": a check that stopped coming back is not ready', async () => {
+  dbOk = true;
+  dbAt = () => Date.now() - 5 * 60 * 1000; // last answer five minutes ago (a hung query)
+  let res = await fetch(`${BASE}/api/ready`);
+  assert.strictEqual(res.status, 503);
+  assert.deepStrictEqual(await res.json(), { ready: false, database: 'stale' });
+  dbAt = () => null; // never checked yet
+  res = await fetch(`${BASE}/api/ready`);
+  assert.strictEqual(res.status, 503);
+  dbAt = () => Date.now();
+  assert.strictEqual((await fetch(`${BASE}/api/ready`)).status, 200);
 });

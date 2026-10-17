@@ -183,6 +183,8 @@ export interface Facility {
   operator?: 'private' | 'government' | 'faith' | 'ngo' | null;
   /** Always false for open data: nobody has confirmed it. */
   verified: boolean;
+  /** "official" only once an authority confirms; open data is "unverified". */
+  verification?: string;
   /** open-data, or needs-review (the reason is in note). */
   status?: 'open-data' | 'needs-review';
   note?: string | null;
@@ -210,6 +212,19 @@ export interface FacilityAnswer {
   attribution: string;
   results: Facility[];
   providers?: FacilityProvider[];
+  /** Data sources with their snapshot dates. */
+  sources?: Record<string, { title: string; snapshot: string | null; license: string }>;
+  /** Known to exist from documents, but no reliable map position (area mode). Never pinned. */
+  knownUnmapped?: FacilityKnownUnmapped[];
+}
+
+export interface FacilityKnownUnmapped {
+  name: string;
+  kind: FacilityKind;
+  region: string;
+  reason: string;
+  evidence: string[];
+  checked: string | null;
 }
 
 export interface FacilityArea {
@@ -981,10 +996,20 @@ export async function fetchSafeRoute(
 
 // --- Emergency call directory ---
 
+/** How sure we are of a number (server/emergency-numbers.js TZ_EVIDENCE). */
+export interface NumberEvidence {
+  level: 'unchecked' | 'unconfirmed' | 'reported' | 'corroborated' | 'government-listed' | 'official';
+  checked: string | null;
+  note: string | null;
+  sources: string[];
+}
+
 export interface EmergencyService {
   id: string;
   label: string;
   numbers: string[];
+  /** Tanzania only: the evidence behind this number. */
+  evidence?: NumberEvidence;
   /** Present only for a country with its own per-service directory (Tanzania today) — see server/emergency-numbers.js. */
   icon?: string;
   description?: string;
@@ -999,6 +1024,8 @@ export interface EmergencyDirectory {
   services: EmergencyService[];
 }
 
+export const DIRECTORY_TIMEOUT_MS = 8000;
+
 /** Published emergency numbers for a position. Unauthenticated by design. */
 export async function fetchDirectory(lat: number | null, lng: number | null, country?: string): Promise<EmergencyDirectory> {
   const params = new URLSearchParams();
@@ -1007,9 +1034,17 @@ export async function fetchDirectory(lat: number | null, lng: number | null, cou
     params.set('lat', String(lat));
     params.set('lng', String(lng));
   }
-  const res = await fetch(`${API_BASE}/api/emergency/directory?${params.toString()}`);
-  if (!res.ok) throw new Error(`directory request failed (${res.status})`);
-  return res.json();
+  // A request that hangs (a captive portal, a dead mobile connection) must
+  // give up, so the saved or bundled list is shown instead of waiting forever.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), DIRECTORY_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${API_BASE}/api/emergency/directory?${params.toString()}`, { signal: ctrl.signal });
+    if (!res.ok) throw new Error(`directory request failed (${res.status})`);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // --- Emergency reports (Tanzania-wide, no account — see EmergencyGrid) ---

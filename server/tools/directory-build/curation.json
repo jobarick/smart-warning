@@ -43,8 +43,16 @@
       "name": "Wete District Hospital",
       "kind": "hospital",
       "region": "TZ54",
-      "reason": "Exists (staff housing project reported December 2024; financed by the Abu Dhabi Fund for Development), but no reliable map location found. Not pinned.",
-      "evidence": ["https://ippmedia.co.tz/the-guardian/news/local-news/read/zbar-launches-housing-project-for-wete-district-hospital-staff-2024-12-26-123823", "https://www.adfd.ae/en/what-we-do/projects/wete-hospital"],
+      "reason": "Exists: one of Pemba's three government district hospitals (with Chake Chake and Micheweni), run by the Zanzibar Ministry of Health; staff housing project reported December 2024; financed by the Abu Dhabi Fund for Development. An unofficial facility list places it at Kinyasini, Wete. Not in OpenStreetMap and no reliable coordinates, so not pinned.",
+      "evidence": ["https://ippmedia.co.tz/the-guardian/news/local-news/read/zbar-launches-housing-project-for-wete-district-hospital-staff-2024-12-26-123823", "https://www.adfd.ae/en/what-we-do/projects/wete-hospital", "https://www.ijhsr.org/IJHSR_Vol.14_Issue.4_April2024/IJHSR54.pdf"],
+      "checked": "2026-10-16"
+    },
+    {
+      "name": "Wete fire station (Kikosi cha Zimamoto na Uokozi Zanzibar)",
+      "kind": "fire",
+      "region": "TZ54",
+      "reason": "Zanzibar House of Representatives records describe a fire station at Mnazimmoja, Wete (office building and vehicle parking built) and a hangar under construction at Finya, Wete. Not in OpenStreetMap and no reliable coordinates, so not pinned.",
+      "evidence": ["https://zanzibarassembly.go.tz/storage/documents/Budgets/all/1684332929.pdf", "http://www.zanzibarassembly.go.tz/storage/documents/hansards/all/1442566129.pdf"],
       "checked": "2026-10-16"
     }
   ],
@@ -84,10 +92,10 @@
     }
   ],
   "candidatesNotConfirmed": [
-    { "name": "City Ambulance Tanzania", "kind": "ambulance", "note": "Social media pages give Plot 486, Haile Selassie Rd, Masaki, Dar es Salaam and 24/7 rescue; no reachable website. Not added.", "evidence": ["https://www.facebook.com/CityAmbulanceTanzania/", "https://x.com/cityambulancetz"] },
-    { "name": "Knight Support (T) Ltd", "kind": "ambulance / security", "note": "Named in a 2023-era guide as a ground ambulance provider in Dar es Salaam and Arusha and as radio alarm response; website unreachable. Not added.", "evidence": ["https://trekmedics.org/database/tanzania-2/", "https://www.devex.com/organizations/knight-support-178766"] },
-    { "name": "Divine Heart", "kind": "ambulance", "note": "Website describes ground ambulances in Dar es Salaam and partner air ambulances, but publishes no emergency line (general contact only). Not added as an emergency contact.", "evidence": ["https://www.divineheart.or.tz/"] },
-    { "name": "G4S Secure Solutions (Tanzania)", "kind": "security", "note": "Branch lists differ between its own pages (Dar es Salaam, Arusha, Mbeya, Mwanza, and Dodoma or Mtwara); pages could not be read automatically to confirm. Not added.", "evidence": ["https://www.g4s.com/en-tz"] },
-    { "name": "Telesecurity Company Limited", "kind": "security", "note": "A job listing names branches in more than ten regions; its website refused automated access. Not added.", "evidence": ["https://mabumbe.com/jobs/marketing-officers-at-telesecurity-company-limited-january-2022/"] }
+    { "name": "City Ambulance Tanzania", "kind": "ambulance", "note": "Only social media pages found (Plot 486, Haile Selassie Rd, Masaki, Dar es Salaam; 24/7 rescue claimed). No reachable website and no independent listing found. Not added.", "evidence": ["https://www.facebook.com/CityAmbulanceTanzania/", "https://x.com/cityambulancetz"], "checked": "2026-10-16" },
+    { "name": "Knight Support (T) Ltd", "kind": "ambulance / security", "note": "Website unreachable on 2026-10-16. Named in a 2023-era guide as a ground ambulance provider in Dar es Salaam and Arusha, and a Czech foreign ministry travel page (undated) lists its Dar es Salaam ambulance numbers. No provider-published source, so not added.", "evidence": ["https://trekmedics.org/database/tanzania-2/", "https://mzv.gov.cz/jnp/cz/encyklopedie_statu/afrika/tanzanie/cestovani/health_care.html"], "checked": "2026-10-16" },
+    { "name": "Divine Heart", "kind": "ambulance", "note": "Website describes ground ambulances in Dar es Salaam and partner air ambulances, but publishes no emergency line (general contact only). Not added as an emergency contact.", "evidence": ["https://www.divineheart.or.tz/"], "checked": "2026-10-16" },
+    { "name": "G4S Secure Solutions (Tanzania)", "kind": "security", "note": "Own site lists a Dar es Salaam office (Plot 37, Ali Hassan Mwinyi Rd, Oysterbay) and a general office number, not a 24 hour response or control room line. Not added as an emergency contact.", "evidence": ["https://www.g4s.com/en-tz"], "checked": "2026-10-16" },
+    { "name": "Telesecurity Company Limited", "kind": "security", "note": "Own site lists one Dar es Salaam office (Regent Estate) with office hours only, no armed response or 24 hour control room, and its call link does not match the number shown. Not added as an emergency contact.", "evidence": ["https://telesecurity.co.tz/"], "checked": "2026-10-16" }
   ]
 }

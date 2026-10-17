@@ -81,7 +81,8 @@ Data freshness: OpenStreetMap exports snapshot 2026-10-07; live OpenStreetMap qu
 
 ## Known to exist, no reliable map location yet
 
-- Wete District Hospital (Kaskazini Pemba): Exists (staff housing project reported December 2024; financed by the Abu Dhabi Fund for Development), but no reliable map location found. Not pinned. Evidence: https://ippmedia.co.tz/the-guardian/news/local-news/read/zbar-launches-housing-project-for-wete-district-hospital-staff-2024-12-26-123823, https://www.adfd.ae/en/what-we-do/projects/wete-hospital
+- Wete District Hospital (Kaskazini Pemba): Exists: one of Pemba's three government district hospitals (with Chake Chake and Micheweni), run by the Zanzibar Ministry of Health; staff housing project reported December 2024; financed by the Abu Dhabi Fund for Development. An unofficial facility list places it at Kinyasini, Wete. Not in OpenStreetMap and no reliable coordinates, so not pinned. Evidence: https://ippmedia.co.tz/the-guardian/news/local-news/read/zbar-launches-housing-project-for-wete-district-hospital-staff-2024-12-26-123823, https://www.adfd.ae/en/what-we-do/projects/wete-hospital, https://www.ijhsr.org/IJHSR_Vol.14_Issue.4_April2024/IJHSR54.pdf
+- Wete fire station (Kikosi cha Zimamoto na Uokozi Zanzibar) (Kaskazini Pemba): Zanzibar House of Representatives records describe a fire station at Mnazimmoja, Wete (office building and vehicle parking built) and a hangar under construction at Finya, Wete. Not in OpenStreetMap and no reliable coordinates, so not pinned. Evidence: https://zanzibarassembly.go.tz/storage/documents/Budgets/all/1684332929.pdf, http://www.zanzibarassembly.go.tz/storage/documents/hansards/all/1442566129.pdf
 
 ## Private providers
 
@@ -90,11 +91,11 @@ Listed in the app (provider-published, from their own websites):
 - **Arusha Medivac** (ambulance): Air ambulance from Arusha Airport; airport to hospital transfers. Northern National Parks, all of Tanzania and Nairobi (provider's claim). Phones: +255 767 996 996, +255 683 996 996. Source: https://arushamedivac.org/, checked 2026-10-16.
 
 Candidates found but not confirmed (not in the app):
-- City Ambulance Tanzania (ambulance): Social media pages give Plot 486, Haile Selassie Rd, Masaki, Dar es Salaam and 24/7 rescue; no reachable website. Not added.
-- Knight Support (T) Ltd (ambulance / security): Named in a 2023-era guide as a ground ambulance provider in Dar es Salaam and Arusha and as radio alarm response; website unreachable. Not added.
+- City Ambulance Tanzania (ambulance): Only social media pages found (Plot 486, Haile Selassie Rd, Masaki, Dar es Salaam; 24/7 rescue claimed). No reachable website and no independent listing found. Not added.
+- Knight Support (T) Ltd (ambulance / security): Website unreachable on 2026-10-16. Named in a 2023-era guide as a ground ambulance provider in Dar es Salaam and Arusha, and a Czech foreign ministry travel page (undated) lists its Dar es Salaam ambulance numbers. No provider-published source, so not added.
 - Divine Heart (ambulance): Website describes ground ambulances in Dar es Salaam and partner air ambulances, but publishes no emergency line (general contact only). Not added as an emergency contact.
-- G4S Secure Solutions (Tanzania) (security): Branch lists differ between its own pages (Dar es Salaam, Arusha, Mbeya, Mwanza, and Dodoma or Mtwara); pages could not be read automatically to confirm. Not added.
-- Telesecurity Company Limited (security): A job listing names branches in more than ten regions; its website refused automated access. Not added.
+- G4S Secure Solutions (Tanzania) (security): Own site lists a Dar es Salaam office (Plot 37, Ali Hassan Mwinyi Rd, Oysterbay) and a general office number, not a 24 hour response or control room line. Not added as an emergency contact.
+- Telesecurity Company Limited (security): Own site lists one Dar es Salaam office (Regent Estate) with office hours only, no armed response or 24 hour control room, and its call link does not match the number shown. Not added as an emergency contact.
 
 ## Priority for field verification or direct contact
 

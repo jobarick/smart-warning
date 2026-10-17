@@ -27,7 +27,10 @@ const CATEGORY_PLACE_KIND = {
   '112': 'police', // Police
   '114': 'fire',   // Fire & Rescue
   '115': 'hospital', // Ambulance
-  '117': 'hospital', // Afya / Health
+  '199': 'hospital', // Health line (Afya)
+  // Before 2026-10-17 the Health category was 117; a client still running the
+  // old bundle may send it, so it keeps its mapping.
+  '117': 'hospital',
 };
 // Tight radius for the email — this is "what's near the reported point right
 // now", not the 15km default places.nearby() uses for a device planning a trip.
@@ -157,6 +160,8 @@ async function handle({ req, res, url, path }) {
       results,
       // Private services you call (no pin), from the provider's own website.
       providers: directory.providers(kinds),
+      // Known to exist but not mappable yet (area mode only): named, no pin.
+      knownUnmapped: hasPoint ? [] : directory.knownUnmapped({ region, kinds }),
     });
     return true;
   }

@@ -6,9 +6,55 @@
 // *available*, including when the network that would refresh it is the thing
 // that just failed. So: fetch when we can, cache what we get, and keep a
 // hard-coded last resort that ships in the bundle and can never fail to load.
-import { fetchDirectory, type EmergencyDirectory } from './api';
+import { fetchDirectory, type EmergencyDirectory, type EmergencyService } from './api';
 
 const CACHE_KEY = 'sw-emergency-directory-v1';
+
+/** Shown when the position is unknown. */
+export const DEFAULT_COUNTRY = 'TZ';
+
+// Bundled evidence for the offline copy below (server/emergency-numbers.js
+// TZ_EVIDENCE is the source of truth; re-checked 2026-10-17).
+const GOV_LISTED = (sources: string[]) => ({ level: 'government-listed' as const, checked: '2026-10-17', note: null, sources });
+const GOV_PORTAL = 'https://www.tanzania.go.tz/topics/health';
+
+/**
+ * Tanzania's list for when the position is unknown AND the network is down
+ * with nothing saved for Tanzania: only the numbers an official government
+ * website lists, so an offline phone never offers an unconfirmed one. Shown
+ * as a saved copy (stale), never as fresh.
+ */
+export const TZ_OFFLINE: EmergencyDirectory = {
+  country: { code: 'TZ', name: 'Tanzania', dial: '+255' },
+  services: ([
+    ['112', 'police', 'Police', 'Polisi', 'Police emergencies', 'Dharura za kipolisi'],
+    ['114', 'fire', 'Fire & Rescue', 'Zimamoto na Uokoaji', 'Fire and rescue emergencies', 'Moto na uokoaji'],
+    ['115', 'ambulance', 'Ambulance · Mama na Mtoto', 'Gari la Wagonjwa · Mama na Mtoto', 'Emergency transport, especially for pregnant women and newborns', 'Usafiri wa dharura, hasa kwa mama mjamzito na mtoto mchanga'],
+    ['111', 'security', 'Crime Stoppers', 'Kuzuia Uhalifu', 'Report and help prevent crime', 'Toa taarifa za uhalifu'],
+    ['116', null, 'Child Helpline', 'Msaada wa Watoto', 'Child emergencies and support', 'Dharura na msaada kwa mtoto'],
+    ['199', null, 'Health line (Afya)', 'Afya (Kituo cha Simu)', 'Health advice from the Ministry of Health. In a medical emergency call 112 or 115.', 'Ushauri wa afya, Wizara ya Afya. Kwa dharura ya kiafya piga 112 au 115.'],
+    ['113', null, 'TAKUKURU (Anticorruption)', 'TAKUKURU', 'Report corruption', 'Kuripoti rushwa'],
+    ['119', null, 'Drug Control', 'Kupambana na Dawa za Kulevya', 'Report drug related emergencies', 'Kuripoti masuala ya dawa za kulevya'],
+    ['190', 'disaster', 'Zanzibar', 'Zanzibar', 'Zanzibar disaster services', 'Huduma za maafa Zanzibar'],
+  ] as const).map(([n, category, label, labelSw, description, descriptionSw]): EmergencyService => ({
+    id: n, numbers: [n], category, label, labelSw, description, descriptionSw,
+    evidence: GOV_LISTED(n === '119' ? ['https://www.dcea.go.tz/'] : [GOV_PORTAL]),
+  })),
+};
+
+/**
+ * A directory is only used if it has the shape the screens need. A malformed
+ * answer (a proxy's error page parsed as JSON, a truncated cache entry, a
+ * string where a list belongs) must fall through to the next source rather
+ * than render nothing, or crash the panel that holds the emergency numbers.
+ */
+export function isUsableDirectory(d: unknown): d is EmergencyDirectory {
+  const dir = d as EmergencyDirectory | null;
+  if (!dir || typeof dir !== 'object' || !dir.country || typeof dir.country.name !== 'string') return false;
+  if (!Array.isArray(dir.services) || dir.services.length === 0) return false;
+  return dir.services.every((s) => s && typeof s.id === 'string' && typeof s.label === 'string'
+    && Array.isArray(s.numbers) && s.numbers.length > 0 && s.numbers.every((n) => typeof n === 'string' && n.length > 0));
+}
 
 /**
  * The floor. 112 is the GSM-standard emergency number and 911 is accepted by
@@ -34,7 +80,10 @@ interface Cached {
 // ~100km. Fine enough that crossing a border re-fetches, coarse enough that
 // ordinary movement doesn't.
 function posKey(lat: number | null, lng: number | null): string {
-  if (lat == null || lng == null) return 'unknown';
+  // Names the country shown without a position. Before 2026-10-16 this was
+  // plain 'unknown' and held the international fallback; a new key makes
+  // those week-long cache entries miss instead of hiding Tanzania's list.
+  if (lat == null || lng == null) return `unknown:${DEFAULT_COUNTRY}`;
   return `${lat.toFixed(0)},${lng.toFixed(0)}`;
 }
 
@@ -43,7 +92,7 @@ function readCache(): Cached | null {
     const raw = localStorage.getItem(CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Cached;
-    if (!parsed?.directory?.services?.length) return null;
+    if (!parsed || typeof parsed.key !== 'string' || !Number.isFinite(parsed.at) || !isUsableDirectory(parsed.directory)) return null;
     return parsed;
   } catch {
     return null;
@@ -58,9 +107,18 @@ function writeCache(entry: Cached) {
   }
 }
 
-/** The cached directory, if there is one. Used to render instantly on boot. */
-export function cachedDirectory(): EmergencyDirectory | null {
-  return readCache()?.directory ?? null;
+/**
+ * What to draw on the very first paint, before anything is fetched. Without a
+ * position only a saved Tanzania list counts (an old "International" entry
+ * must not flash up, or stay up if the fetch hangs); otherwise the bundled
+ * Tanzania copy. With a position, any saved copy is a fair first guess.
+ */
+export function initialDirectory(lat: number | null, lng: number | null): EmergencyDirectory {
+  const cached = readCache();
+  if (lat == null || lng == null) {
+    return cached && cached.directory.country.code === DEFAULT_COUNTRY ? cached.directory : TZ_OFFLINE;
+  }
+  return cached?.directory ?? LAST_RESORT;
 }
 
 /**
@@ -83,8 +141,11 @@ export async function resolveDirectory(
   }
 
   try {
-    const directory = await fetchDirectory(lat, lng);
-    if (directory?.services?.length) {
+    // No position (location refused or unavailable): Tanzania's own numbers,
+    // the audience this app is built for, rather than the international
+    // fallback (112/911). A known position still follows the device abroad.
+    const directory = lat == null || lng == null ? await fetchDirectory(null, null, DEFAULT_COUNTRY) : await fetchDirectory(lat, lng);
+    if (isUsableDirectory(directory)) {
       writeCache({ at: Date.now(), key, directory });
       return { directory, stale: false };
     }
@@ -93,6 +154,12 @@ export async function resolveDirectory(
     // the cache and the last resort exist for.
   }
 
+  // No network. Without a position, a saved Tanzania list (of any age) or the
+  // bundled Tanzania copy; never a saved list for another country.
+  if (lat == null || lng == null) {
+    if (cached && cached.directory.country.code === DEFAULT_COUNTRY) return { directory: cached.directory, stale: cached.key !== key };
+    return { directory: TZ_OFFLINE, stale: true };
+  }
   if (cached) return { directory: cached.directory, stale: cached.key !== key };
   return { directory: LAST_RESORT, stale: true };
 }
