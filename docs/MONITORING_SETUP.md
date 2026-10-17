@@ -1,17 +1,21 @@
 # Production monitoring setup
 
-**Status: NOT CONFIGURED.** No external uptime monitor exists yet, and none
-of the connectors available to the assistant can create one (checked
-2026-10-17), so this needs the owner's own account. The GitHub Actions canary
-is **not** an uptime monitor: GitHub runs it every 2 to 6 hours (measured
-2026-10-11 to 17) instead of every 10 minutes, so an outage can go unnoticed
-for hours. Treat it as a backstop only.
-Since 2026-10-17 the canary also checks `/api/ready` and that the public
-Tanzania number list still contains 112 and 199 and not the removed 117.
+**Status: CONFIGURED on 2026-10-17** (UptimeRobot free plan, owner's account, alerts by email to jobarick@gmail.com).
 
-`/api/ready` reports 503 `{"database":"stale"}` when the last database check
-is more than 90 seconds old (a hung query), not only when it failed, so an
-HTTP monitor on it catches both.
+| Monitor (UptimeRobot id) | Type | Target | Rule | Interval |
+|---|---|---|---|---|
+| Keyword on smart-warning-production.up.railway.app/api/ready (804313219) | Keyword | `https://smart-warning-production.up.railway.app/api/ready` | Incident when `"ready":true,"database":true` is **missing** (catches 503, 404, a wrong app or a stale database check) | 5 min |
+| smart-warning-production.up.railway.app (804313184) | HTTP | `https://smart-warning-production.up.railway.app/api/ready` | Incident on a non-2xx status | 5 min |
+| Keyword on smart-warning.vercel.app/ (804313223) | Keyword | `https://smart-warning.vercel.app/` | Incident when `Smart Warning: Emergency Alert System` (the page title) is missing | 5 min |
+| Keyword on .../api/readyz (804313225) | Keyword | a path that returns 404 | **Temporary alert test, paused. Delete it.** | - |
+
+**Verified 2026-10-17:** all three live monitors read Up. The temporary monitor on the 404 path went Down at 14:22 UTC, and the email "Monitor is DOWN: …/api/readyz" reached the inbox at 14:22:36 UTC (Gmail, Updates tab). Recovery ("UP") emails were seen only as UptimeRobot's own TEST message, not after a real incident yet.
+
+**What it does not do:** UptimeRobot only alerts. It does not restart Railway or fix anything, and it checks from outside Tanzania every 5 minutes, so a short outage can be missed. Phone push alerts need the UptimeRobot app installed and signed in.
+
+The GitHub Actions canary is **not** an uptime monitor: GitHub runs it every 2 to 6 hours (measured 2026-10-11 to 17). It is a backstop that also checks the Tanzania number list.
+
+`/api/ready` reports 503 when the last database check failed, or is more than 90 seconds old (a hung query). Seen on an isolated server on 2026-10-17: stopping the database made `/api/ready` answer 503 `{"ready":false,"database":false}` at once, and 200 again within 5 seconds of the database returning. `/api/health` stays 200 throughout (it is the liveness check) and shows `database.ok:false`.
 
 ## The correct URLs (checked 2026-10-17)
 
