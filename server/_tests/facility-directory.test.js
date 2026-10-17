@@ -211,7 +211,8 @@ test('phase 3: a number is "government-listed" only with a government source, an
   // The Government portal's own emergency list.
   for (const n of ['111', '112', '113', '114', '115', '116', '199', '190']) assert.strictEqual(by[n].level, 'government-listed', n);
   // No credible source: kept, but flagged, never presented as established.
-  for (const n of ['117', '181', '0800110064', '0800711113']) assert.strictEqual(by[n].level, 'unconfirmed', n);
+  for (const n of ['181', '0800110064', '0800711113']) assert.strictEqual(by[n].level, 'unconfirmed', n);
+  assert.strictEqual(by['117'], undefined, '117 is no longer served');
   // 199 is the general health line, not an epidemics-only line.
   assert.match(d.services.find((s) => s.id === '199').label, /Health/);
 });

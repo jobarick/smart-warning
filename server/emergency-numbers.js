@@ -70,11 +70,11 @@ const COUNTRIES = {
       // so both are named. Owner-supplied, not yet independently verified.
       { number: '115', icon: '🚑', category: 'ambulance', sw: { label: 'Gari la Wagonjwa · Mama na Mtoto', description: 'Ambulansi, na usafiri wa dharura kwa mama mjamzito na mtoto mchanga' }, en: { label: 'Ambulance · Mama na Mtoto', description: 'Ambulance, and emergency transport for pregnant women and newborns' } },
       { number: '116', icon: '👶', category: null, sw: { label: 'Msaada wa Watoto', description: 'Dharura na msaada kwa mtoto' }, en: { label: 'Child Helpline', description: 'Child emergencies and support' } },
-      // Relabelled from "HIV/AIDS Services" to the broader "Afya" (Health) per
-      // the product owner's correction (2026-09-17) — same caution as the rest
-      // of this file's owner-supplied data: not independently verified against
-      // an authoritative source.
-      { number: '117', icon: '🩺', category: null, sw: { label: 'Afya', description: 'Huduma na dharura za afya' }, en: { label: 'Health', description: 'Health services and emergencies' } },
+      // 117 ("Afya / Health", owner-supplied 2026-09-17) was removed 2026-10-17:
+      // no official or credible source supports it, and the Ministry of Health's
+      // own site and the Government portal give 199 for the health line. Its
+      // evidence record stays in TZ_EVIDENCE so it can be restored if TCRA or
+      // the Ministry confirm it.
       { number: '119', icon: '💊', category: null, sw: { label: 'Kupambana na Dawa za Kulevya', description: 'Kuripoti masuala ya dawa za kulevya' }, en: { label: 'Drug Control', description: 'Report drug related emergencies' } },
       // DAWASA, the Dar es Salaam water and sewerage authority. Added by the
       // product owner (2026-10-07); Dar es Salaam only. Owner-supplied, not
@@ -82,10 +82,10 @@ const COUNTRIES = {
       { number: '181', icon: '💧', category: 'utility', sw: { label: 'DAWASA (Maji Dar es Salaam)', description: 'Dharura za maji na majitaka, Dar es Salaam' }, en: { label: 'DAWASA (Dar es Salaam water)', description: 'Water and sewerage emergencies in Dar es Salaam' } },
       { number: '190', icon: '🏝️', category: 'disaster', sw: { label: 'Zanzibar', description: 'Huduma za maafa Zanzibar' }, en: { label: 'Zanzibar', description: 'Zanzibar disaster services' } },
       { number: '195', icon: '🚫', category: null, sw: { label: 'Kupinga Usafirishaji Haramu wa Binadamu', description: 'Toa taarifa za usafirishaji haramu wa binadamu' }, en: { label: 'Human Trafficking', description: 'Report human trafficking' } },
-      // Relabelled 2026-10-16: the Government portal lists 199 as "Afya", the
-      // Ministry of Health Afya Call Centre (advice, referral, outbreaks), not
-      // an epidemics-only line. Number unchanged.
-      { number: '199', icon: '🏥', category: null, sw: { label: 'Afya (Kituo cha Simu)', description: 'Ushauri wa afya, rufaa na magonjwa ya mlipuko' }, en: { label: 'Health line (Afya)', description: 'Ministry of Health call centre: health advice, referral and outbreaks' } },
+      // The Ministry of Health's Afya Call Centre (moh.go.tz; Government portal
+      // "Afya 199"). An advice and information line, not an ambulance: the
+      // description sends a medical emergency to 112 or 115.
+      { number: '199', icon: '🏥', category: null, sw: { label: 'Afya (Kituo cha Simu)', description: 'Ushauri na taarifa za afya, Wizara ya Afya. Kwa dharura ya kiafya piga 112 au 115.' }, en: { label: 'Health line (Afya)', description: 'Health advice and information from the Ministry of Health. In a medical emergency call 112 or 115.' } },
       // Not in the owner's new list, but a real published number this file
       // already had — kept rather than silently dropped.
       { number: '0800110064', icon: '🆘', category: 'disaster', sw: { label: 'Maafa (Bara)', description: 'Usimamizi wa maafa Tanzania Bara' }, en: { label: 'Disaster Management (Mainland)', description: 'Mainland Tanzania disaster management' } },
@@ -384,12 +384,14 @@ const TZ_EVIDENCE = {
   '114': { level: 'government-listed', checked: '2026-10-16', note: 'Government portal: "Zimamoto na Uokoaji 114". The Fire and Rescue Force site and a 2015 Parliament record say free on all networks, 24 hours, routed to the nearest station. Press reports patchy availability by region and network.', sources: [GOV_PORTAL, 'https://www.zimamoto.go.tz/', 'https://medicopress.media/if-you-see-an-accident-victim-in-mwanza-dont-take-photos-call-114'] },
   '115': { level: 'government-listed', checked: '2026-10-16', note: 'Government portal: "Gari la Wagonjwa m-mama 115". Launched March 2024 for emergencies of pregnant women and newborns (M-mama); the Zanzibar health ministry says it is free. Not a general ambulance service everywhere.', sources: [GOV_PORTAL, 'https://www.moh.go.tz/en/news-single/dharura-zaidi-60000-zasafirishwa-kupitia-mfumo-wa-m-mama', 'https://www.mwananchi.co.tz/mw/habari/kitaifa/-namba-115-ya-simu-ya-dharura-suluhisho-vifo-vya-wajawazito-yazinduliwa-tanzania-4568530'] },
   '116': { level: 'government-listed', checked: '2026-10-16', note: 'Government portal: "Dawati la Jinsia na Watoto 116" (gender and children desk). UN agencies describe it as the National Child Helpline run by C-Sema with the Government: toll free, 24/7, all networks, Mainland and Zanzibar.', sources: [GOV_PORTAL, 'https://www.unfpa.org/news/tanzanian-helpline-reaching-thousands-risk-women-and-girls-every-day', 'https://news.un.org/en/node/1091972'] },
-  '199': { level: 'government-listed', checked: '2026-10-16', note: 'Government portal: "Afya 199". The Ministry of Health Afya Call Centre: a toll-free, 24/7 health line (advice, symptoms, referral, outbreaks), not only epidemics.', sources: [GOV_PORTAL, 'https://www.villagereach.org/resource/enhancing-the-effectiveness-of-afya-call-center-hotline-199-complaints-and-feedback-system/'] },
+  '199': { level: 'government-listed', checked: '2026-10-17', note: 'Ministry of Health site (4 July 2024): the Minister visits "Afya Call Centre 199", the Ministry\'s centre for receiving and answering citizens\' questions. Government portal: "Afya 199". VillageReach: toll-free, 24/7. An advice line, not an ambulance.', sources: ['https://www.moh.go.tz/en/news-single/mhe-ummy-ahimiza-watumishi-afya-call-centre-199-kuongeza-ufanisi-kuhudumia-wananchi', GOV_PORTAL, 'https://www.villagereach.org/resource/enhancing-the-effectiveness-of-afya-call-center-hotline-199-complaints-and-feedback-system/'] },
   '190': { level: 'government-listed', checked: '2026-10-16', note: 'Government portal: "Zanzibar 190". A World Bank (GFDRR) article describes 190 as a free TCRA-provided emergency number used for disaster alerts; its exact scope outside Zanzibar is not established.', sources: [GOV_PORTAL, 'https://www.gfdrr.org/en/feature-story/assessment-action-how-tanzania-strengthening-emergency-preparedness'] },
   '119': { level: 'government-listed', checked: '2026-10-16', note: 'Drug Control and Enforcement Authority (DCEA) site: "Piga Simu Bure 119" (free).', sources: ['https://www.dcea.go.tz/'] },
   '195': { level: 'reported', checked: '2026-10-16', note: 'The Citizen (25 May 2026): the Ministry of Home Affairs Counter Trafficking in Persons Call Centre, toll-free 195. Not found on a government site.', sources: ['https://www.thecitizen.co.tz/tanzania/news/national/tanzania-rescues-trafficking-victims-from-gulf-asia-5472380'] },
   '110': { level: 'reported', checked: '2026-10-16', note: 'EACO harmonised short codes assign 110 to emergencies on Lake Victoria and other water bodies. A January 2026 report says the Mwanza maritime rescue centre will take toll-free 110 calls once fully operational, so it may not answer yet.', sources: ['https://www.kenyanews.go.ke/eac-eyes-safer-lake-victoria-as-mwanza-maritime-rescue-centre/', 'https://en.wikipedia.org/wiki/Telephone_numbers_in_Tanzania'] },
-  '117': { level: 'unconfirmed', checked: '2026-10-16', note: 'No official or credible source found for 117 as a health line; the Government portal lists 199 for health. Confirm with the Ministry of Health or TCRA before relying on it.', sources: [] },
+  // Not served since 2026-10-17 (see the richServices comment); kept so the
+  // decision and its reason stay on record.
+  '117': { level: 'unconfirmed', checked: '2026-10-17', note: 'No official or credible source found for 117 as a health line; the Ministry of Health and the Government portal give 199. Removed from the app until TCRA or the Ministry confirm it.', sources: [] },
   '181': { level: 'unconfirmed', checked: '2026-10-16', note: 'Dar es Salaam only (DAWASA). No public source found for 181; confirm with DAWASA.', sources: [] },
   '0800110064': { level: 'unconfirmed', checked: '2026-10-16', note: "Mainland only. No public source found linking this number to the Prime Minister's Office Disaster Management Department; confirm with them.", sources: [] },
   '0800711113': { level: 'unconfirmed', checked: '2026-10-16', note: 'No public source found for this number. Which utility it reaches is not established; do not present it as a national utility line.', sources: [] },

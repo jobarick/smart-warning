@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { AlertType, Locale } from '../types';
 import type { EmergencyDirectory } from '../lib/api';
-import { cachedDirectory, canDial, isDialable, resolveDirectory, telHref, SERVICE_ICON } from '../lib/emergency';
+import { canDial, initialDirectory, isDialable, resolveDirectory, telHref, SERVICE_ICON } from '../lib/emergency';
 import { t } from '../lib/i18n';
 import { Icon } from './Icon';
 import type { IconName } from './Icon';
@@ -31,7 +31,7 @@ const PRIORITY: Record<AlertType, string> = {
 export function EmergencyCallPocket({ lat, lng, alertType, defaultOpen = false, locale }: Props) {
   // Start from cache so the list is on screen immediately — including offline,
   // and including the first paint after a cold start.
-  const [directory, setDirectory] = useState<EmergencyDirectory | null>(() => cachedDirectory());
+  const [directory, setDirectory] = useState<EmergencyDirectory | null>(() => initialDirectory(lat, lng));
   const [stale, setStale] = useState(false);
   const [open, setOpen] = useState(defaultOpen);
 
@@ -114,7 +114,7 @@ export function EmergencyCallPocket({ lat, lng, alertType, defaultOpen = false, 
                 </span>
                 {description && <span className="pocket-svc-desc">{description}</span>}
                 {/* A number no official source supports is kept, but says so. */}
-                {(svc.evidence?.level === 'unconfirmed' || svc.evidence?.level === 'unchecked') && (
+                {svc.evidence && svc.evidence.level !== 'government-listed' && svc.evidence.level !== 'official' && (
                   <span className="pocket-unconfirmed" title={svc.evidence.note || undefined}>{t(locale, 'evidence.short')}</span>
                 )}
                 <span className="pocket-numbers">

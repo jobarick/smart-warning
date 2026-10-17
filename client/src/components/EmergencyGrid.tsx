@@ -23,11 +23,10 @@ interface Props {
 }
 
 // Tanzania's own short-code directory (server/emergency-numbers.js,
-// `richServices`) — the seven short codes confirmed by the product owner
-// (2026-09-17), plus Disaster Management and Utility Emergency added
-// (2026-09-18) to reach nine. Ids are the numbers themselves — see that
-// file's directoryFor().
-export const GRID_IDS = ['111', '112', '113', '114', '115', '116', '117', '0800110064', '0800711113'];
+// `richServices`). Ids are the numbers themselves — see that file's
+// directoryFor(). Health is 199, the Ministry of Health line (2026-10-17;
+// it was 117, which no source supports).
+export const GRID_IDS = ['111', '112', '113', '114', '115', '116', '199', '0800110064', '0800711113'];
 
 /**
  * The public front door's 3×3 emergency grid: nine incident types, tap one and

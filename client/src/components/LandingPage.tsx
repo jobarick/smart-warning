@@ -3,7 +3,7 @@ import { track } from '../lib/analytics';
 import { fetchPlans, formatMoney, type Plan, type PaymentMethods } from '../lib/billing';
 import { saveIntendedPlan } from '../lib/intendedPlan';
 import { canDial, telHref } from '../lib/emergency';
-import { EMERGENCY_SERVICE_FALLBACK } from '../lib/emergencyGrid';
+import { EMERGENCY_SERVICE_FALLBACK, NOT_GOVERNMENT_LISTED } from '../lib/emergencyGrid';
 import { PROVIDER, SUPPORT_EMAIL, SUPPORT_PHONE, SALES_EMAIL } from '../lib/termsMeta';
 import { t, type StringKey } from '../lib/i18n';
 import type { ResolvedTheme } from '../lib/theme';
@@ -53,7 +53,7 @@ const PLAN_TAG: Record<string, StringKey> = {
 const HOME_CATEGORIES = ['112', '114', '115', '116', '111', '0800110064'];
 
 /** Every number we carry, for the directory below the fold. */
-const DIRECTORY_IDS = ['112', '114', '115', '117', '116', '111', '113', '195', '199', '110', '0800110064', '0800711113'];
+const DIRECTORY_IDS = ['112', '114', '115', '199', '116', '111', '113', '195', '110', '0800110064', '0800711113'];
 
 const STEPS: { icon: 'user' | 'siren' | 'map-pin'; title: StringKey; body: StringKey }[] = [
   { icon: 'user', title: 'landing.how.1.title', body: 'landing.how.1.body' },
@@ -256,7 +256,10 @@ export function LandingPage({ onGetStarted, onWatchDemo, locale, onToggleLocale,
               const label = locale === 'sw' && svc.labelSw ? svc.labelSw : svc.label;
               return (
                 <li key={id}>
-                  <span><Icon name={svc.iconName} /> {label}</span>
+                  <span>
+                    <Icon name={svc.iconName} /> {label}
+                    {NOT_GOVERNMENT_LISTED.has(id) && <small className="lp-unconfirmed"> · {t(locale, 'evidence.short')}</small>}
+                  </span>
                   {dialable ? <a href={telHref(svc.numbers[0])}>{svc.numbers[0]}</a> : <b>{svc.numbers[0]}</b>}
                 </li>
               );

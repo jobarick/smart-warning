@@ -1024,6 +1024,8 @@ export interface EmergencyDirectory {
   services: EmergencyService[];
 }
 
+export const DIRECTORY_TIMEOUT_MS = 8000;
+
 /** Published emergency numbers for a position. Unauthenticated by design. */
 export async function fetchDirectory(lat: number | null, lng: number | null, country?: string): Promise<EmergencyDirectory> {
   const params = new URLSearchParams();
@@ -1032,9 +1034,17 @@ export async function fetchDirectory(lat: number | null, lng: number | null, cou
     params.set('lat', String(lat));
     params.set('lng', String(lng));
   }
-  const res = await fetch(`${API_BASE}/api/emergency/directory?${params.toString()}`);
-  if (!res.ok) throw new Error(`directory request failed (${res.status})`);
-  return res.json();
+  // A request that hangs (a captive portal, a dead mobile connection) must
+  // give up, so the saved or bundled list is shown instead of waiting forever.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), DIRECTORY_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${API_BASE}/api/emergency/directory?${params.toString()}`, { signal: ctrl.signal });
+    if (!res.ok) throw new Error(`directory request failed (${res.status})`);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // --- Emergency reports (Tanzania-wide, no account — see EmergencyGrid) ---

@@ -538,7 +538,7 @@ const SW: Record<StringKey, string> = {
     'landing.premium.freeNote': 'Hauhitaji kadi kuanza. SOS, 112 na namba za ukurasa huu hazina gharama kamwe.',
     'landing.premium.cta': 'Anza mwezi wa bure',
     'landing.directory.heading': 'Orodha ya namba za dharura, Tanzania',
-    'landing.directory.unverified': 'Namba hizi bado hazijathibitishwa na mamlaka. Ikiwa moja haipatikani, piga 112.',
+    'landing.directory.unverified': 'Zimeorodheshwa kwenye tovuti rasmi za Serikali isipokuwa zilizowekewa alama. Hakuna iliyothibitishwa kwa maandishi na taasisi bado. Ikiwa moja haipatikani, piga 112.',
     'landing.stories.heading': 'Inaposaidia',
     'landing.stories.sub': 'Mifano ya jinsi watu wanavyoitumia, si ushuhuda.',
     'landing.story.1.title': 'Kurudi nyumbani usiku',

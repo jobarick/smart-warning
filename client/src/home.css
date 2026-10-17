@@ -336,3 +336,4 @@
 .eg-evidence a { color: var(--accent); }
 .eg-evidence-weak { color: #f59e0b; }
 .pocket-unconfirmed { font-size: 0.72rem; color: #f59e0b; }
+.lp-unconfirmed { color: #f59e0b; font-size: 0.74rem; }

@@ -20,11 +20,17 @@ export const EMERGENCY_SERVICE_FALLBACK: Record<string, EmergencyGridService> = 
   '114': { id: '114', numbers: ['114'], iconName: 'flame', label: 'Fire & Rescue', labelSw: 'Zimamoto' },
   '115': { id: '115', numbers: ['115'], iconName: 'medical', label: 'Ambulance · Mama na Mtoto', labelSw: 'Gari la Wagonjwa · Mama na Mtoto' },
   '116': { id: '116', numbers: ['116'], iconName: 'child', label: 'Child Helpline', labelSw: 'Msaada wa Watoto' },
-  '117': { id: '117', numbers: ['117'], iconName: 'medical', label: 'Health', labelSw: 'Afya' },
   '195': { id: '195', numbers: ['195'], iconName: 'lock', label: 'Human Trafficking', labelSw: 'Kupinga Usafirishaji Haramu' },
-  '199': { id: '199', numbers: ['199'], iconName: 'epidemic', label: 'Health line (Afya)', labelSw: 'Afya (Kituo cha Simu)' },
+  '199': { id: '199', numbers: ['199'], iconName: 'epidemic', label: 'Health line (Afya)', labelSw: 'Afya (Kituo cha Simu)', description: 'Health advice from the Ministry of Health. In a medical emergency call 112 or 115.', descriptionSw: 'Ushauri wa afya, Wizara ya Afya. Kwa dharura ya kiafya piga 112 au 115.' },
   '0800110064': { id: '0800110064', numbers: ['0800110064'], iconName: 'hazard', label: 'Disaster Management', labelSw: 'Maafa (Bara)' },
   '181': { id: '181', numbers: ['181'], iconName: 'utility', label: 'DAWASA (Dar es Salaam water)', labelSw: 'DAWASA (Maji Dar es Salaam)' },
   '0800711113': { id: '0800711113', numbers: ['0800711113'], iconName: 'utility', label: 'Utility Emergency', labelSw: 'Huduma za Umeme/Maji' },
   '110': { id: '110', numbers: ['110'], iconName: 'coastguard', label: 'Lakes, Sea & Coast Guard', labelSw: 'Maziwa, Bahari' },
 };
+
+/**
+ * Numbers no official government website lists (server TZ_EVIDENCE level
+ * below "government-listed", re-checked 2026-10-17). Used where only the
+ * bundled list is available (the landing page directory) to mark them.
+ */
+export const NOT_GOVERNMENT_LISTED = new Set(['110', '195', '181', '0800110064', '0800711113']);
