@@ -32,6 +32,7 @@ let contactsByUser = new Map();
 const recordedAlerts = [];
 const mailSent = [];
 let mailShouldDeliver = true;
+let mailRefuses = false;
 // Which incident ids have already been recorded — models the real ON
 // CONFLICT DO NOTHING: a second recordAlert for the same id must report back
 // "not the first time" the same way Postgres's rowCount does.
@@ -116,6 +117,7 @@ before(() => {
     destination: () => null,
     send: async (msg) => {
       mailSent.push(msg);
+      if (mailRefuses) return { queued: false, delivered: false, refused: true };
       return { queued: true, delivered: mailShouldDeliver };
     },
   });
@@ -137,6 +139,7 @@ beforeEach(() => {
   recordedAlerts.length = 0;
   mailSent.length = 0;
   mailShouldDeliver = true;
+  mailRefuses = false;
   seenIncidentIds = new Set();
   incidentsById = new Map();
   nearbyHelpCalls.length = 0;
@@ -233,6 +236,15 @@ test('a delivery failure is reported honestly, not as a false success', async ()
   const body = await res.json();
   assert.strictEqual(mailSent.length, 1, 'a real attempt was still made');
   assert.deepStrictEqual(body.contacted, [{ id: 'c3', name: 'Mama', delivered: false, email: 'queued', sms: null }]);
+});
+
+test('a permanent refusal (e.g. a test sender) is reported as refused, never as queued or sent', async () => {
+  mailRefuses = true;
+  contactsByUser.set(USER.id, [{ id: 'c4', name: 'Kaka', email: 'kaka@example.test', phone: null }]);
+  const res = await alertAs(PERSONAL_TOKEN, { type: 'medical', severity: 'high' });
+  const body = await res.json();
+  assert.deepStrictEqual(body.contacted, [{ id: 'c4', name: 'Kaka', delivered: false, email: 'refused', sms: null }]);
+  mailRefuses = false;
 });
 
 test('the incident is recorded against the user, not any organization', async () => {
