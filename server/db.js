@@ -1309,24 +1309,40 @@ async function getResponderStatus(userId) {
  */
 async function findNearbyResponders({ lat, lng, category, radiusM, freshnessMs, excludeUserId }) {
   if (!pool || !Number.isFinite(lat) || !Number.isFinite(lng)) return [];
-  const deg = radiusM / 111000;
+  // A coarse box first (cheap, index friendly), then the true distance below.
+  // East-west degrees shrink with latitude, so the longitude half-width is
+  // widened by 1/cos(lat) to cover the whole circle.
+  const latDeg = radiusM / 111195;
+  const lngDeg = latDeg / Math.max(Math.cos((lat * Math.PI) / 180), 0.01);
   const { rows } = await pool.query(
     // verified_at: only responders a person has vetted (scripts/verify-responder.js)
     // are ever offered an emergency, the same rule the live map uses. Opting in
     // is open to any account; being sent someone's emergency must not be.
+    // $5 may be null (an organisation alert has nobody to leave out): compared
+    // with != it would match no row at all, so it is tested explicitly.
     `SELECT * FROM responders
       WHERE is_available = true
         AND verified_at IS NOT NULL
-        AND user_id != $5
+        AND ($5::uuid IS NULL OR user_id <> $5::uuid)
         AND lat IS NOT NULL AND lng IS NOT NULL
         AND captured_at > now() - ($4 || ' milliseconds')::interval
         AND lat BETWEEN $1::double precision - $6::double precision AND $1::double precision + $6::double precision
-        AND lng BETWEEN $2::double precision - $6::double precision AND $2::double precision + $6::double precision
+        AND lng BETWEEN $2::double precision - $7::double precision AND $2::double precision + $7::double precision
         AND ($3 = ANY(categories) OR 'general' = ANY(categories))
       ORDER BY ($3 = ANY(categories)) DESC`,
-    [lat, lng, category, String(freshnessMs), excludeUserId, deg],
+    [lat, lng, category, String(freshnessMs), excludeUserId || null, latDeg, lngDeg],
   );
-  return rows;
+  // Within the radius by great-circle distance, not merely inside the box
+  // (whose corners are about 1.4 times further away).
+  return rows.filter((r) => greatCircleM(lat, lng, Number(r.lat), Number(r.lng)) <= radiusM);
+}
+
+function greatCircleM(lat1, lng1, lat2, lng2) {
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371000 * Math.asin(Math.min(1, Math.sqrt(a)));
 }
 
 /** One offer row per notified candidate — see incident_offers' own comment. */

@@ -99,6 +99,28 @@ Then: tell every participant the test is paused; note the time; roll back with t
 
 **Not run yet. Run only with the owner's written go-ahead.** The same flow already passes an isolated rehearsal (real server, throwaway database, 38 checks, 2026-10-17). This live run adds what that cannot: real phones, real GPS, real networks and real push.
 
+### 9.0 Isolation pre-check (must pass, or do not run the rehearsal)
+
+How a test SOS can reach anyone (audited 2026-10-18):
+
+| Path | Who it can reach |
+|---|---|
+| Relay broadcast, web push, FCM, escalation, stand-down | Devices of **the test organisation only** |
+| Trusted Circle email | Only the **personal tester's own contacts** (use participants' addresses only) |
+| SMS | Off in production (`SMS_ENABLED` not set) |
+| **Nearby Help** | **Verified, available responders within 10 km (great-circle) whose position is under 5 minutes old and whose category matches.** The only path to people outside the test group |
+
+Nothing retries Nearby Help. A personal SOS raised without a location runs Nearby Help once more, when its location arrives.
+
+Before the day, and again 15 minutes before step 3:
+
+1. In Supabase, open **SQL editor**, paste `docs/sql/nearby-help-coverage.sql`, set the rehearsal point and category, and run it. It is read only and returns counts only.
+2. **Pass only if** `would_be_offered_right_now` and `verified_available_within_10km` are both **0** before you verify the test responders. Otherwise someone outside the test group would be offered the test SOS: move the rehearsal point or postpone.
+3. Verify the test responders (accounts the participants control, Nearby Help switched on in the app). From `server/`, with `DATABASE_URL` set in your terminal session only:
+   `node scripts/verify-responder.js --email <test responder> --by "<who checked them and how, date>"`
+4. Run the query again: `verified_available_within_10km` must now equal the number of test responders and nothing more.
+5. After the rehearsal, revoke them: `node scripts/verify-responder.js --email <test responder> --revoke`
+
 ### 9.1 Before the day (owner)
 
 - [ ] Written go-ahead from the owner, with the date, time window and place.
@@ -153,7 +175,36 @@ Read to everyone at the start: "This is a test of Smart Warning. Every alert tod
 - Build from `main` with `client/android/app/google-services.json` (Firebase project `smart-warning`, package `com.smartwarning.app`): `cd client; npm run build; npx cap sync android; cd android; .\gradlew assembleDebug`.
 - Install `app/build/outputs/apk/debug/app-debug.apk` **only on the participants' phones, signed in to the test org.** Never on a device signed in to a real team: it would register for that team's real alerts.
 
-### 9.5 Stop at once (then follow section 8) if
+### 9.6 Real-device push (part of the rehearsal)
+
+Use the FCM build (9.4) on a consenting tester's phone in the test organisation, and a desktop browser signed in to the same organisation.
+
+| Test | How | Pass |
+|---|---|---|
+| Android, app in front | Worker raises TEST SOS | Alarm shows within 10 s |
+| Android, app in background / screen locked | Lock the phone, raise TEST SOS from another worker | Notification with sound within 30 s |
+| Android, app swiped away | Close the app fully, repeat | Notification within 30 s |
+| Web push | Browser tab closed, notifications allowed | Notification within 30 s |
+| Permission denied | Deny notifications on a second device | The app says alerts are off; nothing pretends it was notified |
+| Stale token | Uninstall and reinstall on one phone, raise again | The old token is pruned (no repeated failure for it); the new one receives |
+| Provider acceptance vs receipt | Compare the incident's events (`notified`, `sent`) with what each phone showed | Record any phone counted as sent that did not ring: provider acceptance is not proof of receipt |
+| Duplicate suppression | Double tap, and flight mode for 30 s then back | One alarm per device |
+
+### 9.7 Measurable acceptance criteria
+
+| Measure | Pass |
+|---|---|
+| SOS tap to server acceptance (incident appears for the coordinator) | under 5 s on 3G/4G |
+| Incident record | exists, with raised, notified, acknowledged and resolved events and times |
+| Push provider acceptance (`notified` event, `sent` > 0) | under 10 s |
+| Receipt on the locked test phone | under 30 s, in 3 of 3 attempts |
+| Nearby Help offer to the verified test responder | arrives; the "Nearby help" panel then counts that person as alerted |
+| Location before acceptance / after revocation / after all-clear | hidden / hidden at once / hidden at once |
+| Duplicates | exactly one alarm and one incident per SOS |
+| Failure recovery | after flight mode, the SOS still arrives once; the coordinator view recovers within 30 s |
+| Anyone outside the test group alerted | **none** (any one is an immediate stop) |
+
+### 9.8 Stop at once (then follow section 8) if
 
 - an SOS is not seen by the coordinator within 30 s,
 - a pin is clearly in the wrong place,
