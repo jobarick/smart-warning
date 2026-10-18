@@ -37,8 +37,12 @@ after(() => { global.fetch = realFetch; });
 
 test('FCM: a send that never answers fails within the timeout, is counted, and keeps the token', async () => {
   hang = true;
+  // AbortSignal.timeout's timer does not keep Node running by itself. A real
+  // hung request holds an open socket (and the server is always listening);
+  // the fake one here holds nothing, so keep the process alive meanwhile.
+  const keepAlive = setInterval(() => {}, 50);
   const t0 = Date.now();
-  const r = await fcm.sendToTokens([{ token: 'a' }, { token: 'b' }], { title: 'TEST', body: 'TEST' });
+  const r = await fcm.sendToTokens([{ token: 'a' }, { token: 'b' }], { title: 'TEST', body: 'TEST' }).finally(() => clearInterval(keepAlive));
   const ms = Date.now() - t0;
   assert.deepStrictEqual({ sent: r.sent, pruned: r.pruned, failed: r.failed }, { sent: 0, pruned: 0, failed: 2 });
   assert.ok(ms < 2000, `took ${ms} ms`);
