@@ -33,6 +33,8 @@ const recordedAlerts = [];
 const mailSent = [];
 let mailShouldDeliver = true;
 let mailRefuses = false;
+let mailDelayMs = 0;
+let mailThrowFor = null;
 // Which incident ids have already been recorded — models the real ON
 // CONFLICT DO NOTHING: a second recordAlert for the same id must report back
 // "not the first time" the same way Postgres's rowCount does.
@@ -117,6 +119,8 @@ before(() => {
     destination: () => null,
     send: async (msg) => {
       mailSent.push(msg);
+      if (mailDelayMs) await new Promise((r) => setTimeout(r, mailDelayMs));
+      if (mailThrowFor && msg.to === mailThrowFor) throw new Error('queue insert failed (test)');
       if (mailRefuses) return { queued: false, delivered: false, refused: true };
       return { queued: true, delivered: mailShouldDeliver };
     },
@@ -140,6 +144,8 @@ beforeEach(() => {
   mailSent.length = 0;
   mailShouldDeliver = true;
   mailRefuses = false;
+  mailDelayMs = 0;
+  mailThrowFor = null;
   seenIncidentIds = new Set();
   incidentsById = new Map();
   nearbyHelpCalls.length = 0;
@@ -245,6 +251,31 @@ test('a permanent refusal (e.g. a test sender) is reported as refused, never as 
   const body = await res.json();
   assert.deepStrictEqual(body.contacted, [{ id: 'c4', name: 'Kaka', delivered: false, email: 'refused', sms: null }]);
   mailRefuses = false;
+});
+
+test('a slow mail server delays the Circle by one timeout, not one per contact, and keeps their order', async () => {
+  mailDelayMs = 300;
+  const people = ['A', 'B', 'C', 'D', 'E'].map((n, i) => ({ id: `s${i}`, name: n, email: `${n.toLowerCase()}@example.test`, phone: null }));
+  contactsByUser.set(USER.id, people);
+  const t0 = Date.now();
+  const res = await alertAs(PERSONAL_TOKEN, { type: 'medical', severity: 'high' });
+  const elapsed = Date.now() - t0;
+  const body = await res.json();
+  assert.strictEqual(res.status, 201);
+  assert.deepStrictEqual(body.contacted.map((c) => c.name), ['A', 'B', 'C', 'D', 'E'], 'order kept');
+  assert.ok(body.contacted.every((c) => c.email === 'sent'));
+  assert.ok(elapsed < 1200, `5 contacts at 300 ms each took ${elapsed} ms (one after another would be at least 1500)`);
+  mailDelayMs = 0;
+});
+
+test('an unexpected error for one contact never stops the others being notified', async () => {
+  mailThrowFor = 'b@example.test';
+  contactsByUser.set(USER.id, ['a', 'b', 'c'].map((n, i) => ({ id: `e${i}`, name: n.toUpperCase(), email: `${n}@example.test`, phone: null })));
+  const res = await alertAs(PERSONAL_TOKEN, { type: 'medical', severity: 'high' });
+  const body = await res.json();
+  assert.strictEqual(res.status, 201, 'the SOS still succeeds');
+  assert.deepStrictEqual(body.contacted.map((c) => [c.name, c.email, c.delivered]), [['A', 'sent', true], ['B', 'failed', false], ['C', 'sent', true]]);
+  mailThrowFor = null;
 });
 
 test('the incident is recorded against the user, not any organization', async () => {

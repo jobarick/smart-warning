@@ -687,7 +687,7 @@ export interface PersonalAlertResult {
   incidentId: string;
   /** `delivered` = email sent, or SMS accepted by the provider. Neither
    *  confirms the person read it. */
-  contacted: { id: string; name: string; delivered: boolean; email?: 'sent' | 'queued' | 'refused' | null; sms?: string | null }[];
+  contacted: { id: string; name: string; delivered: boolean; email?: 'sent' | 'queued' | 'refused' | 'failed' | null; sms?: string | null }[];
   skipped: { id: string; name: string; reason: 'no-email' }[];
   /** True when this exact incident id had already been recorded — a retry
    *  that actually landed the first time, replaying safely rather than

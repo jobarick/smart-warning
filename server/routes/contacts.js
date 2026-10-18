@@ -96,6 +96,24 @@ function parseContact(body, { partial = false } = {}) {
   return out;
 }
 
+
+// How many Trusted Circle contacts are notified at once.
+const CONTACT_CONCURRENCY = 10;
+
+/** Runs fn over items with at most `limit` in flight; results keep the input order. */
+async function mapWithLimit(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i], i);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
 async function handle({ req, res, path }) {
   if (path === '/api/contacts' && req.method === 'GET') {
     const user = await personalUser(req, res);
@@ -241,13 +259,12 @@ async function handle({ req, res, path }) {
       mapsLink ? `Mahali/Location: ${mapsLink}` : 'Mahali haijulikani / Location unknown.',
       'Smart Warning si huduma ya dharura / not an emergency service. Piga/Call 112.',
     ].join(' ');
-    for (const contact of contacts) {
+    const notifyOne = async (contact) => {
       const canSms = smsOn && !!contact.phone;
       if (!contact.email && !canSms) {
         // Unreachable on every channel that is switched on: recorded honestly
         // rather than silently dropped or falsely claimed as notified.
-        skipped.push({ id: contact.id, name: contact.name, reason: 'no-email' });
-        continue;
+        return { skipped: { id: contact.id, name: contact.name, reason: 'no-email' } };
       }
       let smsStatus = null;
       if (canSms) {
@@ -255,8 +272,7 @@ async function handle({ req, res, path }) {
         smsStatus = r.status;
       }
       if (!contact.email) {
-        contacted.push({ id: contact.id, name: contact.name, delivered: smsStatus === 'accepted', sms: smsStatus, email: null });
-        continue;
+        return { contacted: { id: contact.id, name: contact.name, delivered: smsStatus === 'accepted', sms: smsStatus, email: null } };
       }
       const subject = `DHARURA: ${raiser} anahitaji msaada / needs help`;
       const body2 = [
@@ -287,7 +303,7 @@ async function handle({ req, res, path }) {
         refId: `${incidentId}:${contact.id}`,
         orgId: null,
       });
-      contacted.push({
+      return { contacted: {
         id: contact.id, name: contact.name,
         delivered: result.delivered === true || smsStatus === 'accepted',
         // 'refused': the mail provider permanently turned it down (for example
@@ -295,7 +311,25 @@ async function handle({ req, res, path }) {
         // retried, so calling it 'queued' would promise a delivery that never comes.
         email: result.delivered === true ? 'sent' : result.refused === true ? 'refused' : 'queued',
         sms: smsStatus,
-      });
+      } };
+    };
+
+    // Each contact is independent, so they are notified in parallel, a few at
+    // a time so a provider's rate limit is not hit all at once. A slow or
+    // hanging mail server then delays everyone by one timeout (about 40 s),
+    // not one timeout per contact in turn, and a failure while notifying one
+    // contact never stops the others from being tried.
+    const outcomes = await mapWithLimit(contacts, CONTACT_CONCURRENCY, async (contact) => {
+      try {
+        return await notifyOne(contact);
+      } catch (e) {
+        console.error(`[contacts] notifying contact ${contact.id} failed: ${e.message}`);
+        return { contacted: { id: contact.id, name: contact.name, delivered: false, email: contact.email ? 'failed' : null, sms: null } };
+      }
+    });
+    for (const o of outcomes) {
+      if (o.skipped) skipped.push(o.skipped);
+      else contacted.push(o.contacted);
     }
 
     db.recordIncidentEvent?.({
