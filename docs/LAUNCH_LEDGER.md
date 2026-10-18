@@ -6,9 +6,9 @@ Smart Warning is **not** ready for public emergency use.
 
 | Task | Status | Evidence required | Next action |
 |---|---|---|---|
-| Production drill columns (`organizations.is_drill`, `responders.drill_org_id`) | Unconfirmed | Both rows returned by the read-only query in PILOT_PLAN 9.0 step 0 | Operator runs the query in Supabase |
-| Rehearsal readiness | Pending | Columns confirmed; named roles (9.1); coverage query recorded (9.0 step 5); owner's written go-ahead | Owner names the roles and a date |
-| Real-device push | Pending | Evidence log in PILOT_PLAN 9.5 complete (locked and swiped away on Android, tab closed on web, 3 of 3) | Debug APK built 2026-10-18 from `e8767bb` (production backend, Firebase project `smart-warning`); needs consenting testers and a drill organisation (after the column check). Then 9.5 with **Send test notification** |
+| Production drill columns (`organizations.is_drill`, `responders.drill_org_id`) | **Done** 2026-10-18 | Read-only query (PILOT_PLAN 9.0 step 0) in a READ ONLY transaction, owner-authorised: 2 rows, `boolean` and `uuid` | None |
+| Rehearsal readiness | Pending | Named roles (9.1); coverage query recorded (9.0 step 5); owner's written go-ahead | Owner names the roles and a date |
+| Real-device push | Pending | Evidence log in PILOT_PLAN 9.5 complete (locked and swiped away on Android, tab closed on web, 3 of 3) | Debug APK built 2026-10-18 from `e8767bb` (production backend, Firebase project `smart-warning`); needs consenting testers and a drill organisation (owner approves `drill.js --on`). Then 9.5 with **Send test notification** |
 | Trusted Circle email | Blocked (DNS) | Resend shows the domain Verified; `/api/health` `channels.mailSender.testSender` is `false`; an email received by a consenting address that is not the Resend account owner | Owner authorises the DNS records (below). Checked 2026-10-18: Resend still **Failed**; none of the three records exists in public DNS |
 | PR #69 (nodemailer 10) | Blocked by email | `tools/smtp-check.js` email received after the sender is verified | After Trusted Circle email is unblocked |
 | Railway plan | Unverified | Plan name, credit and any trial end date from the Railway dashboard (DEPLOYMENT.md, "Plan, usage and deadline") | Owner signs in and reads them (Railway was not signed in when checked 2026-10-18); earlier notes mention a trial ending about 2026-11-03, never confirmed |
