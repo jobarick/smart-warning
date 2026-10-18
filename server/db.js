@@ -1307,8 +1307,12 @@ async function findNearbyResponders({ lat, lng, category, radiusM, freshnessMs, 
   if (!pool || !Number.isFinite(lat) || !Number.isFinite(lng)) return [];
   const deg = radiusM / 111000;
   const { rows } = await pool.query(
+    // verified_at: only responders a person has vetted (scripts/verify-responder.js)
+    // are ever offered an emergency, the same rule the live map uses. Opting in
+    // is open to any account; being sent someone's emergency must not be.
     `SELECT * FROM responders
       WHERE is_available = true
+        AND verified_at IS NOT NULL
         AND user_id != $5
         AND lat IS NOT NULL AND lng IS NOT NULL
         AND captured_at > now() - ($4 || ' milliseconds')::interval
@@ -1414,11 +1418,15 @@ async function listMyOffers(responderId, withinMs = 6 * 60 * 60 * 1000) {
   if (!pool) return [];
   const { rows } = await pool.query(
     `SELECT o.id, o.incident_id, o.category, o.distance_m, o.status, o.notified_at, o.responded_at,
-            CASE WHEN o.status = 'accepted' THEN i.lat END AS lat,
-            CASE WHEN o.status = 'accepted' THEN i.lng END AS lng,
+            -- Where to go: only for an offer this responder accepted, while they
+            -- are still verified and the incident is still open. Revoking a
+            -- responder, or the all-clear, stops showing the person's location.
+            CASE WHEN o.status = 'accepted' AND r.verified_at IS NOT NULL AND i.status = 'active' THEN i.lat END AS lat,
+            CASE WHEN o.status = 'accepted' AND r.verified_at IS NOT NULL AND i.status = 'active' THEN i.lng END AS lng,
             i.status AS incident_status
        FROM incident_offers o
        LEFT JOIN incidents i ON i.id = o.incident_id
+       LEFT JOIN responders r ON r.user_id = o.responder_id
       WHERE o.responder_id = $1 AND o.notified_at > now() - ($2 || ' milliseconds')::interval
       ORDER BY o.notified_at DESC
       LIMIT 20`,

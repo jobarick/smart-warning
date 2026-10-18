@@ -147,6 +147,12 @@ export function NearbyHelpOptIn({ token, locale = 'sw' }: Props) {
           You're available to help people near you. Not a Safety Coordinator, not an emergency
           service. Just a fellow person nearby who chose to help.
         </p>
+        {/* The server only sends emergencies to verified responders. */}
+        {!status.verified && (
+          <p className="hint">
+            Waiting for verification: you will not be sent emergencies until Smart Warning has verified you.
+          </p>
+        )}
         {categoryPicker(toggleCategoryLive)}
         <button className="btn" onClick={disable} disabled={busy}>
           {busy ? 'Turning off…' : 'Turn off Nearby Help'}
