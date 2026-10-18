@@ -101,7 +101,7 @@ Then: tell every participant the test is paused; note the time; roll back with t
 
 ### 9.0 Isolation (must pass, or do not run the rehearsal)
 
-**Needs drill mode** (PR #80: `scripts/drill.js`, `verify-responder.js --drill-org`) deployed first. Without it, a count of 0 at check time is not enough. A real responder could open the app nearby minutes later. And a real person's SOS nearby would be offered to your verified test responders, with that person's location after they accept.
+**Needs drill mode** (PR #80, live since `676286a`) **and its two database columns confirmed** (step 0 below). Without it, a count of 0 at check time is not enough. A real responder could open the app nearby minutes later. And a real person's SOS nearby would be offered to your verified test responders, with that person's location after they accept.
 
 How a test SOS can reach anyone (audited 2026-10-18 on `f8e6ace`):
 
@@ -121,6 +121,12 @@ Nothing retries Nearby Help. A personal SOS raised without a location runs Nearb
 
 **Operator steps** (from `server/`, with `DATABASE_URL` set in your terminal session only, never written to a file):
 
+0. **Confirm the drill columns exist** (Supabase, SQL editor; read only). Two rows must come back; if not, stop and fix before anything else:
+   ```sql
+   SELECT table_name, column_name, data_type FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND (table_name, column_name) IN (('organizations','is_drill'), ('responders','drill_org_id'));
+   ```
 1. Create the test organisation in the app ("Rehearsal Site"). Note its join code.
 2. `node scripts/drill.js --org <join code> --on`
 3. Each test responder signs in on their own phone, switches Nearby Help on and keeps the app open. Then:
@@ -143,10 +149,19 @@ Without drill mode deployed, the query still runs (every responder counts as rea
 
 - [ ] Written go-ahead from the owner, with the date, time window and place.
 - [ ] A **test organisation** created only for this, e.g. "Rehearsal Site". Never the pilot or customer organisation. Its join code is given only to the participants below.
-- [ ] Participants, each told in writing that this is a **TEST** and agreeing to take part:
-  - 1 coordinator, on a laptop (dashboard)
-  - 2 workers with Android phones, location on
-  - 1 person with a personal (individual) account, for the Trusted Circle check
+- [ ] Named people for each role (one person may hold two roles, except operator and lead):
+
+  | Role | Does |
+  |---|---|
+  | Lead (owner) | Gives the go-ahead, reads 9.2, calls a stop (9.7) |
+  | Operator | Runs 9.0 (SQL check, `drill.js`, `verify-responder.js`) from their own terminal with `DATABASE_URL` set for that session only |
+  | Recorder | Writes the time of every step, every result and the push evidence log (9.5) |
+  | Coordinator | Dashboard on a laptop; sends the test notifications |
+  | Workers A and B | Android phones (FCM build, 9.4) in the test organisation, location on |
+  | Test responders 1 and 2 | Their own phones with Nearby Help switched on, verified as drill testers in 9.0 |
+  | Personal tester | A personal (individual) account, for the Trusted Circle check |
+
+- [ ] Every participant told in writing that this is a **TEST** and agreeing to take part.
 - [ ] Test accounts use the participants' own email addresses or addresses they control. **No real Trusted Circle contacts:** the personal account's circle holds only participants' own addresses.
 - [ ] One participant's circle contact has **no email** (phone only), for the failed-delivery check.
 - [ ] Mail check (§9.3 step 9) only after PR #69's real-email test has passed, or with the current mail library.
@@ -179,9 +194,9 @@ Read to everyone at the start: "This is a test of Smart Warning. Every alert tod
    - Then A (or the coordinator) stands it down: every device stops, and the map loses the red pin.
 8. **Organisation isolation:** someone in another org (or the pilot org) keeps their dashboard open throughout.
    - [ ] They saw nothing from the test org.
-9. **Failed notification delivery (personal account):** the personal tester presses SOS.
+9. **Failed notification delivery (personal account):** with **location permission turned off for the app** (and kept off until "I am safe" is pressed), the personal tester presses SOS. A personal SOS is never a drill: with a location, Nearby Help would offer it to **real** verified responders near them, and turning location on later sends it then.
    - [ ] The phone-only contact is shown as **not notified** (or SMS status), never as sent.
-   - [ ] The email contact shows "sent" only once the mail server accepted it; it arrives in their inbox.
+   - [ ] The email contact shows "sent" only once the mail server accepted it; it arrives in their inbox. Until a verified sender is set (production still uses Resend's test sender), only the Resend account owner's address can receive it: any other address must show "refused", never "sent".
    - Then press "I am safe".
 10. **Location refused:** repeat 3 and 7 with A's location permission denied.
     - [ ] The coordinator sees "not shared", never a wrong or old pin.
@@ -210,18 +225,21 @@ Read to everyone at the start: "This is a test of Smart Warning. Every alert tod
 
 ### 9.5 Real-device push (part of the rehearsal)
 
-Use the FCM build (9.4) on a consenting tester's phone in the test organisation, and a desktop browser signed in to the same organisation.
+Use the FCM build (9.4) on the workers' phones in the test organisation, and a desktop browser with alerts enabled for the same organisation. Run this **before** 9.3: it raises no SOS at all. The coordinator's dashboard shows a **Rehearsal drill** panel (drill organisations only) with **Send test notification**: it reaches every device registered to the test organisation and shows how many the push services accepted. A real organisation is refused.
 
 | Test | How | Pass |
 |---|---|---|
-| Android, app in front | Worker raises TEST SOS | Alarm shows within 10 s |
-| Android, app in background / screen locked | Lock the phone, raise TEST SOS from another worker | Notification with sound within 30 s |
-| Android, app swiped away | Close the app fully, repeat | Notification within 30 s |
-| Web push | Browser tab closed, notifications allowed | Notification within 30 s |
+| Android, screen locked | Lock the phone, coordinator sends a test | "TEST: Smart Warning notification check" with sound within 30 s |
+| Android, app swiped away | Close the app fully, send a test (wait 15 s between tests) | Notification within 30 s |
+| Android, app open | Send a test with the app in front | Record what happens: the app does not ask Android to show notifications while it is open, so none may appear. Real alarms in front arrive over the live connection (9.3 step 3) |
+| Web push | Browser tab closed, notifications allowed, send a test | Notification within 30 s |
+| Real SOS on a locked phone | 9.3 step 3 | Same as the test notification |
 | Permission denied | Deny notifications on a second device | The app says alerts are off; nothing pretends it was notified |
 | Stale token | Uninstall and reinstall on one phone, raise again | The old token is pruned (no repeated failure for it); the new one receives |
 | Provider acceptance vs receipt | Compare the incident's events (`notified`, `sent`) with what each phone showed | Record any phone counted as sent that did not ring: provider acceptance is not proof of receipt |
 | Duplicate suppression | Double tap, and flight mode for 30 s then back | One alarm per device |
+
+**Evidence log (the recorder fills one row per device per test):** device and Android/browser version, app state (locked / swiped / open / tab closed), time sent (from the dashboard result line), accepted counts shown, time it appeared or "never", sound yes/no. **Real-device push is done** only when every device in the table has a row showing receipt for locked and swiped-away (Android) or tab-closed (web), in 3 of 3 attempts, and every "accepted" count matches a device that actually showed it (or the gap is explained).
 
 ### 9.6 Measurable acceptance criteria
 
