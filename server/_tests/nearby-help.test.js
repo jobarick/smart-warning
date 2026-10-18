@@ -25,6 +25,7 @@ let nearbyHelp;
 before(() => {
   stub('db.js', {
     enabled: () => true,
+    isDrillOrg: async () => false,
     findNearbyResponders: async (args) => {
       findCalls.push(args);
       return byRadius[args.radiusM] || [];

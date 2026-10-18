@@ -288,6 +288,15 @@ async function init() {
     -- anyone else's live map, and the badge is shown only from this column.
     ALTER TABLE responders ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;
     ALTER TABLE responders ADD COLUMN IF NOT EXISTS verified_by TEXT;
+    -- Drill isolation for supervised rehearsals. A drill organisation's SOS
+    -- reaches only the responders tied to it ('drill_org_id'), and those
+    -- responders are reached by nothing else: no real SOS, no other
+    -- organisation, no live map. Both are set only by an operator
+    -- (scripts/drill.js, scripts/verify-responder.js --drill-org). No foreign
+    -- key on purpose: deleting the drill organisation must leave its test
+    -- responders isolated, never turn them into real ones.
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS is_drill BOOLEAN NOT NULL DEFAULT false;
+    ALTER TABLE responders ADD COLUMN IF NOT EXISTS drill_org_id UUID;
 
     -- "How did it go?" after an all-clear. One answer per person per incident;
     -- a second submission replaces the first rather than stacking up.
@@ -948,6 +957,32 @@ async function handleReport({ id, orgId, status, handledBy, incidentId = null })
   return rows[0] || null;
 }
 
+/** True only for an organisation an operator marked as a rehearsal drill (scripts/drill.js). */
+async function isDrillOrg(orgId) {
+  if (!pool || !orgId) return false;
+  const { rows } = await pool.query(`SELECT is_drill FROM organizations WHERE id = $1`, [orgId]);
+  return rows[0]?.is_drill === true;
+}
+
+async function setOrgDrill({ orgId, on }) {
+  if (!pool) throw new Error('persistence disabled');
+  const { rows } = await pool.query(
+    `UPDATE organizations SET is_drill = $2::boolean WHERE id = $1 RETURNING id, name, is_drill`,
+    [orgId, on === true],
+  );
+  return rows[0] || null;
+}
+
+async function countDrillResponders(orgId) {
+  if (!pool) return { tied: 0, verified: 0 };
+  const { rows } = await pool.query(
+    `SELECT count(*)::int AS tied, count(*) FILTER (WHERE verified_at IS NOT NULL)::int AS verified
+       FROM responders WHERE drill_org_id = $1`,
+    [orgId],
+  );
+  return rows[0];
+}
+
 async function getOrgById(id) {
   if (!pool) return null;
   const { rows } = await pool.query(`SELECT * FROM organizations WHERE id = $1`, [id]);
@@ -1307,7 +1342,7 @@ async function getResponderStatus(userId) {
  * JS" split as listDirectoryNearby/places.js — see that function's comment
  * for why this is the right amount of geospatial engineering at this scale.
  */
-async function findNearbyResponders({ lat, lng, category, radiusM, freshnessMs, excludeUserId }) {
+async function findNearbyResponders({ lat, lng, category, radiusM, freshnessMs, excludeUserId, drillOrgId = null }) {
   if (!pool || !Number.isFinite(lat) || !Number.isFinite(lng)) return [];
   // A coarse box first (cheap, index friendly), then the true distance below.
   // East-west degrees shrink with latitude, so the longitude half-width is
@@ -1320,9 +1355,12 @@ async function findNearbyResponders({ lat, lng, category, radiusM, freshnessMs, 
     // is open to any account; being sent someone's emergency must not be.
     // $5 may be null (an organisation alert has nobody to leave out): compared
     // with != it would match no row at all, so it is tested explicitly.
+    // $8: a real SOS ($8 null) reaches only responders outside every drill; a
+    // drill organisation's SOS reaches only that drill's own test responders.
     `SELECT * FROM responders
       WHERE is_available = true
         AND verified_at IS NOT NULL
+        AND drill_org_id IS NOT DISTINCT FROM $8::uuid
         AND ($5::uuid IS NULL OR user_id <> $5::uuid)
         AND lat IS NOT NULL AND lng IS NOT NULL
         AND captured_at > now() - ($4 || ' milliseconds')::interval
@@ -1330,7 +1368,7 @@ async function findNearbyResponders({ lat, lng, category, radiusM, freshnessMs, 
         AND lng BETWEEN $2::double precision - $7::double precision AND $2::double precision + $7::double precision
         AND ($3 = ANY(categories) OR 'general' = ANY(categories))
       ORDER BY ($3 = ANY(categories)) DESC`,
-    [lat, lng, category, String(freshnessMs), excludeUserId || null, latDeg, lngDeg],
+    [lat, lng, category, String(freshnessMs), excludeUserId || null, latDeg, lngDeg, drillOrgId || null],
   );
   // Within the radius by great-circle distance, not merely inside the box
   // (whose corners are about 1.4 times further away).
@@ -1432,6 +1470,7 @@ async function listMapResponders({ lat, lng, radiusM, seenWithinMs, excludeUserI
                        AND o.responded_at > now() - interval '60 minutes') AS busy
        FROM responders r
       WHERE r.verified_at IS NOT NULL
+        AND r.drill_org_id IS NULL
         AND r.user_id IS DISTINCT FROM $5::uuid
         AND r.lat IS NOT NULL AND r.lng IS NOT NULL
         AND r.captured_at > now() - ($4 || ' milliseconds')::interval
@@ -1443,13 +1482,17 @@ async function listMapResponders({ lat, lng, radiusM, seenWithinMs, excludeUserI
 }
 
 /** Marks a responder as checked by a person — see scripts/verify-responder.js. */
-async function verifyResponder({ userId, verifiedBy, revoke = false }) {
+// drill: undefined leaves the drill tie as it is, an org id ties the responder
+// to that drill, null releases them (they become reachable by real SOS).
+async function verifyResponder({ userId, verifiedBy, revoke = false, drill }) {
   if (!pool) throw new Error('persistence disabled');
   const { rows } = await pool.query(
     `UPDATE responders SET verified_at = CASE WHEN $3::boolean THEN NULL ELSE now() END,
-            verified_by = CASE WHEN $3::boolean THEN NULL ELSE $2::text END, updated_at = now()
+            verified_by = CASE WHEN $3::boolean THEN NULL ELSE $2::text END,
+            drill_org_id = CASE WHEN $4::boolean THEN $5::uuid ELSE drill_org_id END,
+            updated_at = now()
       WHERE user_id = $1 RETURNING *`,
-    [userId, verifiedBy ?? null, revoke === true],
+    [userId, verifiedBy ?? null, revoke === true, drill !== undefined, drill || null],
   );
   return rows[0] || null;
 }
@@ -2854,6 +2897,9 @@ module.exports = {
   getOrgByCode,
   getOrgByPublicCode,
   getOrgById,
+  isDrillOrg,
+  setOrgDrill,
+  countDrillResponders,
   listDestinations,
   listAllDestinations,
   createDestination,

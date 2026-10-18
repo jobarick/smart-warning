@@ -99,27 +99,45 @@ Then: tell every participant the test is paused; note the time; roll back with t
 
 **Not run yet. Run only with the owner's written go-ahead.** The same flow already passes an isolated rehearsal (real server, throwaway database, 38 checks, 2026-10-17). This live run adds what that cannot: real phones, real GPS, real networks and real push.
 
-### 9.0 Isolation pre-check (must pass, or do not run the rehearsal)
+### 9.0 Isolation (must pass, or do not run the rehearsal)
 
-How a test SOS can reach anyone (audited 2026-10-18):
+**Needs drill mode** (PR #80: `scripts/drill.js`, `verify-responder.js --drill-org`) deployed first. Without it, a count of 0 at check time is not enough. A real responder could open the app nearby minutes later. And a real person's SOS nearby would be offered to your verified test responders, with that person's location after they accept.
+
+How a test SOS can reach anyone (audited 2026-10-18 on `f8e6ace`):
 
 | Path | Who it can reach |
 |---|---|
-| Relay broadcast, web push, FCM, escalation, stand-down | Devices of **the test organisation only** |
+| Relay broadcast, web push, FCM, stand-down | Devices of **the test organisation only** |
+| Escalation (every 5 min until acknowledged, at most 5 times) | Devices of the test organisation only |
 | Trusted Circle email | Only the **personal tester's own contacts** (use participants' addresses only) |
 | SMS | Off in production (`SMS_ENABLED` not set) |
-| **Nearby Help** | **Verified, available responders within 10 km (great-circle) whose position is under 5 minutes old and whose category matches.** The only path to people outside the test group |
+| Offline replay (a phone re-sending a held alert) | Same paths as above; nothing extra |
+| **Nearby Help** | Without drill mode: verified, available responders within 10 km whose position is under 5 minutes old and whose category matches. **With drill mode: only the test responders tied to this drill** |
+| Live map | Verified responders, snapped to about 250 m. **Drill test responders are never shown** |
 
-Nothing retries Nearby Help. A personal SOS raised without a location runs Nearby Help once more, when its location arrives.
+Nothing retries Nearby Help. A personal SOS raised without a location runs Nearby Help once more, when its location arrives (personal SOS never reaches drill test responders).
 
-Before the day, and again 15 minutes before step 3:
+**How drill mode isolates, both ways:** a drill organisation's SOS is offered only to responders tied to that drill. Those responders are never offered any other SOS (real organisation, personal, or another drill) and never appear on the live map. If the drill check fails, Nearby Help offers the SOS to nobody. Revoking a test responder keeps the tie, so they stay isolated.
 
-1. In Supabase, open **SQL editor**, paste `docs/sql/nearby-help-coverage.sql`, set the rehearsal point and category, and run it. It is read only and returns counts only.
-2. **Pass only if** `would_be_offered_right_now` and `verified_available_within_10km` are both **0** before you verify the test responders. Otherwise someone outside the test group would be offered the test SOS: move the rehearsal point or postpone.
-3. Verify the test responders (accounts the participants control, Nearby Help switched on in the app). From `server/`, with `DATABASE_URL` set in your terminal session only:
-   `node scripts/verify-responder.js --email <test responder> --by "<who checked them and how, date>"`
-4. Run the query again: `verified_available_within_10km` must now equal the number of test responders and nothing more.
-5. After the rehearsal, revoke them: `node scripts/verify-responder.js --email <test responder> --revoke`
+**Operator steps** (from `server/`, with `DATABASE_URL` set in your terminal session only, never written to a file):
+
+1. Create the test organisation in the app ("Rehearsal Site"). Note its join code.
+2. `node scripts/drill.js --org <join code> --on`
+3. Each test responder signs in on their own phone, switches Nearby Help on and keeps the app open. Then:
+   `node scripts/verify-responder.js --email <test responder> --by "<who checked them and how, date>" --drill-org <join code>`
+   The output must say `test responder (drill only)`.
+4. `node scripts/drill.js --org <join code> --status`: `drill: true` and `verifiedTestResponders` equal to the number of testers.
+5. **Coverage check, the day before and 15 minutes before step 3 of 9.3.** Supabase, **SQL editor**, paste `docs/sql/nearby-help-coverage.sql`, set `site_lat`, `site_lng` (the rehearsal point, 4 decimals is enough) and `sos_category`, run. It only reads and returns counts plus the point you typed. Record the result.
+
+| Column | Pass |
+|---|---|
+| `real_would_be_offered_right_now`, `real_verified_available_within_10km` | Any value is safe with drill mode (they cannot be reached), but **write them down**: they are who a real SOS here would reach today |
+| `drill_would_be_offered_right_now` | **Equals the number of test responders** with the app open. 0 means the testers cannot be reached: fix before starting |
+| all distance counts NULL | The point was not set. Not a pass |
+
+Without drill mode deployed, the query still runs (every responder counts as real) and the only safe rule is `real_verified_anywhere` = 0 before verifying the testers. Prefer deploying drill mode.
+
+6. **After the rehearsal:** revoke each tester (`verify-responder.js --email <tester> --revoke`), then `drill.js --org <join code> --off`, then run `drill.js --org <join code> --status`: `verifiedTestResponders: 0`. Use `--release-drill` only for someone who is becoming a real responder.
 
 ### 9.1 Before the day (owner)
 
@@ -168,7 +186,22 @@ Read to everyone at the start: "This is a test of Smart Warning. Every alert tod
 10. **Location refused:** repeat 3 and 7 with A's location permission denied.
     - [ ] The coordinator sees "not shared", never a wrong or old pin.
 11. **History:** each incident shows raised, acknowledged and resolved, with times.
-12. **Clean-up:** close the test org, or leave it empty. Record any defect as a GitHub issue.
+12. **Nearby Help (organisation SOS, drill):** worker A raises a TEST SOS with location on.
+    - [ ] Each test responder's phone shows **"DRILL: Emergency near you"** within 30 s, distance and category only, no name and no map.
+    - [ ] Before accepting, the responder's offer shows no location.
+    - [ ] Worker A's "Nearby help" panel counts only people a push reached ("N nearby people alerted"), or says nobody was reached. Compare with what the testers' phones actually showed.
+    - [ ] Tester 1 accepts: their offer now shows where to go; A's panel shows "1 responding" and the distance.
+    - [ ] Tester 2 declines: not counted as responding.
+    - [ ] The operator revokes tester 1 (`verify-responder.js --email <tester 1> --revoke`): within one refresh their offer shows no location, and A's panel no longer says help is on the way.
+    - [ ] Tester 1 tries to accept a new offer while revoked: refused.
+    - [ ] Re-verify tester 1 (with `--drill-org`), raise again, tester 1 accepts, then A stands it down: tester 1's location disappears at once; accepting after the all-clear is refused.
+    - [ ] Nobody else reports an alert (ask the room; a real responder seeing "DRILL" is an immediate stop).
+13. **Timeout (escalation):** raise a TEST SOS and do **not** acknowledge it.
+    - [ ] After about 5 minutes the test organisation's devices get "Still unacknowledged" once, with no second stacked notification; the incident history shows `escalated` level 1.
+    - Then acknowledge it: no further reminders.
+14. **Delivery status:** for every SOS, open the incident history.
+    - [ ] Each push channel has a `notified` event with `sent` / `failed` counts that match what the phones showed (write down any phone counted as sent that never rang).
+15. **All-clear and clean-up:** stand down every open test incident; run 9.0 step 6 (revoke, drill off, status 0); run the coverage query once more and record `drill_would_be_offered_right_now` = 0. Record any defect as a GitHub issue.
 
 ### 9.4 Android push build for the rehearsal
 
@@ -198,7 +231,10 @@ Use the FCM build (9.4) on a consenting tester's phone in the test organisation,
 | Incident record | exists, with raised, notified, acknowledged and resolved events and times |
 | Push provider acceptance (`notified` event, `sent` > 0) | under 10 s |
 | Receipt on the locked test phone | under 30 s, in 3 of 3 attempts |
-| Nearby Help offer to the verified test responder | arrives; the "Nearby help" panel then counts that person as alerted |
+| Nearby Help offer to each drill test responder | "DRILL" offer on every tester's phone within 30 s; offers in the database = number of testers; no offer to anyone else |
+| Reporter's "Nearby help" panel | counts only offers a push reached; "responding" only for an accepted, still-verified tester |
+| Escalation when unacknowledged | one reminder at 5 min (±1 min), stops after acknowledgement |
+| Delivery status | every phone counted as `sent` actually rang, or the gap is written down |
 | Location before acceptance / after revocation / after all-clear | hidden / hidden at once / hidden at once |
 | Duplicates | exactly one alarm and one incident per SOS |
 | Failure recovery | after flight mode, the SOS still arrives once; the coordinator view recovers within 30 s |
@@ -209,4 +245,6 @@ Use the FCM build (9.4) on a consenting tester's phone in the test organisation,
 - an SOS is not seen by the coordinator within 30 s,
 - a pin is clearly in the wrong place,
 - an alarm cannot be stopped, or
-- anyone outside the test group receives an alert.
+- anyone outside the test group receives an alert,
+- a non-tester receives a "DRILL" offer, or a tester receives an offer that is not "DRILL", or
+- a location is still visible after revocation or the all-clear.
