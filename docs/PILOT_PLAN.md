@@ -228,7 +228,7 @@ Read to everyone at the start: "This is a test of Smart Warning. Every alert tod
 
 1. Send the APK file directly (cable, or a private file share), with its SHA-256 from the ledger. The tester compares it (for example with a file manager that shows checksums) before installing.
 2. Open the file. Android asks to allow installing from that source (Files or the browser): allow it for this install only, then turn it off again.
-3. Open Smart Warning. Accept the terms, then **Join a team** with the test organisation's join code (given in person, never in a group chat).
+3. Open Smart Warning. Accept the terms, then **Join your team** with the test organisation's join code (given in person, never in a group chat).
 4. **Allow notifications** when asked (Android 13+). If it was refused: Settings, Apps, Smart Warning, Notifications, on. Check that the "Emergency alerts" category is allowed with sound.
 5. Allow location when asked.
 6. Battery: Settings, Apps, Smart Warning, Battery, **Unrestricted**. Some phones (Tecno, Infinix, Xiaomi, Samsung) stop background apps otherwise.
