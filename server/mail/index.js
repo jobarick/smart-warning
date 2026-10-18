@@ -153,7 +153,9 @@ const backoffFor = (attempts) => Math.min(BASE_BACKOFF_MS * 2 ** Math.max(0, att
 /**
  * Queue a message and try it immediately.
  *
- * @returns {Promise<{queued: boolean, delivered: boolean}>} `delivered` is only
+ * @returns {Promise<{queued: boolean, delivered: boolean, refused?: boolean}>} `refused` is true
+ * when the provider permanently refused the message (5xx): it is not retried,
+ * so it must never be described as queued. `delivered` is only
  * ever true when a provider actually accepted the message — callers surface
  * this to the user, so it must never be optimistic.
  */
@@ -169,7 +171,7 @@ async function send({ to = FEEDBACK_TO, replyTo = null, subject, body, kind = 'g
     } catch (e) {
       recordMailFailure(e);
       console.error(`[mail] ${kind} not delivered (${e.code || 'no code'}): ${e.message}`);
-      return { queued: false, delivered: false };
+      return { queued: false, delivered: false, refused: e.permanent === true };
     }
   }
 
@@ -191,8 +193,9 @@ async function send({ to = FEEDBACK_TO, replyTo = null, subject, body, kind = 'g
       permanent: e.permanent === true,
     });
     recordMailFailure(e);
-    console.error(`[mail] ${kind} queued but not delivered (${e.code || 'no code'}): ${e.message}`);
-    return { queued: true, delivered: false };
+    const refused = e.permanent === true;
+    console.error(`[mail] ${kind} ${refused ? 'refused by the provider, not retried' : 'queued but not delivered'} (${e.code || 'no code'}): ${e.message}`);
+    return { queued: !refused, delivered: false, refused };
   }
 }
 
