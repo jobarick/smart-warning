@@ -1498,6 +1498,7 @@ export default function App() {
           onEscalateReport={onEscalateReport}
           onDismissReport={onDismissReport}
           token={token}
+          drill={org?.drill === true}
           selfPosition={telemetry.lat !== null && telemetry.lng !== null ? { lat: telemetry.lat, lng: telemetry.lng } : null}
           selfLocation={
             !settings.shareLocation ? 'off'

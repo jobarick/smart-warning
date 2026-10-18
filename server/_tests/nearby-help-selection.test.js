@@ -10,7 +10,8 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const src = fs.readFileSync(path.join(__dirname, '..', 'db.js'), 'utf8');
+// Normalised so a Windows checkout (CRLF) slices the same as CI (LF).
+const src = fs.readFileSync(path.join(__dirname, '..', 'db.js'), 'utf8').replace(/\r\n/g, '\n');
 const start = src.indexOf('async function findNearbyResponders(');
 const body = src.slice(start, src.indexOf('\nfunction greatCircleM', start));
 

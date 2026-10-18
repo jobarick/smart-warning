@@ -89,6 +89,9 @@ function publicUser(user, org) {
           industry: org.industry || null,
           address: org.address || null,
           country: org.country || null,
+          // A rehearsal drill (scripts/drill.js): the dashboard offers a test
+          // notification only then.
+          drill: org.is_drill === true,
         }
       : undefined,
   };
