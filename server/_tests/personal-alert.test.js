@@ -35,6 +35,7 @@ let mailShouldDeliver = true;
 let mailRefuses = false;
 let mailDelayMs = 0;
 let mailThrowFor = null;
+let mailNoQueue = false;
 // Which incident ids have already been recorded — models the real ON
 // CONFLICT DO NOTHING: a second recordAlert for the same id must report back
 // "not the first time" the same way Postgres's rowCount does.
@@ -122,6 +123,7 @@ before(() => {
       if (mailDelayMs) await new Promise((r) => setTimeout(r, mailDelayMs));
       if (mailThrowFor && msg.to === mailThrowFor) throw new Error('queue insert failed (test)');
       if (mailRefuses) return { queued: false, delivered: false, refused: true };
+      if (mailNoQueue) return { queued: false, delivered: false, refused: false };
       return { queued: true, delivered: mailShouldDeliver };
     },
   });
@@ -146,6 +148,7 @@ beforeEach(() => {
   mailRefuses = false;
   mailDelayMs = 0;
   mailThrowFor = null;
+  mailNoQueue = false;
   seenIncidentIds = new Set();
   incidentsById = new Map();
   nearbyHelpCalls.length = 0;
@@ -276,6 +279,15 @@ test('an unexpected error for one contact never stops the others being notified'
   assert.strictEqual(res.status, 201, 'the SOS still succeeds');
   assert.deepStrictEqual(body.contacted.map((c) => [c.name, c.email, c.delivered]), [['A', 'sent', true], ['B', 'failed', false], ['C', 'sent', true]]);
   mailThrowFor = null;
+});
+
+test('mail neither delivered nor kept for a retry is reported as failed, not queued', async () => {
+  mailNoQueue = true;
+  contactsByUser.set(USER.id, [{ id: 'q1', name: 'Dada', email: 'dada@example.test', phone: null }]);
+  const res = await alertAs(PERSONAL_TOKEN, { type: 'medical', severity: 'high' });
+  const body = await res.json();
+  assert.deepStrictEqual(body.contacted, [{ id: 'q1', name: 'Dada', delivered: false, email: 'failed', sms: null }]);
+  mailNoQueue = false;
 });
 
 test('the incident is recorded against the user, not any organization', async () => {
