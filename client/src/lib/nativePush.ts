@@ -127,6 +127,36 @@ async function persistToken(Push: PushPlugin, token: string): Promise<void> {
 }
 
 /**
+ * The outcome of the most recent registration attempt on this device, so the
+ * UI can say whether alerts will actually reach it and the foreground watcher
+ * below knows whether there is anything left to retry. Null until the first
+ * attempt of a session, and again after sign-out.
+ */
+let lastResult: RegisterResult | null = null;
+const resultListeners = new Set<() => void>();
+
+function setLastResult(res: RegisterResult | null): void {
+  lastResult = res;
+  for (const fn of resultListeners) fn();
+}
+
+export function lastPushResult(): RegisterResult | null {
+  return lastResult;
+}
+
+/** Subscribe to registration outcomes. Returns the unsubscribe function. */
+export function onPushResult(fn: () => void): () => void {
+  resultListeners.add(fn);
+  return () => { resultListeners.delete(fn); };
+}
+
+/** Whether this device still needs a successful registration. */
+export function pushNeedsRetry(): boolean {
+  if (lastResult?.status === 'unsupported') return false; // no plugin in this build: nothing will change
+  return lastResult?.status !== 'registered' || !currentToken();
+}
+
+/**
  * Ask for permission, register with FCM, and hand the token to the backend.
  *
  * Safe to call repeatedly — FCM returns the same token, and the server upsert
@@ -144,13 +174,23 @@ async function persistToken(Push: PushPlugin, token: string): Promise<void> {
  * anywhere in between. Every firing after the first therefore still persists
  * the token — it just no longer needs to settle anything.
  */
-export async function registerForPush(creds: { token?: string; orgCode?: string }, label?: string): Promise<RegisterResult> {
+export async function registerForPush(
+  creds: { token?: string; orgCode?: string },
+  label?: string,
+  opts: { prompt?: boolean } = {},
+): Promise<RegisterResult> {
+  const res = await registerOnce(creds, label, opts.prompt !== false);
+  setLastResult(res);
+  return res;
+}
+
+async function registerOnce(creds: { token?: string; orgCode?: string }, label: string | undefined, prompt: boolean): Promise<RegisterResult> {
   const Push = (await loadPlugin())?.push ?? null;
   if (!Push) return { status: 'unsupported' };
 
   try {
     let perm = await Push.checkPermissions();
-    if (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') {
+    if (prompt && (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale')) {
       perm = await Push.requestPermissions();
     }
     if (perm.receive !== 'granted') return { status: 'denied' };
@@ -223,8 +263,85 @@ export async function unregisterFromPush(
   // that just signed out.
   activeCreds = null;
   activeLabel = undefined;
+  setLastResult(null);
   const Push = (await loadPlugin())?.push ?? null;
   if (Push) await Push.removeAllListeners().catch(() => {});
+}
+
+/**
+ * Register unless this device already is, sharing one attempt between
+ * callers that overlap. `force` always runs a fresh attempt (after any in
+ * flight), for a new session or label that the server has not seen yet.
+ */
+let inflight: Promise<RegisterResult> | null = null;
+
+export function ensurePushRegistered(
+  creds: { token?: string; orgCode?: string },
+  label?: string,
+  opts: { prompt?: boolean; force?: boolean } = {},
+): Promise<RegisterResult> {
+  if (inflight && !opts.force) return inflight;
+  if (!opts.force && !pushNeedsRetry() && lastResult) return Promise.resolve(lastResult);
+  const run = (inflight ?? Promise.resolve())
+    .catch(() => undefined)
+    .then(() => registerForPush(creds, label, { prompt: opts.prompt }));
+  inflight = run;
+  run.finally(() => { if (inflight === run) inflight = null; }).catch(() => {});
+  return run;
+}
+
+/**
+ * Retry registration whenever the app comes back to the foreground, until it
+ * succeeds.
+ *
+ * Registration otherwise runs once, when the session starts. Someone who
+ * declined or dismissed the permission prompt then, and later switched
+ * notifications on in Android Settings, came back to an app that never asked
+ * again: no token reached the server and no alarm reached the phone until the
+ * process was killed and relaunched.
+ *
+ * A retry from here only checks permission, it never shows the prompt. The
+ * system permission dialog is itself an activity, so closing it resumes the
+ * app; prompting on resume would reopen the dialog every time it was
+ * dismissed. The prompt stays where it was: the first registration of a
+ * session, and the alerts button the person taps themselves.
+ *
+ * Both the Capacitor appStateChange event and document visibilitychange are
+ * watched, because which one a given WebView fires is not something to bet
+ * an alarm on; a retry already in flight absorbs the duplicate. Returns a
+ * function that removes every listener this call added.
+ */
+export function retryPushOnForeground(
+  getArgs: () => { creds: { token?: string; orgCode?: string }; label?: string } | null,
+): () => void {
+  if (!nativePushSupported()) return () => {};
+  let disposed = false;
+  const retry = () => {
+    if (disposed || !pushNeedsRetry()) return;
+    const args = getArgs();
+    if (!args || (!args.creds.token && !args.creds.orgCode)) return;
+    void ensurePushRegistered(args.creds, args.label, { prompt: false });
+  };
+  const onVisibility = () => { if (document.visibilityState === 'visible') retry(); };
+  document.addEventListener('visibilitychange', onVisibility);
+
+  let removeAppListener: (() => void) | null = null;
+  void (async () => {
+    try {
+      const { App } = await import('@capacitor/app');
+      const handle = await App.addListener('appStateChange', ({ isActive }) => { if (isActive) retry(); });
+      if (disposed) void handle.remove();
+      else removeAppListener = () => { void handle.remove(); };
+    } catch {
+      /* no App plugin in this build: visibilitychange alone still covers it */
+    }
+  })();
+
+  return () => {
+    disposed = true;
+    document.removeEventListener('visibilitychange', onVisibility);
+    removeAppListener?.();
+  };
 }
 
 /**

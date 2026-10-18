@@ -54,7 +54,7 @@ import { Onboarding, hasOnboarded } from './components/Onboarding';
 import { useUnsafeMode } from './hooks/useUnsafeMode';
 import { telHref } from './lib/emergency';
 import { unsubscribe as unsubscribePush } from './lib/push';
-import { nativePushSupported, registerForPush, unregisterFromPush, attachHandlers } from './lib/nativePush';
+import { nativePushSupported, ensurePushRegistered, retryPushOnForeground, unregisterFromPush, attachHandlers } from './lib/nativePush';
 import { startIncidentLocation, stopIncidentLocation } from './lib/nativeForegroundService';
 import { STALE_REPLAY_MS } from './lib/outbox';
 import * as trackBuffer from './lib/trackBuffer';
@@ -575,13 +575,20 @@ export default function App() {
   // FCM instead. Registration is accepted by the server even before Firebase
   // credentials exist, so the devices already in the field are the ones that
   // receive the first alert once they do.
+  //
+  // It also retries each time the app returns to the foreground until it
+  // succeeds, so someone who declined the prompt and then allowed
+  // notifications in Android Settings is registered when they come back,
+  // not only after the app is killed and relaunched.
   useEffect(() => {
     if (!nativePushSupported()) return;
     const creds = joinCredentials(session);
     if (!creds || (!creds.token && !creds.orgCode)) return;
     let cancelled = false;
+    const label = settings.deviceName;
+    const stopRetrying = retryPushOnForeground(() => ({ creds, label }));
     void (async () => {
-      const res = await registerForPush(creds, settings.deviceName);
+      const res = await ensurePushRegistered(creds, label, { force: true });
       if (cancelled) return;
       if (res.status === 'error') console.warn('[push] native registration failed:', res.error);
       else if (res.delivery === 'pending-credentials') {
@@ -591,7 +598,7 @@ export default function App() {
     // Tapping a notification only needs to bring the app forward — the relay is
     // the authority on state and the socket reconciles it on resume.
     void attachHandlers({});
-    return () => { cancelled = true; };
+    return () => { cancelled = true; stopRetrying(); };
   }, [session, settings.deviceName]);
 
   // The app only runs its socket/dashboard once we're past the auth gate.
@@ -1404,7 +1411,7 @@ export default function App() {
           ) : (
             <span className="org-info"><b>Team {workerCode}</b><span className="org-code">{settings.deviceName}</span></span>
           )}
-          {joinCreds && <PushToggle creds={joinCreds} />}
+          {joinCreds && <PushToggle creds={joinCreds} label={settings.deviceName} />}
           {org && !showTools && !showSupport && (
             <button className="org-tools" onClick={() => navigate('/setup')} title="Safe destinations and feedback">
               <Icon name="map-pin" /> Setup
