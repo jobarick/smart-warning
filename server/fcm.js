@@ -21,6 +21,9 @@ const db = require('./db');
  */
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
+// Both Google calls give up after this long: a hung endpoint fails the send
+// (counted and recorded) instead of leaving it pending for ever.
+const FCM_TIMEOUT_MS = Number(process.env.PUSH_TIMEOUT_MS) > 0 ? Number(process.env.PUSH_TIMEOUT_MS) : 10_000;
 const SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 
 let account = null; // { client_email, private_key, project_id }
@@ -129,6 +132,7 @@ async function accessToken() {
   );
 
   const res = await fetch(TOKEN_URL, {
+    signal: AbortSignal.timeout(FCM_TIMEOUT_MS),
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -253,6 +257,7 @@ async function sendToTokens(tokens, payload) {
   await Promise.all(tokens.map(async ({ token }) => {
     try {
       const res = await fetch(url, {
+        signal: AbortSignal.timeout(FCM_TIMEOUT_MS),
         method: 'POST',
         headers: { authorization: `Bearer ${bearer}`, 'content-type': 'application/json' },
         body: JSON.stringify(buildMessage(token, payload)),

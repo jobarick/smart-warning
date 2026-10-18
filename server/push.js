@@ -63,7 +63,10 @@ const getPublicKey = () => publicKey;
 // for an emergency that ended long ago — the same principle STALE_REPLAY_MS
 // already applies on the socket path in relay.js, just enforced here instead
 // of trusted to a client that may never get the chance to check it.
-const PUSH_OPTIONS = { urgency: 'high', TTL: 3600 };
+// timeout: a push service that never answers must fail this one send (and
+// let the outcome be recorded), not leave it hanging for ever.
+const PUSH_TIMEOUT_MS = Number(process.env.PUSH_TIMEOUT_MS) > 0 ? Number(process.env.PUSH_TIMEOUT_MS) : 10_000;
+const PUSH_OPTIONS = { urgency: 'high', TTL: 3600, timeout: PUSH_TIMEOUT_MS };
 
 // Fan a notification out to every stored subscription in one org. Prunes
 // subscriptions the push service reports as gone (404/410).
@@ -131,4 +134,4 @@ async function notifyUser(userId, payloadObj) {
   return sendToSubs(subs, payloadObj, { userId });
 }
 
-module.exports = { init, enabled, getPublicKey, notifyOrg, notifyUser };
+module.exports = { init, enabled, getPublicKey, notifyOrg, notifyUser, PUSH_OPTIONS };

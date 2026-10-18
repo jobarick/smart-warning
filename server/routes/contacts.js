@@ -309,7 +309,8 @@ async function handle({ req, res, path }) {
         // 'refused': the mail provider permanently turned it down (for example
         // a test sender that only delivers to its own account); it will not be
         // retried, so calling it 'queued' would promise a delivery that never comes.
-        email: result.delivered === true ? 'sent' : result.refused === true ? 'refused' : 'queued',
+        // 'failed': neither accepted nor kept for a retry (no queue to keep it in).
+        email: result.delivered === true ? 'sent' : result.refused === true ? 'refused' : result.queued === false ? 'failed' : 'queued',
         sms: smsStatus,
       } };
     };
