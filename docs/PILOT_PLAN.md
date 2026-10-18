@@ -222,6 +222,19 @@ Read to everyone at the start: "This is a test of Smart Warning. Every alert tod
 
 - Build from `main` with `client/android/app/google-services.json` (Firebase project `smart-warning`, package `com.smartwarning.app`): `cd client; npm run build; npx cap sync android; cd android; .\gradlew assembleDebug`.
 - Install `app/build/outputs/apk/debug/app-debug.apk` **only on the participants' phones, signed in to the test org.** Never on a device signed in to a real team: it would register for that team's real alerts.
+- Or use the script, which also picks a JDK Gradle can run: `pwsh tools/android-build.ps1 -Task assembleDebug`.
+
+**Installing on a tester's phone** (Android 7 or newer; the app targets Android 16):
+
+1. Send the APK file directly (cable, or a private file share), with its SHA-256 from the ledger. The tester compares it (for example with a file manager that shows checksums) before installing.
+2. Open the file. Android asks to allow installing from that source (Files or the browser): allow it for this install only, then turn it off again.
+3. Open Smart Warning. Accept the terms, then **Join a team** with the test organisation's join code (given in person, never in a group chat).
+4. **Allow notifications** when asked (Android 13+). If it was refused: Settings, Apps, Smart Warning, Notifications, on. Check that the "Emergency alerts" category is allowed with sound.
+5. Allow location when asked.
+6. Battery: Settings, Apps, Smart Warning, Battery, **Unrestricted**. Some phones (Tecno, Infinix, Xiaomi, Samsung) stop background apps otherwise.
+7. Keep the app open for 10 seconds so it registers with the server. Registration is confirmed only by the next test notification's counts: the dashboard result shows how many phones the push service accepted. That number should equal the testers' phones.
+
+After the rehearsal: uninstall, or sign out of the team, on every tester's phone.
 
 ### 9.5 Real-device push (part of the rehearsal)
 
