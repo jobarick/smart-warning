@@ -1175,7 +1175,9 @@ export async function respondToOffer(
 export interface IncidentOfferView {
   distanceM: number | null;
   category: string;
-  status: 'notified' | 'accepted' | 'declined';
+  status: 'notified' | 'accepted' | 'declined' | 'withdrawn';
+  /** A push provider accepted a notification for them; not proof their phone showed it. */
+  reached?: boolean;
   notifiedAt: number;
 }
 

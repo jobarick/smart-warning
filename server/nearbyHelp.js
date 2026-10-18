@@ -127,16 +127,24 @@ async function searchAndNotify({ incidentId, type, lat, lng, excludeUserId, orgI
     detail: { channel, nearbyHelp: true, responderId: offer.responder_id, offerId: offer.id, ...detail },
   }).catch((e) => console.error(`[db] recordIncidentEvent(notified/${channel}):`, e.message));
 
+  // Marks the offer as reached once any provider accepted a notification for
+  // it, so the person's screen counts only people a push actually went to.
+  const markReached = (offer, result) => {
+    if (result && Number(result.sent) > 0) {
+      db.markOfferPushAccepted?.(offer.id).catch((e) => console.error('[db] markOfferPushAccepted:', e.message));
+    }
+  };
+
   for (const offer of offers) {
     const body = `A person may need help approximately ${offer.distance_m}m away. ${category} emergency.`;
     push.notifyUser(offer.responder_id, { ...notification, body, offerId: offer.id })
-      .then((result) => recordNotified(offer, 'web-push', result))
+      .then((result) => { markReached(offer, result); return recordNotified(offer, 'web-push', result); })
       .catch((e) => {
         console.error(`[nearby-help] push to ${offer.responder_id} failed: ${e.message}`);
         recordNotified(offer, 'web-push', { error: e.message });
       });
     fcm.notifyUser(offer.responder_id, { ...notification, body, offerId: offer.id })
-      .then((result) => recordNotified(offer, 'fcm', result))
+      .then((result) => { markReached(offer, result); return recordNotified(offer, 'fcm', result); })
       .catch((e) => {
         console.error(`[nearby-help] fcm to ${offer.responder_id} failed: ${e.message}`);
         recordNotified(offer, 'fcm', { error: e.message });

@@ -37,15 +37,20 @@ export function NearbyHelpStatus({ incidentId }: Props) {
   if (!offers || offers.length === 0) return null;
 
   const responding = offers.filter((o) => o.status === 'accepted');
-  const nearest = [...offers].sort((a, b) => (a.distanceM ?? Infinity) - (b.distanceM ?? Infinity))[0];
+  // Only people a push provider actually accepted a notification for.
+  const reached = offers.filter((o) => o.reached === true);
+  // The nearest of those actually coming, not of everyone who was asked.
+  const nearest = [...responding].sort((a, b) => (a.distanceM ?? Infinity) - (b.distanceM ?? Infinity))[0];
 
   return (
     <div className="nearby-status" role="status">
       <p className="nearby-status-line">
-        {offers.length} nearby {offers.length === 1 ? 'person' : 'people'} notified
+        {reached.length > 0
+          ? `${reached.length} nearby ${reached.length === 1 ? 'person' : 'people'} alerted`
+          : 'Nearby help requested, nobody reached yet'}
         {responding.length > 0 && ` · ${responding.length} responding`}
       </p>
-      {responding.length > 0 && nearest.distanceM != null && (
+      {nearest && nearest.distanceM != null && (
         <p className="nearby-status-eta">Nearest: ~{nearest.distanceM}m away. Help is on the way</p>
       )}
     </div>
