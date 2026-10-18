@@ -336,6 +336,10 @@ async function init() {
       notified_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
       responded_at  TIMESTAMPTZ
     );
+    -- When a push provider (web push or FCM) accepted at least one notification
+    -- for this offer. Provider acceptance, not proof the phone showed it; null
+    -- means nobody was reached, and the person's screen must not say otherwise.
+    ALTER TABLE incident_offers ADD COLUMN IF NOT EXISTS push_accepted_at TIMESTAMPTZ;
     CREATE INDEX IF NOT EXISTS incident_offers_incident_idx  ON incident_offers (incident_id);
     CREATE INDEX IF NOT EXISTS incident_offers_responder_idx ON incident_offers (responder_id, status);
 
@@ -1346,7 +1350,15 @@ async function createIncidentOffers(offers) {
 async function listOffersForIncident(incidentId) {
   if (!pool) return [];
   const { rows } = await pool.query(
-    `SELECT * FROM incident_offers WHERE incident_id = $1 ORDER BY distance_m ASC NULLS LAST`,
+    // An accepted offer whose responder has since been revoked is reported as
+    // 'withdrawn', so the person's screen stops counting them as coming.
+    `SELECT o.id, o.incident_id, o.category, o.distance_m, o.notified_at, o.responded_at,
+            CASE WHEN o.status = 'accepted' AND r.verified_at IS NULL THEN 'withdrawn' ELSE o.status END AS status,
+            (o.push_accepted_at IS NOT NULL) AS reached
+       FROM incident_offers o
+       LEFT JOIN responders r ON r.user_id = o.responder_id
+      WHERE o.incident_id = $1
+      ORDER BY o.distance_m ASC NULLS LAST`,
     [incidentId],
   );
   return rows;
@@ -1358,12 +1370,29 @@ async function listOffersForIncident(incidentId) {
  * into a second acceptance, and a responder can't answer an offer that was
  * never theirs.
  */
+/** A push provider accepted a notification for this offer (first time wins). */
+async function markOfferPushAccepted(offerId) {
+  if (!pool) return null;
+  const { rows } = await pool.query(
+    `UPDATE incident_offers SET push_accepted_at = COALESCE(push_accepted_at, now()) WHERE id = $1 RETURNING push_accepted_at`,
+    [offerId],
+  );
+  return rows[0] || null;
+}
+
 async function respondToOffer({ offerId, responderId, status }) {
   if (!pool) throw new Error('persistence disabled');
   const { rows } = await pool.query(
-    `UPDATE incident_offers SET status = $3, responded_at = now()
-      WHERE id = $1 AND responder_id = $2 AND status = 'notified'
-      RETURNING *`,
+    // Declining is always allowed. Accepting needs the responder to be
+    // verified right now and the incident to be still open: otherwise a
+    // revoked responder, or an answer after the all-clear, would show the
+    // person in danger "Help is on the way" when no vetted helper is coming.
+    `UPDATE incident_offers o SET status = $3::text, responded_at = now()
+      WHERE o.id = $1 AND o.responder_id = $2 AND o.status = 'notified'
+        AND ($3::text = 'declined' OR (
+              EXISTS (SELECT 1 FROM responders r WHERE r.user_id = o.responder_id AND r.verified_at IS NOT NULL)
+          AND EXISTS (SELECT 1 FROM incidents i WHERE i.id = o.incident_id AND i.status = 'active')))
+      RETURNING o.*`,
     [offerId, responderId, status],
   );
   return rows[0] || null;
@@ -2873,6 +2902,7 @@ module.exports = {
   createIncidentOffers,
   listOffersForIncident,
   respondToOffer,
+  markOfferPushAccepted,
   listMapResponders,
   verifyResponder,
   listMyOffers,
