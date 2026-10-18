@@ -175,7 +175,7 @@ Read to everyone at the start: "This is a test of Smart Warning. Every alert tod
 - Build from `main` with `client/android/app/google-services.json` (Firebase project `smart-warning`, package `com.smartwarning.app`): `cd client; npm run build; npx cap sync android; cd android; .\gradlew assembleDebug`.
 - Install `app/build/outputs/apk/debug/app-debug.apk` **only on the participants' phones, signed in to the test org.** Never on a device signed in to a real team: it would register for that team's real alerts.
 
-### 9.6 Real-device push (part of the rehearsal)
+### 9.5 Real-device push (part of the rehearsal)
 
 Use the FCM build (9.4) on a consenting tester's phone in the test organisation, and a desktop browser signed in to the same organisation.
 
@@ -190,7 +190,7 @@ Use the FCM build (9.4) on a consenting tester's phone in the test organisation,
 | Provider acceptance vs receipt | Compare the incident's events (`notified`, `sent`) with what each phone showed | Record any phone counted as sent that did not ring: provider acceptance is not proof of receipt |
 | Duplicate suppression | Double tap, and flight mode for 30 s then back | One alarm per device |
 
-### 9.7 Measurable acceptance criteria
+### 9.6 Measurable acceptance criteria
 
 | Measure | Pass |
 |---|---|
@@ -204,7 +204,7 @@ Use the FCM build (9.4) on a consenting tester's phone in the test organisation,
 | Failure recovery | after flight mode, the SOS still arrives once; the coordinator view recovers within 30 s |
 | Anyone outside the test group alerted | **none** (any one is an immediate stop) |
 
-### 9.8 Stop at once (then follow section 8) if
+### 9.7 Stop at once (then follow section 8) if
 
 - an SOS is not seen by the coordinator within 30 s,
 - a pin is clearly in the wrong place,
