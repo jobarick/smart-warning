@@ -17,6 +17,7 @@ import { loadSettings, saveSettings, makeOperatorId } from './lib/settings';
 import { startVibration, stopVibration } from './lib/haptics';
 import { useAlertSocket } from './hooks/useAlertSocket';
 import { useAlarmState } from './hooks/useAlarmState';
+import { useIncidentLocation } from './hooks/useIncidentLocation';
 import { useRoute } from './hooks/useRoute';
 import { useSiren } from './hooks/useSiren';
 import { useSelfTelemetry } from './hooks/useSelfTelemetry';
@@ -55,7 +56,6 @@ import { useUnsafeMode } from './hooks/useUnsafeMode';
 import { telHref } from './lib/emergency';
 import { unsubscribe as unsubscribePush } from './lib/push';
 import { nativePushSupported, ensurePushRegistered, retryPushOnForeground, unregisterFromPush, attachHandlers } from './lib/nativePush';
-import { startIncidentLocation, stopIncidentLocation } from './lib/nativeForegroundService';
 import { STALE_REPLAY_MS } from './lib/outbox';
 import * as trackBuffer from './lib/trackBuffer';
 import {
@@ -934,24 +934,27 @@ export default function App() {
     // a supervisor actually watches during an incident.
   }, [telemetry.lat, telemetry.lng, token]);
 
-  // Hold a foreground-service slot for the duration of any active org
-  // incident — not just on this device if it was the one that raised the
-  // alarm, but on every device that sees it, since the live roster a
-  // supervisor watches depends on every worker's heartbeat still reaching
-  // the relay, not only the raiser's. Personal accounts have no live roster
-  // for this to serve (see P1-1's note on why the org and personal paths
-  // diverge here) and are excluded. See nativeForegroundService.ts and
-  // IncidentLocationService.java for what this does and why it is scoped to
-  // Android only for now.
-  useEffect(() => {
-    if (isPersonal || !alarm.alert) return;
-    void startIncidentLocation();
-    return () => void stopIncidentLocation();
-    // Keyed on the alert's id, a stable primitive, rather than the alert
-    // object itself — a new object with the same id on every heartbeat
-    // re-render must not stop and restart the service each time.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPersonal, alarm.alert?.id]);
+  // The incident a supervisor on this device has said they are responding
+  // to. Only feeds the foreground service gate below.
+  const [respondedFor, setRespondedFor] = useState<string | null>(null);
+
+  // Hold a foreground-service slot for the duration of an active org
+  // incident, since the live roster a supervisor watches depends on every
+  // worker's heartbeat still reaching the relay, not only the raiser's.
+  // Google Play only allows a location foreground service to start as a
+  // continuation of a user action, so it starts at once only on the device
+  // that raised the SOS; a receiving device waits until the person
+  // acknowledges, answers the roll call or responds. Personal accounts have
+  // no live roster for this to serve (see P1-1's note on why the org and
+  // personal paths diverge here) and are excluded. See useIncidentLocation.ts.
+  useIncidentLocation({
+    isPersonal,
+    alertId: alarm.alert?.id ?? null,
+    raisedHere: !!alarm.alert && alarm.alert.sender === settings.deviceName,
+    acknowledged: alarm.acknowledged,
+    safeConfirmed: !!alarm.alert && safeFor === alarm.alert.id,
+    responded: !!alarm.alert && respondedFor === alarm.alert.id,
+  });
 
   const trigger = useCallback(
     (type: AlertType, severity: Severity, message: string) => {
@@ -1073,6 +1076,7 @@ export default function App() {
   // reconnect would tell somebody help was two minutes away when it is not.
   const onRespond = useCallback(
     (r: { incidentId: string; etaS: number | null; distanceM: number | null; routed: boolean; lat?: number | null; lng?: number | null }) => {
+      setRespondedFor(r.incidentId);
       send({
         kind: 'responding',
         ...r,
