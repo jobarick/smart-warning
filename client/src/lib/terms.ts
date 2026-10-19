@@ -278,7 +278,9 @@ export const PRIVACY_SECTIONS: TermsSection[] = [
       'Your position is written down and kept only between an emergency alert being raised and its all clear. Outside an active incident, no location history is stored.',
       'Your position is visible to Safety Coordinators of your own organization only. It is never shared with other organizations, and it is not sold or used for advertising.',
       'You can stop sharing at any time by turning off location sharing in Settings, by signing out, or by revoking the permission in your device settings. The application will keep working; a Safety Coordinator will simply not be able to see where you are.',
-      'The app does not collect location in the background when it is closed.',
+      'During an active incident in your organization, the Android app can keep sharing your position while it is in the background or the screen is locked, so Safety Coordinators can still account for you during an evacuation. While it does, Android shows a notification saying Smart Warning is sharing your location. These positions are seen only by your own organization’s Safety Coordinators, pass through the hosting providers listed under Who your data is shared with, and are kept as part of the incident record described under How long we keep it.',
+      'This continues only until the incident’s all clear. You can stop it earlier by turning off location sharing in Settings, by signing out, or by revoking the location permission in your device settings.',
+      'Outside an active incident the app does not collect location in the background, and it never asks for Android’s background location permission.',
     ],
   },
   {
