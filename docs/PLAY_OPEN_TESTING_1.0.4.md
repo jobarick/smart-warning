@@ -92,32 +92,25 @@ Hili ni toleo la majaribio. Katika dharura halisi piga 112 au namba ya dharura y
    (`IncidentLocationService`, added 2026-09-20). Play requires a declaration
    per foreground service type on **App content**, with a description, the user
    impact if interrupted, and a link to a video showing the user starting the
-   feature. Suggested text:
+   feature. See **Foreground service declaration answers** below.
 
-   > *Location.* While an emergency incident in the user's organisation is
-   > active, Smart Warning keeps the user's position flowing to their
-   > organisation's Safety Coordinators so the coordinator can see who is safe
-   > and where people are. A persistent notification says so. The service stops
-   > when the incident is closed. If the system stops it, coordinators lose
-   > sight of workers during an evacuation and cannot account for them.
+   **Policy risk, and its fix.** Play says a location foreground service must
+   continue a user initiated action. In 1.0.4 (versionCode 4) the service
+   starts automatically on *every* organisation phone the moment an alert
+   arrives, which a reviewer may reject. PR #85 changes that: the phone that
+   raised the SOS starts it at once (pressing SOS is the action); a receiving
+   phone starts it only after the person taps **Acknowledge**, answers
+   **I am safe**, or taps respond on the command dashboard. All clear still
+   stops it everywhere. Trade off: until a receiving worker taps something,
+   their position may stop updating once the screen locks. **Do not send
+   versionCode 4 for review; merge #85 and upload versionCode 5 instead.**
 
-   Video: record a phone raising an SOS in a test organisation, show the
-   notification appearing, then the all clear removing it. Upload it unlisted
-   (YouTube or Drive) and paste the link.
-
-   **Policy risk to know about:** Play says a location foreground service must
-   continue a user-initiated action. On the device that raises the SOS it
-   does. On *other* devices in the organisation it starts automatically when
-   the alert arrives (`App.tsx`, the `startIncidentLocation` effect). A
-   reviewer may reject that. Safest fix is to start it on receiving devices
-   only after the person taps to respond or acknowledges the alert.
-
-2. **Data safety and privacy policy wording.** The live privacy policy says the
-   app "does not collect location in the background when it is closed." True,
-   but it no longer says that during an active incident it keeps sharing while
-   in the background. Add one sentence to the policy, and in the Data safety
-   form keep precise location declared as collected, not shared, for app
-   functionality.
+2. **Privacy policy wording.** The live policy said only that the app "does
+   not collect location in the background when it is closed." PR #86 adds the
+   background sharing during an active incident (purpose, notification, who
+   sees it, retention as part of the incident record, how it ends). In the
+   Data safety form keep precise location declared as collected, not shared,
+   for app functionality.
 
 3. **Precise location declaration (coming).** Play has announced a declaration
    for apps using `ACCESS_FINE_LOCATION`, expected to appear around November
@@ -131,6 +124,72 @@ Hili ni toleo la majaribio. Katika dharura halisi piga 112 au namba ya dharura y
    coordination tool, not an emergency service, no guaranteed delivery.
 
 6. **No in-app purchases** in the Android app (billing stays on the web).
+
+## Foreground service declaration answers
+
+Play Console, **App content**, **Foreground service permissions**. Written
+for the behaviour in PR #85 (versionCode 5). If you ever submit versionCode 4
+instead, these answers would not be accurate for receiving phones.
+
+**Foreground service type:** Location. Closest listed use case: *location
+sharing* (user initiated, during an emergency). No other foreground service
+types are declared by the app.
+
+**Describe the feature (what the user does and sees):**
+
+> Smart Warning is an emergency alert app for organisations such as
+> workplaces and sites. When a member presses SOS, or when a member
+> acknowledges an incoming emergency alert or reports themselves safe, the
+> app keeps sending that person's location to their own organisation's
+> Safety Coordinators for as long as the incident is active. This is how a
+> coordinator sees where people are and who is still unaccounted for during
+> an evacuation. While this runs, Android shows a persistent notification,
+> "Smart Warning is sharing your location". It stops automatically when the
+> coordinator issues the all clear. The person can stop it sooner by turning
+> off location sharing, signing out or revoking the location permission. The
+> app does not request background location permission and collects no
+> location in the background outside an active incident.
+
+**Why location must continue during the incident:**
+
+> During an evacuation people lock their phones and move. Without the
+> foreground service Android throttles the app as soon as the screen locks,
+> so the coordinator's live map freezes on stale positions at the moment it
+> matters most.
+
+**User impact if the task is deferred or interrupted:**
+
+> The Safety Coordinator loses sight of the person during an active
+> emergency and cannot tell whether they are safe, trapped, or still inside a
+> hazardous area. This can delay help reaching them. The alert itself still
+> works, but the coordinator's roster shows the person's last known position
+> only.
+
+**How it starts, stays visible and ends:** starts only from a user action
+(SOS press, Acknowledge, I am safe, or respond); visible the whole time via
+an ongoing notification on its own channel ("Active incident tracking");
+ends at the all clear, or when the person signs out, turns off sharing or
+revokes the permission.
+
+**Video URL:** *not recorded yet. Leave the field empty until you have one.*
+
+### Video recording checklist (about 30 to 60 seconds)
+
+Use the drill/test organisation only, never a real site. Use a build with
+PR #85 (versionCode 5) so the video matches the declaration.
+
+1. Phone A (worker) and phone B (coordinator) signed in to the test
+   organisation. Screen record phone A (Android quick settings, Screen record).
+2. On phone A, open Smart Warning and press **SOS**; choose type and send.
+3. Pull down the notification shade: show "Smart Warning is sharing your
+   location".
+4. Lock phone A for a few seconds; on phone B (or a second recording) show
+   the coordinator map still updating phone A's position.
+5. Optional second clip: phone C receives the alert, taps **Acknowledge**,
+   the notification appears only then.
+6. On phone B issue the **all clear**; on phone A show the notification gone.
+7. Upload to YouTube as **Unlisted** (or a Drive link viewable by anyone with
+   the link), paste the URL in the declaration.
 
 ## Play Console steps (owner)
 
