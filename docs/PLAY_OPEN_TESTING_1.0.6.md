@@ -1,8 +1,9 @@
-# Open testing release 1.0.4 (versionCode 4)
+# Open testing release 1.0.6 (versionCode 6)
 
-Prepared 2026-10-19. Everything below was checked against the repository, the
-built bundle and the Play Console account (read only). Nothing here has been
-sent to Google for review.
+Prepared 2026-10-19, replacing the earlier 1.0.4 and 1.0.5 candidates (never
+uploaded). Everything below was checked against the repository, the built
+bundle and the Play Console account (read only). Nothing here has been sent to
+Google for review.
 
 Smart Warning is **not** ready for real emergency use. This release is for
 testers who know that.
@@ -11,33 +12,35 @@ testers who know that.
 
 | Item | Value |
 |---|---|
-| File | `client/android/app/build/outputs/bundle/release/app-release.aab` (gitignored, local build) |
-| Size | 2,640,714 bytes (2.52 MB) |
-| SHA-256 | `a8e68db80829820322144ad415230aa5d6672c0e82ae964a6a841fc936a35090` |
-| Built from | `main` at `04dc8ed` (includes PR #83, push registration retry on resume) |
+| File | `Downloads\smart-warning-1.0.6-vc6.aab` (copy of `client/android/app/build/outputs/bundle/release/app-release.aab`, gitignored) |
+| Size | 2,641,281 bytes (2.52 MB) |
+| SHA-256 | `96583799701066c0843bfccd35b4de236cb448cfb0d2c1f0ac12ad5eac43350a` |
+| Built from | `main` at `b3b0a96`, identical git tree `2bbf08f7`; web bundle `main-C2QlPvDJ.js`, the same one Vercel serves |
+| Includes | #83 push retry on resume, #85 location service only after a user action, #86 privacy text, #87 service stops on sign out |
 | Package | `com.smartwarning.app` |
-| versionCode / versionName | `4` / `1.0.4` (Play already holds 1, 2, 3) |
+| versionCode / versionName | `6` / `1.0.6`, read from the bundle's own manifest (Play holds 1, 2, 3) |
 | minSdk / targetSdk | 24 / 36 (meets the 31 Aug 2026 rule: API 36 for new apps and updates) |
-| Signed with | upload key alias `smart-warning`, SHA-1 `0D:08:0C:00:3F:3F:77:D2:AF:D7:3F:22:F5:7B:BE:4E:32:78:83:EA` (`jarsigner -verify`: jar verified) |
-| Backend baked in | `wss://smart-warning-production.up.railway.app` only. Web bundle `main-C4SaBOWl.js`, the same one Vercel serves |
+| Signed with | upload key alias `smart-warning`, SHA-1 `0D:08:0C:00:3F:3F:77:D2:AF:D7:3F:22:F5:7B:BE:4E:32:78:83:EA` (`jarsigner -verify`: jar verified; `-strict` only adds the usual self signed certificate warnings every upload key gives) |
+| Backend baked in | `wss://smart-warning-production.up.railway.app` only |
+| Permissions | internet, network state, notifications, vibrate, coarse + fine location, foreground service + foreground service location, wake lock, FCM receive. **No** background location |
 | Not in the bundle | private keys, service accounts, `.env` values, keystores (scanned) |
 | Debuggable / cleartext | no / no |
 
-Build commands (from `tools/android-build.ps1`, which builds the web app and
-runs `cap sync` first): `clean`, `bundleRelease -VersionCode 4 -VersionName 1.0.4`,
+Build commands (`tools/android-build.ps1`, which builds the web app and runs
+`cap sync` first): `clean`, `bundleRelease -VersionCode 6 -VersionName 1.0.6`,
 `lintVitalRelease`. All three `BUILD SUCCESSFUL`. Client `tsc` clean, client
-tests 27 files passing.
+tests 28 files / 158 tests passing; CI green on every merged PR.
 
 Signing material was read from the documented key at
 `OneDrive\Desktop\emergency-alert-system\smart-warning\client\android\` through
-environment variables, never copied into this checkout. A **second, older key**
+environment variables, never copied into a checkout. A **second, older key**
 exists at `Downloads\smart-warning-main\client\android\smart-warning-release.jks`
 (alias `smartwarning`, SHA-1 `6C:AD:AA:FE:…`). It is not the upload key Play
 used for 1.0 to 1.0.3; do not sign with it.
 
 ## Release name
 
-`1.0.4 open test`
+`Smart Warning 1.0.6 Open Testing`
 
 ## Release notes
 
@@ -46,20 +49,20 @@ Swahili before saving.
 
 ```
 <en-US>
-Smart Warning 1.0.4 test build
+Smart Warning 1.0.6 test build
 • New mobile layout and a live map for Safety Coordinators
 • Tanzania emergency numbers and a nationwide list of nearby help
 • SOS alert types in Swahili
-• During an active incident the app keeps sharing your location in the background and shows a notification while it does
-• Push alerts now retry registration when you return to the app
+• After you raise an SOS or respond to an alert, the app keeps sharing your location during the incident and shows a notification
+• Push alerts retry registration when you return to the app
 This is a test build. In a real emergency always call 112 or your local emergency number.
 </en-US>
 <sw>
-Smart Warning 1.0.4 toleo la majaribio
+Smart Warning 1.0.6 toleo la majaribio
 • Muonekano mpya wa simu na ramani ya moja kwa moja kwa Waratibu wa Usalama
-• Namba za dharura za Tanzania na orodha ya huduma za msaada zilizo karibu nchi nzima
+• Namba za dharura za Tanzania na orodha ya huduma za msaada zilizo karibu
 • Aina za SOS kwa Kiswahili
-• Wakati wa tukio, programu inaendelea kushiriki mahali ulipo hata ikiwa nyuma na inaonyesha arifa
+• Ukibonyeza SOS au kujibu tahadhari, programu inashiriki mahali ulipo wakati wa tukio na inaonyesha arifa
 • Arifa za push zinajisajili tena unaporudi kwenye programu
 Hili ni toleo la majaribio. Katika dharura halisi piga 112 au namba ya dharura ya eneo lako.
 </sw>
@@ -87,23 +90,22 @@ Hili ni toleo la majaribio. Katika dharura halisi piga 112 au namba ya dharura y
 
 ## Compliance gaps for this upload
 
-1. **Foreground service declaration (will block the release).** 1.0.4 is the
-   first bundle that declares `FOREGROUND_SERVICE_LOCATION`
+1. **Foreground service declaration (will block the release).** 1.0.6 is the
+   first uploaded bundle that declares `FOREGROUND_SERVICE_LOCATION`
    (`IncidentLocationService`, added 2026-09-20). Play requires a declaration
    per foreground service type on **App content**, with a description, the user
    impact if interrupted, and a link to a video showing the user starting the
    feature. See **Foreground service declaration answers** below.
 
    **Policy risk, and its fix.** Play says a location foreground service must
-   continue a user initiated action. In 1.0.4 (versionCode 4) the service
+   continue a user initiated action. In the never uploaded 1.0.4 build the service
    starts automatically on *every* organisation phone the moment an alert
    arrives, which a reviewer may reject. PR #85 changes that: the phone that
    raised the SOS starts it at once (pressing SOS is the action); a receiving
    phone starts it only after the person taps **Acknowledge**, answers
    **I am safe**, or taps respond on the command dashboard. All clear still
    stops it everywhere. Trade off: until a receiving worker taps something,
-   their position may stop updating once the screen locks. **Do not send
-   versionCode 4 for review; merge #85 and upload versionCode 5 instead.**
+   their position may stop updating once the screen locks. **Fixed in 1.0.6.**
 
 2. **Privacy policy wording.** The live policy said only that the app "does
    not collect location in the background when it is closed." PR #86 adds the
@@ -128,8 +130,7 @@ Hili ni toleo la majaribio. Katika dharura halisi piga 112 au namba ya dharura y
 ## Foreground service declaration answers
 
 Play Console, **App content**, **Foreground service permissions**. Written
-for the behaviour in PR #85 (versionCode 5). If you ever submit versionCode 4
-instead, these answers would not be accurate for receiving phones.
+for the behaviour in 1.0.6 (versionCode 6): PRs #85 and #87.
 
 **Foreground service type:** Location. Closest listed use case: *location
 sharing* (user initiated, during an emergency). No other foreground service
@@ -175,8 +176,8 @@ revokes the permission.
 
 ### Video recording checklist (about 30 to 60 seconds)
 
-Use the drill/test organisation only, never a real site. Use a build with
-PR #85 (versionCode 5) so the video matches the declaration.
+Use the drill/test organisation only, never a real site. Record it with
+1.0.6 (versionCode 6) so the video matches the declaration.
 
 1. Phone A (worker) and phone B (coordinator) signed in to the test
    organisation. Screen record phone A (Android quick settings, Screen record).
@@ -198,9 +199,9 @@ PR #85 (versionCode 5) so the video matches the declaration.
 2. **Testing, Open testing**, open the existing draft (**Edit release**).
 3. Check **App signing by Google Play** is shown as enabled (it is: the App
    signing page says *Protected with Play*).
-4. **Upload** `app-release.aab`. Expect versionCode 4. If Play says the upload
+4. **Upload** `app-release.aab`. Use `smart-warning-1.0.6-vc6.aab`. Expect versionCode 6. If Play says the upload
    key is wrong, stop: do not sign with the second key.
-5. Release name `1.0.4 open test`, paste the release notes above.
+5. Release name `Smart Warning 1.0.6 Open Testing`, paste the release notes above.
 6. **Next**, read every error and warning. Fix errors before continuing.
 7. **Save**, then **Publishing overview**, **Send changes for review**.
 8. Status will be *In review*. Only when it reads *Available on Google Play*
@@ -217,7 +218,7 @@ real phone and a tester's result.
 | Area | Status | What to do | Pass when |
 |---|---|---|---|
 | Install from opt-in link, first launch | Implemented | Install from Play, open | Launches, no crash, sign in gate shows |
-| Upgrade over 1.0.3 | Implemented | Install 1.0.3 test build, then update to 1.0.4 | Session kept or a clean sign in prompt, no crash |
+| Upgrade over 1.0.3 | Implemented | Install 1.0.3 test build, then update to 1.0.6 | Session kept or a clean sign in prompt, no crash |
 | Coordinator sign in / sign up | Implemented | Sign in with test coordinator account | Command dashboard opens |
 | Worker join with team code | Implemented | Join test org with its code | Worker home shows the org |
 | Notification permission | Implemented | Deny, then allow in Android Settings, return to app | Bell reads *Alerts on* without restarting (PR #83) |
@@ -252,6 +253,6 @@ Record each result with phone model, Android version and time.
 - Trusted Circle email does not reach anyone but the Resend account owner.
 - Railway plan end date unverified (earlier notes say about 2026-11-03). If the
   backend stops, every tester loses alerts.
-- 1.0.4 was not installed on a device before upload (no phone was connected to
+- 1.0.6 was not installed on a device before upload (no phone was connected to
   the build machine). The first install from Play is the first device run of
   this exact build under R8.
