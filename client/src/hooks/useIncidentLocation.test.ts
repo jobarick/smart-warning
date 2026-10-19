@@ -16,6 +16,7 @@ import { shouldHoldIncidentLocation, useIncidentLocation, type IncidentLocationI
 
 const received: IncidentLocationInput = {
   isPersonal: false,
+  signedIn: true,
   alertId: 'a1',
   raisedHere: false,
   acknowledged: false,
@@ -38,6 +39,10 @@ describe('shouldHoldIncidentLocation', () => {
 
   it('never holds for personal accounts, even when raised here', () => {
     expect(shouldHoldIncidentLocation({ ...received, isPersonal: true, raisedHere: true, acknowledged: true })).toBe(false);
+  });
+
+  it('never holds once signed out, even mid incident', () => {
+    expect(shouldHoldIncidentLocation({ ...received, signedIn: false, raisedHere: true, acknowledged: true })).toBe(false);
   });
 
   it('never holds without an active alert', () => {
@@ -85,6 +90,16 @@ describe('useIncidentLocation', () => {
     expect(start).toHaveBeenCalledTimes(1);
     rerender({ ...received, alertId: 'a2', responded: true });
     expect(start).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops when the person signs out while the alert is still held', () => {
+    const { rerender } = renderHook((p: IncidentLocationInput) => useIncidentLocation(p), {
+      initialProps: { ...received, raisedHere: true },
+    });
+    expect(start).toHaveBeenCalledTimes(1);
+    rerender({ ...received, raisedHere: true, signedIn: false });
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(start).toHaveBeenCalledTimes(1);
   });
 
   it('never starts for a personal account', () => {

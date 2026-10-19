@@ -4,6 +4,12 @@ import { startIncidentLocation, stopIncidentLocation } from '../lib/nativeForegr
 export interface IncidentLocationInput {
   /** Personal accounts have no live roster for the service to serve. */
   isPersonal: boolean;
+  /**
+   * This device is signed in and its relay connection is meant to run. After
+   * sign out no position can reach anyone, so the service (and its "sharing
+   * your location" notification) must stop even if the alert is still held.
+   */
+  signedIn: boolean;
   /** The active alert's id, or null when there is none (or after all clear). */
   alertId: string | null;
   /** This device raised the alert: pressing SOS is itself the user action. */
@@ -26,7 +32,7 @@ export interface IncidentLocationInput {
  * acts on the alert (acknowledges it, answers the roll call or responds).
  */
 export function shouldHoldIncidentLocation(i: IncidentLocationInput): boolean {
-  if (i.isPersonal || !i.alertId) return false;
+  if (i.isPersonal || !i.signedIn || !i.alertId) return false;
   return i.raisedHere || i.acknowledged || i.safeConfirmed || i.responded;
 }
 

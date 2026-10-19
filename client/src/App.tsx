@@ -949,6 +949,9 @@ export default function App() {
   // personal paths diverge here) and are excluded. See useIncidentLocation.ts.
   useIncidentLocation({
     isPersonal,
+    // Signed out means the relay socket is off and no position reaches
+    // anyone, so the service and its notification must not linger.
+    signedIn: runSocket,
     alertId: alarm.alert?.id ?? null,
     raisedHere: !!alarm.alert && alarm.alert.sender === settings.deviceName,
     acknowledged: alarm.acknowledged,
