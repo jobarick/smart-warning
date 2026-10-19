@@ -87,6 +87,13 @@ Hili ni toleo la majaribio. Katika dharura halisi piga 112 au namba ya dharura y
 - Bundles on Play: versionCode 1 (inactive), 2 and 3 (active, uploaded 9 to 11 Aug 2026).
 - Open testing track: **Draft** "Untitled release" with no bundle, 6 countries selected, testers set.
 - App content: nothing needing attention; 10 declarations last edited 10 Aug 2026.
+- Rechecked the same evening: still 3 bundles ("1 - 3 of 3"), so versionCode 6
+  is free; the draft still has no bundle; the **Foreground service
+  permissions** page exists but lists no permissions and shows no fields yet
+  (only "Your app uses the following undeclared foreground service
+  permissions"). Play fills it from uploaded bundles, so the real fields only
+  appear after the 1.0.6 upload. The country names in the draft could not be
+  read from the browser pane, only the count (6).
 
 ## Compliance gaps for this upload
 
