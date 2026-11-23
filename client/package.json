@@ -36,5 +36,11 @@
     "vite": "^7.0.0",
     "vite-plugin-pwa": "^1.0.0",
     "vitest": "^5.0.1"
+  },
+  "overrides": {
+    "rimraf": "^6.1.4",
+    "workbox-build": {
+      "glob": "^14.0.6"
+    }
   }
 }
