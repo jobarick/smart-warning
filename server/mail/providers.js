@@ -78,10 +78,15 @@ function memoryProvider() {
  * became a hung HTTP request — the feedback route awaited delivery, and
  * delivery neither finished nor failed. Generous enough for a slow relay on a
  * bad link, short enough that a dead host fails and gets retried.
+ *
+ * Since nodemailer 10.1, connectionTimeout is one deadline for the whole of
+ * connecting: DNS, TCP, the banner and any STARTTLS upgrade. greetingTimeout is
+ * then cut short by whatever is left of it. On 9.x the two were separate 10s
+ * budgets, so connectionTimeout is 20s here to keep the same total.
  */
 const SMTP_TIMEOUTS = {
-  connectionTimeout: 10_000, // TCP connect
-  greetingTimeout: 10_000,   // waiting for the server's banner
+  connectionTimeout: 20_000, // DNS + TCP + banner + STARTTLS, end to end
+  greetingTimeout: 10_000,   // waiting for the server's banner (within the above)
   socketTimeout: 20_000,     // silence mid-conversation
 };
 
