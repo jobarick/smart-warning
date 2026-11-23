@@ -17,6 +17,7 @@ import { loadSettings, saveSettings, makeOperatorId } from './lib/settings';
 import { startVibration, stopVibration } from './lib/haptics';
 import { useAlertSocket } from './hooks/useAlertSocket';
 import { useAlarmState } from './hooks/useAlarmState';
+import { useIncidentLocation } from './hooks/useIncidentLocation';
 import { useRoute } from './hooks/useRoute';
 import { useSiren } from './hooks/useSiren';
 import { useSelfTelemetry } from './hooks/useSelfTelemetry';
@@ -54,8 +55,7 @@ import { Onboarding, hasOnboarded } from './components/Onboarding';
 import { useUnsafeMode } from './hooks/useUnsafeMode';
 import { telHref } from './lib/emergency';
 import { unsubscribe as unsubscribePush } from './lib/push';
-import { nativePushSupported, registerForPush, unregisterFromPush, attachHandlers } from './lib/nativePush';
-import { startIncidentLocation, stopIncidentLocation } from './lib/nativeForegroundService';
+import { nativePushSupported, ensurePushRegistered, retryPushOnForeground, unregisterFromPush, attachHandlers } from './lib/nativePush';
 import { STALE_REPLAY_MS } from './lib/outbox';
 import * as trackBuffer from './lib/trackBuffer';
 import {
@@ -575,13 +575,20 @@ export default function App() {
   // FCM instead. Registration is accepted by the server even before Firebase
   // credentials exist, so the devices already in the field are the ones that
   // receive the first alert once they do.
+  //
+  // It also retries each time the app returns to the foreground until it
+  // succeeds, so someone who declined the prompt and then allowed
+  // notifications in Android Settings is registered when they come back,
+  // not only after the app is killed and relaunched.
   useEffect(() => {
     if (!nativePushSupported()) return;
     const creds = joinCredentials(session);
     if (!creds || (!creds.token && !creds.orgCode)) return;
     let cancelled = false;
+    const label = settings.deviceName;
+    const stopRetrying = retryPushOnForeground(() => ({ creds, label }));
     void (async () => {
-      const res = await registerForPush(creds, settings.deviceName);
+      const res = await ensurePushRegistered(creds, label, { force: true });
       if (cancelled) return;
       if (res.status === 'error') console.warn('[push] native registration failed:', res.error);
       else if (res.delivery === 'pending-credentials') {
@@ -591,7 +598,7 @@ export default function App() {
     // Tapping a notification only needs to bring the app forward — the relay is
     // the authority on state and the socket reconciles it on resume.
     void attachHandlers({});
-    return () => { cancelled = true; };
+    return () => { cancelled = true; stopRetrying(); };
   }, [session, settings.deviceName]);
 
   // The app only runs its socket/dashboard once we're past the auth gate.
@@ -927,24 +934,30 @@ export default function App() {
     // a supervisor actually watches during an incident.
   }, [telemetry.lat, telemetry.lng, token]);
 
-  // Hold a foreground-service slot for the duration of any active org
-  // incident — not just on this device if it was the one that raised the
-  // alarm, but on every device that sees it, since the live roster a
-  // supervisor watches depends on every worker's heartbeat still reaching
-  // the relay, not only the raiser's. Personal accounts have no live roster
-  // for this to serve (see P1-1's note on why the org and personal paths
-  // diverge here) and are excluded. See nativeForegroundService.ts and
-  // IncidentLocationService.java for what this does and why it is scoped to
-  // Android only for now.
-  useEffect(() => {
-    if (isPersonal || !alarm.alert) return;
-    void startIncidentLocation();
-    return () => void stopIncidentLocation();
-    // Keyed on the alert's id, a stable primitive, rather than the alert
-    // object itself — a new object with the same id on every heartbeat
-    // re-render must not stop and restart the service each time.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPersonal, alarm.alert?.id]);
+  // The incident a supervisor on this device has said they are responding
+  // to. Only feeds the foreground service gate below.
+  const [respondedFor, setRespondedFor] = useState<string | null>(null);
+
+  // Hold a foreground-service slot for the duration of an active org
+  // incident, since the live roster a supervisor watches depends on every
+  // worker's heartbeat still reaching the relay, not only the raiser's.
+  // Google Play only allows a location foreground service to start as a
+  // continuation of a user action, so it starts at once only on the device
+  // that raised the SOS; a receiving device waits until the person
+  // acknowledges, answers the roll call or responds. Personal accounts have
+  // no live roster for this to serve (see P1-1's note on why the org and
+  // personal paths diverge here) and are excluded. See useIncidentLocation.ts.
+  useIncidentLocation({
+    isPersonal,
+    // Signed out means the relay socket is off and no position reaches
+    // anyone, so the service and its notification must not linger.
+    signedIn: runSocket,
+    alertId: alarm.alert?.id ?? null,
+    raisedHere: !!alarm.alert && alarm.alert.sender === settings.deviceName,
+    acknowledged: alarm.acknowledged,
+    safeConfirmed: !!alarm.alert && safeFor === alarm.alert.id,
+    responded: !!alarm.alert && respondedFor === alarm.alert.id,
+  });
 
   const trigger = useCallback(
     (type: AlertType, severity: Severity, message: string) => {
@@ -1066,6 +1079,7 @@ export default function App() {
   // reconnect would tell somebody help was two minutes away when it is not.
   const onRespond = useCallback(
     (r: { incidentId: string; etaS: number | null; distanceM: number | null; routed: boolean; lat?: number | null; lng?: number | null }) => {
+      setRespondedFor(r.incidentId);
       send({
         kind: 'responding',
         ...r,
@@ -1404,7 +1418,7 @@ export default function App() {
           ) : (
             <span className="org-info"><b>Team {workerCode}</b><span className="org-code">{settings.deviceName}</span></span>
           )}
-          {joinCreds && <PushToggle creds={joinCreds} />}
+          {joinCreds && <PushToggle creds={joinCreds} label={settings.deviceName} />}
           {org && !showTools && !showSupport && (
             <button className="org-tools" onClick={() => navigate('/setup')} title="Safe destinations and feedback">
               <Icon name="map-pin" /> Setup
@@ -1498,6 +1512,7 @@ export default function App() {
           onEscalateReport={onEscalateReport}
           onDismissReport={onDismissReport}
           token={token}
+          drill={org?.drill === true}
           selfPosition={telemetry.lat !== null && telemetry.lng !== null ? { lat: telemetry.lat, lng: telemetry.lng } : null}
           selfLocation={
             !settings.shareLocation ? 'off'

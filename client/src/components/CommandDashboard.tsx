@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { TestPushButton } from './TestPushButton';
 import type { AlarmState } from '../hooks/useAlarmState';
 import type { SocketStatus } from '../hooks/useAlertSocket';
 import type { AlertType, LogEntry, Severity, SystemStatusLevel, WorkerInfo } from '../types';
@@ -43,6 +44,8 @@ interface Props {
   onDismissReport: (id: string) => Promise<void>;
   /** Supervisor bearer token — needed to read the incident movement history. */
   token?: string;
+  /** This organisation is a rehearsal drill: offer a test notification. */
+  drill?: boolean;
   /** This supervisor's own live position, when they are sharing it. */
   selfPosition?: { lat: number; lng: number } | null;
   selfLocation?: SelfLocationState;
@@ -99,7 +102,7 @@ function lastSeen(updatedAt: number, now: number): string {
  * about the page scrolls; the three list panels scroll inside themselves, so
  * the state of the site is never below the fold.
  */
-export function CommandDashboard({ roster, alarm, log, history, stats, persistence, historyError, profile, selfName, status, onAcknowledge, onAllClear, standing, onSetStatus, reports, reportsError, onEscalateReport, onDismissReport, token, selfPosition, selfLocation, onEnableLocation, onRespond }: Props) {
+export function CommandDashboard({ roster, alarm, log, history, stats, persistence, historyError, profile, selfName, status, onAcknowledge, onAllClear, standing, onSetStatus, reports, reportsError, onEscalateReport, onDismissReport, token, drill, selfPosition, selfLocation, onEnableLocation, onRespond }: Props) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -433,6 +436,13 @@ export function CommandDashboard({ roster, alarm, log, history, stats, persisten
                 : 'Advisory warns the site without sounding an alarm.'}
             </p>
           </section>
+
+          {drill && token && (
+            <section className="mc-block">
+              <h4 className="mc-h">Rehearsal drill</h4>
+              <TestPushButton creds={{ token }} />
+            </section>
+          )}
 
           <section className="mc-block">
             <h4 className="mc-h">Readout</h4>

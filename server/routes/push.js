@@ -101,7 +101,49 @@ async function handle({ req, res, path }) {
     return true;
   }
 
+  // A test notification for the real-device push check (docs/PILOT_PLAN.md
+  // 9.5), with no incident behind it: no Nearby Help, no escalation, nothing
+  // in anyone's history. A personal account reaches only its own devices. An
+  // organisation may send one only while it is a rehearsal drill, so nobody
+  // in a real team gets a test they were not expecting.
+  if (path === '/api/push/test' && req.method === 'POST') {
+    const body = await readJson(req);
+    const owner = await deviceOwnerFromRequest(req, body);
+    if (!owner) { sendJson(res, 401, { error: 'credentials required' }); return true; }
+    if (owner.orgId && !(await db.isDrillOrg(owner.orgId))) {
+      sendJson(res, 403, { error: 'test notifications are only available in a rehearsal drill organisation' });
+      return true;
+    }
+    const key = owner.userId || owner.orgId;
+    const last = lastTestAt.get(key) || 0;
+    if (Date.now() - last < TEST_INTERVAL_MS) { sendJson(res, 429, { error: 'wait a few seconds before sending another test' }); return true; }
+    lastTestAt.set(key, Date.now());
+
+    const payload = {
+      title: 'TEST: Smart Warning notification check',
+      body: 'Test only. There is no emergency.',
+      type: 'test',
+      // The same urgency, channel and sound as a real alert: the point is to
+      // prove that path reaches a locked phone.
+      severity: 'high',
+      tag: 'sw-test',
+    };
+    const failedWith = (e) => ({ sent: 0, pruned: 0, failed: 0, error: e.message });
+    const [webPush, native] = await Promise.all([
+      (owner.userId ? push.notifyUser(owner.userId, payload) : push.notifyOrg(owner.orgId, payload)).catch(failedWith),
+      (owner.userId ? fcm.notifyUser(owner.userId, payload) : fcm.notifyOrg(owner.orgId, payload)).catch(failedWith),
+    ]);
+    console.log(`[push] test notification for ${owner.userId ? 'a personal account' : `org ${owner.orgId}`}: web ${webPush.sent}/${webPush.failed}, fcm ${native.sent}/${native.failed}`);
+    sendJson(res, 200, { ok: true, at: Date.now(), webPush, fcm: native });
+    return true;
+  }
+
   return false;
 }
+
+// One test per owner per interval: enough for a tester to retry, too slow to
+// become a way of buzzing a room of phones.
+const TEST_INTERVAL_MS = 15 * 1000;
+const lastTestAt = new Map();
 
 module.exports = { handle };

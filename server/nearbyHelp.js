@@ -70,11 +70,16 @@ async function searchAndNotify({ incidentId, type, lat, lng, excludeUserId, orgI
 
   let candidates = [];
   let ringUsedM = null;
+  let drillOrgId = null;
   try {
+    // A rehearsal must never reach a real responder, and a real emergency must
+    // never go to a rehearsal's test responder. If this lookup fails, the
+    // search stops here: nobody is better than the wrong people.
+    if (orgId && await db.isDrillOrg(orgId)) drillOrgId = orgId;
     for (const radiusM of RINGS_M) {
       // eslint-disable-next-line no-await-in-loop
       const found = await db.findNearbyResponders({
-        lat, lng, category, radiusM, freshnessMs: RESPONDER_FRESHNESS_MS, excludeUserId: excludeUserId || null,
+        lat, lng, category, radiusM, freshnessMs: RESPONDER_FRESHNESS_MS, excludeUserId: excludeUserId || null, drillOrgId,
       });
       if (found.length >= MIN_CANDIDATES || radiusM === RINGS_M[RINGS_M.length - 1]) {
         candidates = found;
@@ -88,7 +93,7 @@ async function searchAndNotify({ incidentId, type, lat, lng, excludeUserId, orgI
   }
 
   if (candidates.length === 0) {
-    return { attempted: true, ringUsedM, notified: 0 };
+    return { attempted: true, ringUsedM, notified: 0, ...(drillOrgId ? { drill: true } : {}) };
   }
 
   const ranked = candidates
@@ -111,7 +116,7 @@ async function searchAndNotify({ incidentId, type, lat, lng, excludeUserId, orgI
   // offer. Full detail unlocks only for whoever actually accepts (see
   // routes/responders.js's accept handler).
   const notification = {
-    title: '🚨 Emergency near you',
+    title: drillOrgId ? 'DRILL: Emergency near you' : '🚨 Emergency near you',
     body: `A person may need help approximately ${offers[0]?.distance_m ?? '?'}m away. ${category} emergency.`,
     type,
     severity: 'nearby-help',
@@ -127,16 +132,24 @@ async function searchAndNotify({ incidentId, type, lat, lng, excludeUserId, orgI
     detail: { channel, nearbyHelp: true, responderId: offer.responder_id, offerId: offer.id, ...detail },
   }).catch((e) => console.error(`[db] recordIncidentEvent(notified/${channel}):`, e.message));
 
+  // Marks the offer as reached once any provider accepted a notification for
+  // it, so the person's screen counts only people a push actually went to.
+  const markReached = (offer, result) => {
+    if (result && Number(result.sent) > 0) {
+      db.markOfferPushAccepted?.(offer.id).catch((e) => console.error('[db] markOfferPushAccepted:', e.message));
+    }
+  };
+
   for (const offer of offers) {
     const body = `A person may need help approximately ${offer.distance_m}m away. ${category} emergency.`;
     push.notifyUser(offer.responder_id, { ...notification, body, offerId: offer.id })
-      .then((result) => recordNotified(offer, 'web-push', result))
+      .then((result) => { markReached(offer, result); return recordNotified(offer, 'web-push', result); })
       .catch((e) => {
         console.error(`[nearby-help] push to ${offer.responder_id} failed: ${e.message}`);
         recordNotified(offer, 'web-push', { error: e.message });
       });
     fcm.notifyUser(offer.responder_id, { ...notification, body, offerId: offer.id })
-      .then((result) => recordNotified(offer, 'fcm', result))
+      .then((result) => { markReached(offer, result); return recordNotified(offer, 'fcm', result); })
       .catch((e) => {
         console.error(`[nearby-help] fcm to ${offer.responder_id} failed: ${e.message}`);
         recordNotified(offer, 'fcm', { error: e.message });
@@ -145,10 +158,10 @@ async function searchAndNotify({ incidentId, type, lat, lng, excludeUserId, orgI
 
   db.recordIncidentEvent?.({
     incidentId, orgId, kind: 'nearby-searched', actorRole: 'system',
-    detail: { category, ringUsedM, candidatesFound: candidates.length, notified: offers.length },
+    detail: { category, ringUsedM, candidatesFound: candidates.length, notified: offers.length, ...(drillOrgId ? { drill: true } : {}) },
   }).catch((e) => console.error('[db] recordIncidentEvent(nearby-searched):', e.message));
 
-  return { attempted: true, ringUsedM, notified: offers.length };
+  return { attempted: true, ringUsedM, notified: offers.length, ...(drillOrgId ? { drill: true } : {}) };
 }
 
 module.exports = { searchAndNotify, RINGS_M, MIN_CANDIDATES, RESPONDER_FRESHNESS_MS, MAX_NOTIFIED, CATEGORY_BY_ALERT_TYPE };

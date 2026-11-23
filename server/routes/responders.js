@@ -103,7 +103,14 @@ async function handle({ req, res, path }) {
     if (!status) { sendJson(res, 400, { error: "status must be 'accepted' or 'declined'" }); return true; }
 
     const offer = await db.respondToOffer({ offerId: respondMatch[1], responderId: ctx.user.id, status });
-    if (!offer) { sendJson(res, 404, { error: 'no matching offer, it may already have been answered' }); return true; }
+    if (!offer) {
+      sendJson(res, 404, {
+        error: status === 'accepted'
+          ? 'this offer can no longer be accepted: it was already answered, the emergency is over, or you are not a verified responder'
+          : 'no matching offer, it may already have been answered',
+      });
+      return true;
+    }
 
     db.recordIncidentEvent?.({
       incidentId: offer.incident_id, orgId: null, kind: status === 'accepted' ? 'responder-accepted' : 'responder-declined',
@@ -125,6 +132,9 @@ async function handle({ req, res, path }) {
     sendJson(res, 200, {
       offers: offers.map((o) => ({
         distanceM: o.distance_m, category: o.category, status: o.status,
+        // A push provider accepted a notification for this person (not proof
+        // their phone showed it). False means nobody has been reached yet.
+        reached: o.reached === true,
         notifiedAt: new Date(o.notified_at).getTime(),
       })),
     });

@@ -50,6 +50,8 @@ export interface OrgProfile {
   industry: string | null;
   address: string | null;
   country: string | null;
+  /** A rehearsal drill organisation (server scripts/drill.js). */
+  drill?: boolean;
 }
 
 export interface AuthUser {
@@ -687,7 +689,7 @@ export interface PersonalAlertResult {
   incidentId: string;
   /** `delivered` = email sent, or SMS accepted by the provider. Neither
    *  confirms the person read it. */
-  contacted: { id: string; name: string; delivered: boolean; email?: 'sent' | 'queued' | null; sms?: string | null }[];
+  contacted: { id: string; name: string; delivered: boolean; email?: 'sent' | 'queued' | 'refused' | 'failed' | null; sms?: string | null }[];
   skipped: { id: string; name: string; reason: 'no-email' }[];
   /** True when this exact incident id had already been recorded — a retry
    *  that actually landed the first time, replaying safely rather than
@@ -1175,7 +1177,9 @@ export async function respondToOffer(
 export interface IncidentOfferView {
   distanceM: number | null;
   category: string;
-  status: 'notified' | 'accepted' | 'declined';
+  status: 'notified' | 'accepted' | 'declined' | 'withdrawn';
+  /** A push provider accepted a notification for them; not proof their phone showed it. */
+  reached?: boolean;
   notifiedAt: number;
 }
 
@@ -1310,5 +1314,26 @@ export async function setWeeklyTips(on: boolean, token: string): Promise<{ weekl
 export async function fetchMyConsent(token: string): Promise<{ version: string | null; points: string[] }> {
   const res = await fetch(`${API_BASE}/api/consent/me`, { headers: authHeaders(token) });
   if (!res.ok) throw new Error(await errorMessage(res, 'could not check your terms'));
+  return res.json();
+}
+
+export interface PushTestResult {
+  at: number;
+  webPush: { sent: number; failed: number; error?: string; skipped?: string };
+  fcm: { sent: number; failed: number; error?: string; skipped?: string };
+}
+
+/**
+ * Ask the server to send a test notification to every device registered to
+ * this drill organisation (or this personal account). "sent" is what the push
+ * providers accepted, not proof that a phone showed it.
+ */
+export async function sendTestPush(creds: { token?: string; orgCode?: string }): Promise<PushTestResult> {
+  const res = await fetch(`${API_BASE}/api/push/test`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(creds.token) },
+    body: JSON.stringify(creds.orgCode ? { orgCode: creds.orgCode } : {}),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, 'could not send a test notification'));
   return res.json();
 }

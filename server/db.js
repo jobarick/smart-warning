@@ -288,6 +288,15 @@ async function init() {
     -- anyone else's live map, and the badge is shown only from this column.
     ALTER TABLE responders ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;
     ALTER TABLE responders ADD COLUMN IF NOT EXISTS verified_by TEXT;
+    -- Drill isolation for supervised rehearsals. A drill organisation's SOS
+    -- reaches only the responders tied to it ('drill_org_id'), and those
+    -- responders are reached by nothing else: no real SOS, no other
+    -- organisation, no live map. Both are set only by an operator
+    -- (scripts/drill.js, scripts/verify-responder.js --drill-org). No foreign
+    -- key on purpose: deleting the drill organisation must leave its test
+    -- responders isolated, never turn them into real ones.
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS is_drill BOOLEAN NOT NULL DEFAULT false;
+    ALTER TABLE responders ADD COLUMN IF NOT EXISTS drill_org_id UUID;
 
     -- "How did it go?" after an all-clear. One answer per person per incident;
     -- a second submission replaces the first rather than stacking up.
@@ -336,6 +345,10 @@ async function init() {
       notified_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
       responded_at  TIMESTAMPTZ
     );
+    -- When a push provider (web push or FCM) accepted at least one notification
+    -- for this offer. Provider acceptance, not proof the phone showed it; null
+    -- means nobody was reached, and the person's screen must not say otherwise.
+    ALTER TABLE incident_offers ADD COLUMN IF NOT EXISTS push_accepted_at TIMESTAMPTZ;
     CREATE INDEX IF NOT EXISTS incident_offers_incident_idx  ON incident_offers (incident_id);
     CREATE INDEX IF NOT EXISTS incident_offers_responder_idx ON incident_offers (responder_id, status);
 
@@ -944,6 +957,32 @@ async function handleReport({ id, orgId, status, handledBy, incidentId = null })
   return rows[0] || null;
 }
 
+/** True only for an organisation an operator marked as a rehearsal drill (scripts/drill.js). */
+async function isDrillOrg(orgId) {
+  if (!pool || !orgId) return false;
+  const { rows } = await pool.query(`SELECT is_drill FROM organizations WHERE id = $1`, [orgId]);
+  return rows[0]?.is_drill === true;
+}
+
+async function setOrgDrill({ orgId, on }) {
+  if (!pool) throw new Error('persistence disabled');
+  const { rows } = await pool.query(
+    `UPDATE organizations SET is_drill = $2::boolean WHERE id = $1 RETURNING id, name, is_drill`,
+    [orgId, on === true],
+  );
+  return rows[0] || null;
+}
+
+async function countDrillResponders(orgId) {
+  if (!pool) return { tied: 0, verified: 0 };
+  const { rows } = await pool.query(
+    `SELECT count(*)::int AS tied, count(*) FILTER (WHERE verified_at IS NOT NULL)::int AS verified
+       FROM responders WHERE drill_org_id = $1`,
+    [orgId],
+  );
+  return rows[0];
+}
+
 async function getOrgById(id) {
   if (!pool) return null;
   const { rows } = await pool.query(`SELECT * FROM organizations WHERE id = $1`, [id]);
@@ -1303,22 +1342,45 @@ async function getResponderStatus(userId) {
  * JS" split as listDirectoryNearby/places.js — see that function's comment
  * for why this is the right amount of geospatial engineering at this scale.
  */
-async function findNearbyResponders({ lat, lng, category, radiusM, freshnessMs, excludeUserId }) {
+async function findNearbyResponders({ lat, lng, category, radiusM, freshnessMs, excludeUserId, drillOrgId = null }) {
   if (!pool || !Number.isFinite(lat) || !Number.isFinite(lng)) return [];
-  const deg = radiusM / 111000;
+  // A coarse box first (cheap, index friendly), then the true distance below.
+  // East-west degrees shrink with latitude, so the longitude half-width is
+  // widened by 1/cos(lat) to cover the whole circle.
+  const latDeg = radiusM / 111195;
+  const lngDeg = latDeg / Math.max(Math.cos((lat * Math.PI) / 180), 0.01);
   const { rows } = await pool.query(
+    // verified_at: only responders a person has vetted (scripts/verify-responder.js)
+    // are ever offered an emergency, the same rule the live map uses. Opting in
+    // is open to any account; being sent someone's emergency must not be.
+    // $5 may be null (an organisation alert has nobody to leave out): compared
+    // with != it would match no row at all, so it is tested explicitly.
+    // $8: a real SOS ($8 null) reaches only responders outside every drill; a
+    // drill organisation's SOS reaches only that drill's own test responders.
     `SELECT * FROM responders
       WHERE is_available = true
-        AND user_id != $5
+        AND verified_at IS NOT NULL
+        AND drill_org_id IS NOT DISTINCT FROM $8::uuid
+        AND ($5::uuid IS NULL OR user_id <> $5::uuid)
         AND lat IS NOT NULL AND lng IS NOT NULL
         AND captured_at > now() - ($4 || ' milliseconds')::interval
         AND lat BETWEEN $1::double precision - $6::double precision AND $1::double precision + $6::double precision
-        AND lng BETWEEN $2::double precision - $6::double precision AND $2::double precision + $6::double precision
+        AND lng BETWEEN $2::double precision - $7::double precision AND $2::double precision + $7::double precision
         AND ($3 = ANY(categories) OR 'general' = ANY(categories))
       ORDER BY ($3 = ANY(categories)) DESC`,
-    [lat, lng, category, String(freshnessMs), excludeUserId, deg],
+    [lat, lng, category, String(freshnessMs), excludeUserId || null, latDeg, lngDeg, drillOrgId || null],
   );
-  return rows;
+  // Within the radius by great-circle distance, not merely inside the box
+  // (whose corners are about 1.4 times further away).
+  return rows.filter((r) => greatCircleM(lat, lng, Number(r.lat), Number(r.lng)) <= radiusM);
+}
+
+function greatCircleM(lat1, lng1, lat2, lng2) {
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371000 * Math.asin(Math.min(1, Math.sqrt(a)));
 }
 
 /** One offer row per notified candidate — see incident_offers' own comment. */
@@ -1342,7 +1404,15 @@ async function createIncidentOffers(offers) {
 async function listOffersForIncident(incidentId) {
   if (!pool) return [];
   const { rows } = await pool.query(
-    `SELECT * FROM incident_offers WHERE incident_id = $1 ORDER BY distance_m ASC NULLS LAST`,
+    // An accepted offer whose responder has since been revoked is reported as
+    // 'withdrawn', so the person's screen stops counting them as coming.
+    `SELECT o.id, o.incident_id, o.category, o.distance_m, o.notified_at, o.responded_at,
+            CASE WHEN o.status = 'accepted' AND r.verified_at IS NULL THEN 'withdrawn' ELSE o.status END AS status,
+            (o.push_accepted_at IS NOT NULL) AS reached
+       FROM incident_offers o
+       LEFT JOIN responders r ON r.user_id = o.responder_id
+      WHERE o.incident_id = $1
+      ORDER BY o.distance_m ASC NULLS LAST`,
     [incidentId],
   );
   return rows;
@@ -1354,12 +1424,29 @@ async function listOffersForIncident(incidentId) {
  * into a second acceptance, and a responder can't answer an offer that was
  * never theirs.
  */
+/** A push provider accepted a notification for this offer (first time wins). */
+async function markOfferPushAccepted(offerId) {
+  if (!pool) return null;
+  const { rows } = await pool.query(
+    `UPDATE incident_offers SET push_accepted_at = COALESCE(push_accepted_at, now()) WHERE id = $1 RETURNING push_accepted_at`,
+    [offerId],
+  );
+  return rows[0] || null;
+}
+
 async function respondToOffer({ offerId, responderId, status }) {
   if (!pool) throw new Error('persistence disabled');
   const { rows } = await pool.query(
-    `UPDATE incident_offers SET status = $3, responded_at = now()
-      WHERE id = $1 AND responder_id = $2 AND status = 'notified'
-      RETURNING *`,
+    // Declining is always allowed. Accepting needs the responder to be
+    // verified right now and the incident to be still open: otherwise a
+    // revoked responder, or an answer after the all-clear, would show the
+    // person in danger "Help is on the way" when no vetted helper is coming.
+    `UPDATE incident_offers o SET status = $3::text, responded_at = now()
+      WHERE o.id = $1 AND o.responder_id = $2 AND o.status = 'notified'
+        AND ($3::text = 'declined' OR (
+              EXISTS (SELECT 1 FROM responders r WHERE r.user_id = o.responder_id AND r.verified_at IS NOT NULL)
+          AND EXISTS (SELECT 1 FROM incidents i WHERE i.id = o.incident_id AND i.status = 'active')))
+      RETURNING o.*`,
     [offerId, responderId, status],
   );
   return rows[0] || null;
@@ -1383,6 +1470,7 @@ async function listMapResponders({ lat, lng, radiusM, seenWithinMs, excludeUserI
                        AND o.responded_at > now() - interval '60 minutes') AS busy
        FROM responders r
       WHERE r.verified_at IS NOT NULL
+        AND r.drill_org_id IS NULL
         AND r.user_id IS DISTINCT FROM $5::uuid
         AND r.lat IS NOT NULL AND r.lng IS NOT NULL
         AND r.captured_at > now() - ($4 || ' milliseconds')::interval
@@ -1394,13 +1482,17 @@ async function listMapResponders({ lat, lng, radiusM, seenWithinMs, excludeUserI
 }
 
 /** Marks a responder as checked by a person — see scripts/verify-responder.js. */
-async function verifyResponder({ userId, verifiedBy, revoke = false }) {
+// drill: undefined leaves the drill tie as it is, an org id ties the responder
+// to that drill, null releases them (they become reachable by real SOS).
+async function verifyResponder({ userId, verifiedBy, revoke = false, drill }) {
   if (!pool) throw new Error('persistence disabled');
   const { rows } = await pool.query(
     `UPDATE responders SET verified_at = CASE WHEN $3::boolean THEN NULL ELSE now() END,
-            verified_by = CASE WHEN $3::boolean THEN NULL ELSE $2::text END, updated_at = now()
+            verified_by = CASE WHEN $3::boolean THEN NULL ELSE $2::text END,
+            drill_org_id = CASE WHEN $4::boolean THEN $5::uuid ELSE drill_org_id END,
+            updated_at = now()
       WHERE user_id = $1 RETURNING *`,
-    [userId, verifiedBy ?? null, revoke === true],
+    [userId, verifiedBy ?? null, revoke === true, drill !== undefined, drill || null],
   );
   return rows[0] || null;
 }
@@ -1414,11 +1506,15 @@ async function listMyOffers(responderId, withinMs = 6 * 60 * 60 * 1000) {
   if (!pool) return [];
   const { rows } = await pool.query(
     `SELECT o.id, o.incident_id, o.category, o.distance_m, o.status, o.notified_at, o.responded_at,
-            CASE WHEN o.status = 'accepted' THEN i.lat END AS lat,
-            CASE WHEN o.status = 'accepted' THEN i.lng END AS lng,
+            -- Where to go: only for an offer this responder accepted, while they
+            -- are still verified and the incident is still open. Revoking a
+            -- responder, or the all-clear, stops showing the person's location.
+            CASE WHEN o.status = 'accepted' AND r.verified_at IS NOT NULL AND i.status = 'active' THEN i.lat END AS lat,
+            CASE WHEN o.status = 'accepted' AND r.verified_at IS NOT NULL AND i.status = 'active' THEN i.lng END AS lng,
             i.status AS incident_status
        FROM incident_offers o
        LEFT JOIN incidents i ON i.id = o.incident_id
+       LEFT JOIN responders r ON r.user_id = o.responder_id
       WHERE o.responder_id = $1 AND o.notified_at > now() - ($2 || ' milliseconds')::interval
       ORDER BY o.notified_at DESC
       LIMIT 20`,
@@ -2801,6 +2897,9 @@ module.exports = {
   getOrgByCode,
   getOrgByPublicCode,
   getOrgById,
+  isDrillOrg,
+  setOrgDrill,
+  countDrillResponders,
   listDestinations,
   listAllDestinations,
   createDestination,
@@ -2865,6 +2964,7 @@ module.exports = {
   createIncidentOffers,
   listOffersForIncident,
   respondToOffer,
+  markOfferPushAccepted,
   listMapResponders,
   verifyResponder,
   listMyOffers,

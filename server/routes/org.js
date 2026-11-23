@@ -49,7 +49,7 @@ async function handle({ req, res, path }) {
     // Turn out anyone still connected: their org no longer exists, and the
     // relay must not keep a room alive for a deleted account.
     relay.closeOrgClients(ctx.orgId, 4003, 'organization deleted');
-    console.warn(`[!] organization ${ctx.orgId} ("${org.name}") deleted by ${ctx.user?.email || 'a supervisor'}: ${JSON.stringify(removed)}`);
+    console.warn(`[!] organization ${ctx.orgId} ("${org.name}") deleted by ${ctx.user?.id ? `user ${ctx.user.id}` : 'a supervisor'}: ${JSON.stringify(removed)}`);
     sendJson(res, 200, { ok: true, deleted: removed });
     return true;
   }

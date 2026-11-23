@@ -79,6 +79,23 @@ Variables tab: `DATABASE_URL` (Supabase's pooled connection string),
 `JWT_SECRET`, `VAPID_*`, `SMTP_URL`, `SMTP_FROM`, `FIREBASE_SERVICE_ACCOUNT`,
 `APP_URL`. Payment and routing keys are optional (see the table below).
 
+### Plan, usage and deadline (owner, in the Railway dashboard)
+
+Nobody without the account can see these; do not assume them. Check:
+
+1. **Plan:** railway.com, then your avatar (top right), **Account Settings**, then **Plans** (or **Billing**). Note whether it says Trial, Free, Hobby or Pro.
+2. **Credit and deadline:** on the same page, the remaining credit and any trial end date. Free gives $1 of credit a month; Trial is a one-time $5 grant. When credit reaches zero, Railway stops the service, which stops SOS delivery.
+3. **Usage:** project `smart-warning`, then **Usage** (or **Observability**). Note the cost so far this month and the projection, and memory and CPU of the `smart-warning` service.
+4. **App sleeping must be OFF:** service `smart-warning`, **Settings**, then **Serverless / App Sleeping**. A sleeping service drops every WebSocket, so phones stop hearing alarms.
+5. **Health check:** in the same Settings, under **Deploy**, the healthcheck path should read `/api/health`, and the restart policy should be "On failure".
+6. **Decide:** Hobby is $5 a month and includes $5 of usage (docs.railway.com, checked 2026-10-16). Upgrading is the owner's decision; nothing has been changed.
+
+### Operational risks to know
+
+- **One instance, one region (EU West).** A crash or a redeploy drops every connection for the few seconds it takes to restart; phones reconnect and replay unsent messages.
+- **Live-alert state is in memory.** The relay's "active alert" (shown to coordinators who open the dashboard late) and "on the way" status are lost on any redeploy or restart. The incident itself is safe in Postgres. **Do not merge to `main` while an emergency is live:** check the dashboard, or `GET /api/incidents` as a coordinator, first.
+- **Database on Supabase.** If Supabase is down, phones that are already connected still hear alarms over the relay, but joining a site, signing in, history, push lists and mail stop. `/api/ready` then returns 503 and the uptime monitor (docs/MONITORING_SETUP.md) alerts.
+
 Railway's edge sets `X-Forwarded-For` itself, which is what the per-IP rate
 limiters use. Do **not** set `TRUST_CLOUDFLARE_IP` here: Railway passes a
 client-sent `CF-Connecting-IP` straight through.

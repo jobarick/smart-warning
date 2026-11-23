@@ -24,6 +24,23 @@ const providers = require('./providers');
 const FEEDBACK_TO = process.env.FEEDBACK_TO || 'jobarick@gmail.com';
 const FROM = process.env.SMTP_FROM || 'Smart Warning <no-reply@smart-warning.app>';
 
+// Test senders that only deliver to the mail account's own owner. Resend's
+// onboarding@resend.dev accepts a message for anyone else and then refuses it,
+// so a Trusted Circle email to a family member would never arrive.
+const TEST_SENDER_DOMAINS = ['resend.dev'];
+
+/**
+ * The sending domain, and whether it is a test sender. Public on /api/health:
+ * the domain is in the From line of every email the app sends anyway, and it
+ * lets anyone check from outside that real recipients can be reached.
+ */
+function senderInfo(from = FROM) {
+  const match = String(from || '').match(/@([A-Za-z0-9.-]+)>?\s*$/);
+  const domain = match ? match[1].toLowerCase() : null;
+  const testSender = !!domain && TEST_SENDER_DOMAINS.some((d) => domain === d || domain.endsWith(`.${d}`));
+  return { domain, testSender };
+}
+
 /** How often the backlog is swept. */
 const DRAIN_INTERVAL_MS = 60_000;
 /** Per-attempt backoff, doubling, capped so a long outage still retries hourly. */
@@ -96,6 +113,9 @@ function queueSnapshot() {
 function init({ env = process.env, provider: override = null } = {}) {
   provider = override || providers.fromEnv(env, { from: FROM });
   console.log(`[mail] provider: ${provider.name} — ${provider.describe()}`);
+  if (senderInfo().testSender) {
+    console.warn(`[mail] SMTP_FROM uses the test sender domain ${senderInfo().domain}: mail to anyone but the mail account's owner will be refused. Verify a domain with the mail provider and set SMTP_FROM to an address on it.`);
+  }
   if (!drainTimer && db.enabled()) {
     drainTimer = setInterval(() => {
       drain()
@@ -133,7 +153,9 @@ const backoffFor = (attempts) => Math.min(BASE_BACKOFF_MS * 2 ** Math.max(0, att
 /**
  * Queue a message and try it immediately.
  *
- * @returns {Promise<{queued: boolean, delivered: boolean}>} `delivered` is only
+ * @returns {Promise<{queued: boolean, delivered: boolean, refused?: boolean}>} `refused` is true
+ * when the provider permanently refused the message (5xx): it is not retried,
+ * so it must never be described as queued. `delivered` is only
  * ever true when a provider actually accepted the message — callers surface
  * this to the user, so it must never be optimistic.
  */
@@ -149,7 +171,7 @@ async function send({ to = FEEDBACK_TO, replyTo = null, subject, body, kind = 'g
     } catch (e) {
       recordMailFailure(e);
       console.error(`[mail] ${kind} not delivered (${e.code || 'no code'}): ${e.message}`);
-      return { queued: false, delivered: false };
+      return { queued: false, delivered: false, refused: e.permanent === true };
     }
   }
 
@@ -171,8 +193,9 @@ async function send({ to = FEEDBACK_TO, replyTo = null, subject, body, kind = 'g
       permanent: e.permanent === true,
     });
     recordMailFailure(e);
-    console.error(`[mail] ${kind} queued but not delivered (${e.code || 'no code'}): ${e.message}`);
-    return { queued: true, delivered: false };
+    const refused = e.permanent === true;
+    console.error(`[mail] ${kind} ${refused ? 'refused by the provider, not retried' : 'queued but not delivered'} (${e.code || 'no code'}): ${e.message}`);
+    return { queued: !refused, delivered: false, refused };
   }
 }
 
@@ -327,6 +350,7 @@ module.exports = {
   drain,
   stats,
   queueSnapshot,
+  senderInfo,
   sendFeedback,
   sendEmergencyReport,
   providers,

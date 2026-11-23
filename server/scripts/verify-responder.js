@@ -9,6 +9,14 @@
 // Usage (from server/, with DATABASE_URL set):
 //   node scripts/verify-responder.js --email asha@example.com --by "ID checked by J. Mushi 2026-10-13"
 //   node scripts/verify-responder.js --email asha@example.com --revoke
+//
+// Rehearsal test responders (docs/PILOT_PLAN.md section 9): tie them to the
+// drill organisation so only its SOS can reach them, and no real SOS ever does.
+//   node scripts/verify-responder.js --email tester@example.com --by "..." --drill-org <join code>
+//   node scripts/verify-responder.js --email tester@example.com --revoke
+//   node scripts/verify-responder.js --email tester@example.com --revoke --release-drill
+// Revoking keeps the drill tie, so a revoked tester stays isolated even if
+// someone verifies them again later; --release-drill removes it.
 const db = require('../db');
 
 function parseArgs(argv) {
@@ -32,12 +40,25 @@ async function main() {
   await db.init();
   const user = await db.getUserByEmail(String(args.email));
   if (!user) { console.error(`no account with email ${args.email}`); process.exit(1); }
-  const row = await db.verifyResponder({ userId: user.id, verifiedBy: args.by || null, revoke: args.revoke === true });
+  if (args['drill-org'] && args['release-drill']) { console.error('--drill-org and --release-drill cannot be used together'); process.exit(1); }
+  let drill;
+  if (args['drill-org']) {
+    const org = await db.getOrgByCode(String(args['drill-org']));
+    if (!org) { console.error(`no organisation with join code ${args['drill-org']}`); process.exit(1); }
+    if (!org.is_drill) { console.error(`${org.name} is not a drill: run scripts/drill.js --org ${args['drill-org']} --on first`); process.exit(1); }
+    drill = org.id;
+  } else if (args['release-drill']) {
+    drill = null;
+  }
+  const row = await db.verifyResponder({ userId: user.id, verifiedBy: args.by || null, revoke: args.revoke === true, drill });
   if (!row) {
     console.error('that account has never opted in to Nearby Help, so there is nothing to verify yet');
     process.exit(1);
   }
-  console.log(args.revoke ? 'Revoked:' : 'Verified:', { user: user.email, verifiedAt: row.verified_at, verifiedBy: row.verified_by });
+  console.log(args.revoke ? 'Revoked:' : 'Verified:', {
+    user: user.email, verifiedAt: row.verified_at, verifiedBy: row.verified_by,
+    drill: row.drill_org_id ? 'test responder (drill only)' : 'real responder',
+  });
   process.exit(0);
 }
 
